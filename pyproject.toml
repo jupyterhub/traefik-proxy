@@ -1,0 +1,10 @@
+[tool.black]
+exclude = '''
+/(
+  .git
+| build
+| dist
+| _version\.py
+| versioneer\.py
+)
+'''
