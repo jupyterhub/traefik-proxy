@@ -1,0 +1,25 @@
+language: python
+sudo: false
+cache:
+  - pip
+python:
+  - 3.6
+env:
+  global:
+    - ASYNC_TEST_TIMEOUT=15
+
+# installing dependencies
+before_install:
+  - pip install --upgrade setuptools pip
+  - pip install --pre -r dev-requirements.txt
+install:
+  - pip install --pre -r dev-requirements.txt .
+  # TODO: setup etcd
+  - pip freeze
+
+# running tests
+script:
+  - pytest -v
+after_success:
+  - codecov
+
