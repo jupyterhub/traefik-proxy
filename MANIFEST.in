@@ -1,0 +1,2 @@
+include versioneer.py
+include jupyterhub_traefik_proxy/_version.py
