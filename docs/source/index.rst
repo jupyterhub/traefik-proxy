@@ -3,14 +3,19 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to JupyterHub Traefik Proxy's documentation!
-====================================================
+JupyterHub Traefik Proxy
+========================
+
+An implementation of the JupyterHub proxy api with `traefik <https://traefik.io>`__
+
+Version: |version|
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
    api/index
+   changelog
 
 
 
