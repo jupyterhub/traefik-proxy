@@ -34,8 +34,6 @@ docs = os.path.abspath(
 )
 # add sphinxext
 sys.path.append(os.path.join(docs, 'sphinxext'))
-# add repo root
-sys.path.append(os.path.dirname(docs))
 
 import jupyterhub_traefik_proxy
 
