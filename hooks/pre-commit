@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -e
+# ensure lang is defined
+export LANG=${LANG:-en_US.UTF-8}
+
 if ! which black 2>&1 > /dev/null; then
   echo "missing black, skipping autoformatting" >&2
   exit 0
