@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+hooks="$(dirname $0)"
+githooks="$hooks/../.git/hooks"
+
+cp -v $hooks/pre-commit $githooks/pre-commit
