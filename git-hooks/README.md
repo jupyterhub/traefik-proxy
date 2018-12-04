@@ -7,6 +7,6 @@ so you don't have to worry about code formatting.
 
 Install it with:
 
-./hooks/install
+./git-hooks/install
 
 from the root of the repo.
