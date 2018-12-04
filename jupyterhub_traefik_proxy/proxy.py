@@ -27,6 +27,7 @@ from subprocess import Popen
 
 from jupyterhub.proxy import Proxy
 
+
 class TraefikProxy(Proxy):
     """JupyterHub Proxy implementation using traefik"""
 
@@ -38,16 +39,16 @@ class TraefikProxy(Proxy):
 
     def _setup_etcd(self):
         print("Seting up etcd...")
-        self.client.put(self.prefix + '/debug', 'true')
-        self.client.put(self.prefix + '/defaultentrypoints/0', 'http')
-        self.client.put(self.prefix + '/entrypoints/http/address', ':8000')
-        self.client.put(self.prefix + '/api/dashboard', 'true')
-        self.client.put(self.prefix + '/api/entrypoint', 'http')
-        self.client.put(self.prefix + '/loglevel', 'ERROR')
-        self.client.put(self.prefix + '/etcd/endpoint', '127.0.0.1:2379')
-        self.client.put(self.prefix + '/etcd/prefix', self.prefix)
-        self.client.put(self.prefix + '/etcd/useapiv3', 'true')
-        self.client.put(self.prefix + '/etcd/watch', 'true')
+        self.client.put(self.prefix + "/debug", "true")
+        self.client.put(self.prefix + "/defaultentrypoints/0", "http")
+        self.client.put(self.prefix + "/entrypoints/http/address", ":8000")
+        self.client.put(self.prefix + "/api/dashboard", "true")
+        self.client.put(self.prefix + "/api/entrypoint", "http")
+        self.client.put(self.prefix + "/loglevel", "ERROR")
+        self.client.put(self.prefix + "/etcd/endpoint", "127.0.0.1:2379")
+        self.client.put(self.prefix + "/etcd/prefix", self.prefix)
+        self.client.put(self.prefix + "/etcd/useapiv3", "true")
+        self.client.put(self.prefix + "/etcd/watch", "true")
 
     def _create_backend_alias_from_url(self, url):
         target = urlparse(url)
@@ -58,16 +59,16 @@ class TraefikProxy(Proxy):
         return "jupyterhub_frontend_" + target.netloc
 
     def _create_backend_url_path(self, backend_alias):
-        return self.prefix + '/backends/' + backend_alias + "/servers/server1/url"
+        return self.prefix + "/backends/" + backend_alias + "/servers/server1/url"
 
     def _create_backend_weight_path(self, backend_alias):
-        return self.prefix + '/backends/' + backend_alias + "/servers/server1/weight"
+        return self.prefix + "/backends/" + backend_alias + "/servers/server1/weight"
 
     def _create_frontend_backend_path(self, frontend_alias):
-        return self.prefix + '/frontends/' + frontend_alias + "/backend"
+        return self.prefix + "/frontends/" + frontend_alias + "/backend"
 
     def _create_frontend_rule_path(self, frontend_alias):
-        return self.prefix + '/frontends/' + frontend_alias + "/routes/test/rule"
+        return self.prefix + "/frontends/" + frontend_alias + "/routes/test/rule"
 
     async def start(self):
         """Start the proxy.
@@ -78,7 +79,7 @@ class TraefikProxy(Proxy):
         if the proxy is to be started by the Hub
         """
 
-        #TODO check if there is another proxy process running
+        # TODO check if there is another proxy process running
         self.traefik = Popen(["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None)
         # raise NotImplementedError()
 
@@ -94,7 +95,6 @@ class TraefikProxy(Proxy):
 
         print(self.traefik.kill())
         print(self.traefik.wait())
-
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
@@ -124,14 +124,13 @@ class TraefikProxy(Proxy):
 
         self.client.put(self.jupyterhub_prefix + routespec, target)
         # To be able to delete the route when routespec is provided
-        encoded_data = data=json.dumps(data)
+        encoded_data = data = json.dumps(data)
         self.client.put(target, encoded_data)
         # Store the data dict passed in by JupyterHub
         self.client.put(backend_url_path, target)
         self.client.put(backend_weight_path, "1")
         self.client.put(frontend_backend_path, backend_alias)
         self.client.put(frontend_rule_path, "PathPrefix:" + routespec)
-
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
@@ -147,8 +146,8 @@ class TraefikProxy(Proxy):
         backend_alias = self._create_backend_alias_from_url(target)
         frontend_alias = self._create_frontend_alias_from_url(target)
 
-        self.client.delete_prefix(self.prefix + '/backends/' + backend_alias)
-        self.client.delete_prefix(self.prefix + '/frontends/' + frontend_alias)
+        self.client.delete_prefix(self.prefix + "/backends/" + backend_alias)
+        self.client.delete_prefix(self.prefix + "/frontends/" + frontend_alias)
 
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
@@ -173,11 +172,7 @@ class TraefikProxy(Proxy):
 
             value, _ = self.client.get(target)
             data = value.decode()
-            partial_res = {
-                "routespec": routespec,
-                "target": target,
-                "data": data
-            }
+            partial_res = {"routespec": routespec, "target": target, "data": data}
 
             result[routespec] = partial_res
         return result
@@ -207,10 +202,6 @@ class TraefikProxy(Proxy):
         target = value.decode()
         value, _ = self.client.get(target)
         data = value.decode()
-        result = {
-            "routespec": routespec,
-            "target": target,
-            "data": data
-        }
+        result = {"routespec": routespec, "target": target, "data": data}
 
         return result

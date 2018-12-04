@@ -19,7 +19,7 @@ async def test_add_route(proxy):
 async def test_get_all_routes(proxy):
     # with pytest.raises(NotImplementedError):
     routes = await proxy.get_all_routes()
-    print(json.dumps(routes, sort_keys=True, indent=4, separators=(',', ': ')))
+    print(json.dumps(routes, sort_keys=True, indent=4, separators=(",", ": ")))
     await proxy.stop()
     # TODO: test the routes
 
@@ -33,6 +33,6 @@ async def test_delete_route(proxy):
 async def test_get_route(proxy):
     # with pytest.raises(NotImplementedError):
     route = await proxy.get_route("/prefix")
-    print(json.dumps(route, sort_keys=True, indent=4, separators=(',', ': ')))
+    print(json.dumps(route, sort_keys=True, indent=4, separators=(",", ": ")))
     await proxy.stop()
     # TODO: test the route
