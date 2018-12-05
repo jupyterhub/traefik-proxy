@@ -21,9 +21,12 @@ Route Specification:
 import asyncio
 import json
 import etcd3
+import os
 
 from urllib.parse import urlparse
 from subprocess import Popen
+
+from traitlets import Any, Unicode
 
 from jupyterhub.proxy import Proxy
 
@@ -31,24 +34,29 @@ from jupyterhub.proxy import Proxy
 class TraefikProxy(Proxy):
     """JupyterHub Proxy implementation using traefik"""
 
+    traefik = Any()
     client = etcd3.client("127.0.0.1", 2379)
+
     traefik_port = 8000
-    traefik = None
-    prefix = "/traefik"
+    traefik_prefix = "/traefik"
     jupyterhub_prefix = "/jupyterhub"
+    command = "traefik"
 
     def _setup_etcd(self):
-        print("Seting up etcd...")
-        self.client.put(self.prefix + "/debug", "true")
-        self.client.put(self.prefix + "/defaultentrypoints/0", "http")
-        self.client.put(self.prefix + "/entrypoints/http/address", ":8000")
-        self.client.put(self.prefix + "/api/dashboard", "true")
-        self.client.put(self.prefix + "/api/entrypoint", "http")
-        self.client.put(self.prefix + "/loglevel", "ERROR")
-        self.client.put(self.prefix + "/etcd/endpoint", "127.0.0.1:2379")
-        self.client.put(self.prefix + "/etcd/prefix", self.prefix)
-        self.client.put(self.prefix + "/etcd/useapiv3", "true")
-        self.client.put(self.prefix + "/etcd/watch", "true")
+        self.log.info("Seting up etcd...")
+        self.client.put(self.traefik_prefix + "/debug", "true")
+        self.client.put(self.traefik_prefix + "/defaultentrypoints/0", "http")
+        self.client.put(
+            self.traefik_prefix + "/entrypoints/http/address",
+            ":" + str(self.traefik_port),
+        )
+        self.client.put(self.traefik_prefix + "/api/dashboard", "true")
+        self.client.put(self.traefik_prefix + "/api/entrypoint", "http")
+        self.client.put(self.traefik_prefix + "/loglevel", "ERROR")
+        self.client.put(self.traefik_prefix + "/etcd/endpoint", "127.0.0.1:2379")
+        self.client.put(self.traefik_prefix + "/etcd/prefix", self.traefik_prefix)
+        self.client.put(self.traefik_prefix + "/etcd/useapiv3", "true")
+        self.client.put(self.traefik_prefix + "/etcd/watch", "true")
 
     def _create_backend_alias_from_url(self, url):
         target = urlparse(url)
@@ -59,16 +67,25 @@ class TraefikProxy(Proxy):
         return "jupyterhub_frontend_" + target.netloc
 
     def _create_backend_url_path(self, backend_alias):
-        return self.prefix + "/backends/" + backend_alias + "/servers/server1/url"
+        return (
+            self.traefik_prefix + "/backends/" + backend_alias + "/servers/server1/url"
+        )
 
     def _create_backend_weight_path(self, backend_alias):
-        return self.prefix + "/backends/" + backend_alias + "/servers/server1/weight"
+        return (
+            self.traefik_prefix
+            + "/backends/"
+            + backend_alias
+            + "/servers/server1/weight"
+        )
 
     def _create_frontend_backend_path(self, frontend_alias):
-        return self.prefix + "/frontends/" + frontend_alias + "/backend"
+        return self.traefik_prefix + "/frontends/" + frontend_alias + "/backend"
 
     def _create_frontend_rule_path(self, frontend_alias):
-        return self.prefix + "/frontends/" + frontend_alias + "/routes/test/rule"
+        return (
+            self.traefik_prefix + "/frontends/" + frontend_alias + "/routes/test/rule"
+        )
 
     async def start(self):
         """Start the proxy.
@@ -78,10 +95,20 @@ class TraefikProxy(Proxy):
         **Subclasses must define this method**
         if the proxy is to be started by the Hub
         """
-
-        # TODO check if there is another proxy process running
-        self.traefik = Popen(["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None)
-        # raise NotImplementedError()
+        # TODO: investigate deploying a traefik cluster instead of a single instance!
+        self.log.info("Starting %s proxy...", self.command)
+        self._setup_etcd()
+        try:
+            self.traefik = Popen(
+                [self.command, "--etcd", "--etcd.useapiv3=true"], stdout=None
+            )
+        except FileNotFoundError as e:
+            self.log.error(
+                "Failed to find proxy %s\n"
+                "The proxy can be downloaded from https://github.com/containous/traefik/releases/download."
+                % self.command
+            )
+            raise
 
     async def stop(self):
         """Stop the proxy.
@@ -91,10 +118,8 @@ class TraefikProxy(Proxy):
         **Subclasses must define this method**
         if the proxy is to be started by the Hub
         """
-        # raise NotImplementedError()
-
-        print(self.traefik.kill())
-        print(self.traefik.wait())
+        self.log.info("Cleaning up proxy[%i]...", self.traefik.pid)
+        self.traefik.kill()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
@@ -115,6 +140,8 @@ class TraefikProxy(Proxy):
         route came from JupyterHub.
         """
 
+        self.log.info("Adding route for %s to %s.", routespec, target)
+
         backend_alias = self._create_backend_alias_from_url(target)
         backend_url_path = self._create_backend_url_path(backend_alias)
         backend_weight_path = self._create_backend_weight_path(backend_alias)
@@ -122,15 +149,36 @@ class TraefikProxy(Proxy):
         frontend_backend_path = self._create_frontend_backend_path(frontend_alias)
         frontend_rule_path = self._create_frontend_rule_path(frontend_alias)
 
-        self.client.put(self.jupyterhub_prefix + routespec, target)
         # To be able to delete the route when routespec is provided
+        if routespec.startswith("/"):
+            self.client.put(self.jupyterhub_prefix + routespec, target)
+        else:
+            self.client.put(self.jupyterhub_prefix + "/" + routespec, target)
+        # Store the data dict passed in by JupyterHub
         encoded_data = data = json.dumps(data)
         self.client.put(target, encoded_data)
-        # Store the data dict passed in by JupyterHub
+
+        self.log.info("Adding backend %s with the alias.", target, backend_alias)
         self.client.put(backend_url_path, target)
         self.client.put(backend_weight_path, "1")
+
+        self.log.info(
+            "Adding frontend %s for backend %s with the following routing rule %s.",
+            frontend_alias,
+            backend_alias,
+            routespec,
+        )
         self.client.put(frontend_backend_path, backend_alias)
-        self.client.put(frontend_rule_path, "PathPrefix:" + routespec)
+        if routespec.startswith("/"):
+            # Path-based route, e.g. /proxy/path/
+            rule = "PathPrefix:" + routespec
+        else:
+            # Host-based routing, e.g. host.tld/proxy/path/
+            host, path_prefix = routespec.split("/", 1)
+            path_prefix = "/" + path_prefix
+            rule = "Host:" + host + ";PathPrefix:" + path_prefix
+
+        self.client.put(frontend_rule_path, rule)
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
@@ -138,16 +186,29 @@ class TraefikProxy(Proxy):
         **Subclasses must define this method**
         """
         value, _ = self.client.get(self.jupyterhub_prefix + routespec)
-        target = value.decode()
+        if value is None:
+            self.log.warning("Route %s doesn't exist. Nothing to delete", routespec)
+            return
 
-        self.client.delete(self.jupyterhub_prefix + routespec)
-        self.client.delete(target)
+        target = value.decode()
+        rc = self.client.delete(self.jupyterhub_prefix + routespec)
+        if rc is False:
+            self.log.error("Couldn't delete %s.", routespec)
+        rc = self.client.delete(target)
+        if rc is False:
+            self.log.error("Couldn't delete %s.", routespec)
 
         backend_alias = self._create_backend_alias_from_url(target)
         frontend_alias = self._create_frontend_alias_from_url(target)
 
-        self.client.delete_prefix(self.prefix + "/backends/" + backend_alias)
-        self.client.delete_prefix(self.prefix + "/frontends/" + frontend_alias)
+        self.log.info(
+            'Deleting %s and %s associated with the the routespec "%s".',
+            frontend_alias,
+            backend_alias,
+            routespec,
+        )
+        self.client.delete_prefix(self.traefik_prefix + "/backends/" + backend_alias)
+        self.client.delete_prefix(self.traefik_prefix + "/frontends/" + frontend_alias)
 
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
@@ -164,18 +225,27 @@ class TraefikProxy(Proxy):
             'data': the attached data dict for this route (as specified in add_route)
           }
         """
-        result = {}
+        all_routes = {}
         routes = self.client.get_prefix(self.jupyterhub_prefix)
+
         for value, metadata in routes:
+            # Strip the "/jupyterhub" prefix from the routespec
             routespec = metadata.key.decode().replace(self.jupyterhub_prefix, "")
             target = value.decode()
 
             value, _ = self.client.get(target)
-            data = value.decode()
-            partial_res = {"routespec": routespec, "target": target, "data": data}
+            if value is None:
+                data = None
+            else:
+                data = value.decode()
 
-            result[routespec] = partial_res
-        return result
+            all_routes[routespec] = {
+                "routespec": routespec,
+                "target": target,
+                "data": data,
+            }
+
+        return all_routes
 
     async def get_route(self, routespec):
         """Return the route info for a given routespec.
@@ -199,9 +269,14 @@ class TraefikProxy(Proxy):
         """
 
         value, _ = self.client.get(self.jupyterhub_prefix + routespec)
+        if value == None:
+            return None
         target = value.decode()
         value, _ = self.client.get(target)
-        data = value.decode()
-        result = {"routespec": routespec, "target": target, "data": data}
+        if value is None:
+            data = None
+        else:
+            data = value.decode()
 
+        result = {"routespec": routespec, "target": target, "data": data}
         return result
