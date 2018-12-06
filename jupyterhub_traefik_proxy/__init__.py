@@ -1,6 +1,7 @@
 """Traefik implementation of the JupyterHub proxy API"""
 
 from .proxy import TraefikProxy  # noqa
+from .etcd import TraefikEtcdProxy
 
 from ._version import get_versions
 
