@@ -30,6 +30,6 @@ install:
 
 # running tests
 script:
-  - pytest -v
+  - pytest -v -s
 after_success:
   - codecov
