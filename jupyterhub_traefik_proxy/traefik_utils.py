@@ -15,9 +15,6 @@ _ports = {
     "second_backend": 9099,
 }
 
-traefik_prefix = "/traefik"
-jupyterhub_prefix = "/jupyterhub/"
-
 
 def get_port(service_name):
     return _ports[service_name]
@@ -154,17 +151,26 @@ def create_frontend_alias_from_url(url):
     return "jupyterhub_frontend_" + target.netloc
 
 
-def create_backend_url_path(backend_alias):
-    return traefik_prefix + "/backends/" + backend_alias + "/servers/server1/url"
+def create_backend_url_path(proxy, backend_alias):
+    return (
+        proxy.etcd_traefik_prefix + "backends/" + backend_alias + "/servers/server1/url"
+    )
 
 
-def create_backend_weight_path(backend_alias):
-    return traefik_prefix + "/backends/" + backend_alias + "/servers/server1/weight"
+def create_backend_weight_path(proxy, backend_alias):
+    return (
+        proxy.etcd_traefik_prefix
+        + "backends/"
+        + backend_alias
+        + "/servers/server1/weight"
+    )
 
 
-def create_frontend_backend_path(frontend_alias):
-    return traefik_prefix + "/frontends/" + frontend_alias + "/backend"
+def create_frontend_backend_path(proxy, frontend_alias):
+    return proxy.etcd_traefik_prefix + "frontends/" + frontend_alias + "/backend"
 
 
-def create_frontend_rule_path(frontend_alias):
-    return traefik_prefix + "/frontends/" + frontend_alias + "/routes/test/rule"
+def create_frontend_rule_path(proxy, frontend_alias):
+    return (
+        proxy.etcd_traefik_prefix + "frontends/" + frontend_alias + "/routes/test/rule"
+    )

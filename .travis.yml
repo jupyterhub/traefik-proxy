@@ -16,9 +16,6 @@ before_install:
 install:
   - pip install --pre -r dev-requirements.txt .
   - pip install pytest-travis-fold
-  - pip install requests
-  - pip install etcd3
-  - pip install asyncio
   - wget https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64
   - sudo chmod +x traefik_linux-amd64
   - sudo ln -s -T `pwd`/traefik_linux-amd64 /usr/local/bin/traefik

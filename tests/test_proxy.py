@@ -8,7 +8,7 @@ import sys
 from jupyterhub_traefik_proxy import traefik_utils
 import asyncio
 
-# mark all tests in this file as asyncio
+# Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
 
 etcdctl_path = abspath(
@@ -45,14 +45,16 @@ def assert_etcdctl_del(key, expected_rv):
     )
 
 
-def cleanup_test_route(routespec, target, data):
-    jupyterhub_routespec = traefik_utils.jupyterhub_prefix + routespec
+def cleanup_test_route(proxy, routespec, target, data):
+    jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
     backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_url_path = traefik_utils.create_backend_url_path(backend_alias)
-    backend_weight_path = traefik_utils.create_backend_weight_path(backend_alias)
+    backend_url_path = traefik_utils.create_backend_url_path(proxy, backend_alias)
+    backend_weight_path = traefik_utils.create_backend_weight_path(proxy, backend_alias)
     frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
-    frontend_backend_path = traefik_utils.create_frontend_backend_path(frontend_alias)
-    frontend_rule_path = traefik_utils.create_frontend_rule_path(frontend_alias)
+    frontend_backend_path = traefik_utils.create_frontend_backend_path(
+        proxy, frontend_alias
+    )
+    frontend_rule_path = traefik_utils.create_frontend_rule_path(proxy, frontend_alias)
     expected_rv = "1"  # Number of deleted entries
 
     assert_etcdctl_del(jupyterhub_routespec, expected_rv)
@@ -63,14 +65,16 @@ def cleanup_test_route(routespec, target, data):
     assert_etcdctl_del(frontend_rule_path, expected_rv)
 
 
-def add_route_with_etcdctl(routespec, target, data):
-    jupyterhub_routespec = traefik_utils.jupyterhub_prefix + routespec
+def add_route_with_etcdctl(proxy, routespec, target, data):
+    jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
     backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_url_path = traefik_utils.create_backend_url_path(backend_alias)
-    backend_weight_path = traefik_utils.create_backend_weight_path(backend_alias)
+    backend_url_path = traefik_utils.create_backend_url_path(proxy, backend_alias)
+    backend_weight_path = traefik_utils.create_backend_weight_path(proxy, backend_alias)
     frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
-    frontend_backend_path = traefik_utils.create_frontend_backend_path(frontend_alias)
-    frontend_rule_path = traefik_utils.create_frontend_rule_path(frontend_alias)
+    frontend_backend_path = traefik_utils.create_frontend_backend_path(
+        proxy, frontend_alias
+    )
+    frontend_rule_path = traefik_utils.create_frontend_rule_path(proxy, frontend_alias)
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
         rule = "PathPrefix:" + routespec
@@ -89,15 +93,17 @@ def add_route_with_etcdctl(routespec, target, data):
     assert_etcdctl_put(frontend_rule_path, rule, expected_rv)
 
 
-def check_route_with_etcdl(routespec, target, data, test_deletion=False):
-    jupyterhub_routespec = traefik_utils.jupyterhub_prefix + routespec
+def check_route_with_etcdctl(proxy, routespec, target, data, test_deletion=False):
+    jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
     backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_url_path = traefik_utils.create_backend_url_path(backend_alias)
+    backend_url_path = traefik_utils.create_backend_url_path(proxy, backend_alias)
     backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_weight_path = traefik_utils.create_backend_weight_path(backend_alias)
+    backend_weight_path = traefik_utils.create_backend_weight_path(proxy, backend_alias)
     frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
-    frontend_backend_path = traefik_utils.create_frontend_backend_path(frontend_alias)
-    frontend_rule_path = traefik_utils.create_frontend_rule_path(frontend_alias)
+    frontend_backend_path = traefik_utils.create_frontend_backend_path(
+        proxy, frontend_alias
+    )
+    frontend_rule_path = traefik_utils.create_frontend_rule_path(proxy, frontend_alias)
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
         rule = "PathPrefix:" + routespec
@@ -150,12 +156,12 @@ def check_route_with_etcdl(routespec, target, data, test_deletion=False):
         ("host/proxy/path", "http://127.0.0.1:99", {"test": "test2"}),
     ],
 )
-async def test_add_path_based_route_to_etcd(proxy, routespec, target, data):
+async def test_add_route_to_etcd(proxy, routespec, target, data):
     await proxy.add_route(routespec, target, data)
 
     try:
-        check_route_with_etcdl(routespec, target, data)
-        cleanup_test_route(routespec, target, data)
+        check_route_with_etcdctl(proxy, routespec, target, data)
+        cleanup_test_route(proxy, routespec, target, data)
     finally:
         await proxy.stop()
 
@@ -170,12 +176,12 @@ async def test_add_path_based_route_to_etcd(proxy, routespec, target, data):
     ],
 )
 async def test_delete_route_from_etcd(proxy, routespec, target, data):
-    add_route_with_etcdctl(routespec, target, data)
+    add_route_with_etcdctl(proxy, routespec, target, data)
     await proxy.delete_route(routespec)
 
     try:
         # Test that (routespec, target) pair has been added to etcd
-        check_route_with_etcdl(routespec, target, data, True)
+        check_route_with_etcdctl(proxy, routespec, target, data, True)
     finally:
         await proxy.stop()
 
@@ -212,9 +218,9 @@ async def test_delete_route_from_etcd(proxy, routespec, target, data):
     ],
 )
 async def test_get_route(proxy, routespec, target, data, expected_output):
-    add_route_with_etcdctl(routespec, target, data)
+    add_route_with_etcdctl(proxy, routespec, target, data)
     route = await proxy.get_route(routespec)
-    cleanup_test_route(routespec, target, data)
+    cleanup_test_route(proxy, routespec, target, data)
 
     assert route == expected_output
     await proxy.stop()
@@ -244,16 +250,16 @@ async def test_get_all_routes(proxy):
         },
     }
 
-    add_route_with_etcdctl(routespec[0], target[0], data[0])
-    add_route_with_etcdctl(routespec[1], target[1], data[1])
-    add_route_with_etcdctl(routespec[2], target[2], data[2])
+    add_route_with_etcdctl(proxy, routespec[0], target[0], data[0])
+    add_route_with_etcdctl(proxy, routespec[1], target[1], data[1])
+    add_route_with_etcdctl(proxy, routespec[2], target[2], data[2])
     routes = await proxy.get_all_routes()
     try:
         assert routes == expected_output
     finally:
-        cleanup_test_route(routespec[0], target[0], data[0])
-        cleanup_test_route(routespec[1], target[1], data[1])
-        cleanup_test_route(routespec[2], target[2], data[2])
+        cleanup_test_route(proxy, routespec[0], target[0], data[0])
+        cleanup_test_route(proxy, routespec[1], target[1], data[1])
+        cleanup_test_route(proxy, routespec[2], target[2], data[2])
         await proxy.stop()
 
 
@@ -284,6 +290,6 @@ async def test_etcd_routing(proxy):
         first_backend.wait()
         second_backend.wait()
         await proxy.stop()
-        cleanup_test_route(routespec[0], target[0], data[0])
-        cleanup_test_route(routespec[1], target[1], data[1])
-        cleanup_test_route(routespec[2], target[2], data[2])
+        cleanup_test_route(proxy, routespec[0], target[0], data[0])
+        cleanup_test_route(proxy, routespec[1], target[1], data[1])
+        cleanup_test_route(proxy, routespec[2], target[2], data[2])

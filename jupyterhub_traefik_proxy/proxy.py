@@ -18,18 +18,7 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-import asyncio
-import json
-import etcd3
-import os
-
-from subprocess import Popen
-
-from traitlets import Any, Unicode
-
 from jupyterhub.proxy import Proxy
-
-from . import traefik_utils
 
 
 class TraefikProxy(Proxy):

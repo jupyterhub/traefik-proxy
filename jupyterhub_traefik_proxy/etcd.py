@@ -25,7 +25,7 @@ import os
 
 from subprocess import Popen
 
-from traitlets import Any, Unicode
+from traitlets import Any, default, Unicode
 
 from jupyterhub.proxy import Proxy
 
@@ -36,30 +36,44 @@ class TraefikEtcdProxy(Proxy):
     """JupyterHub Proxy implementation using traefik and etcd"""
 
     traefik_process = Any()
-    client = etcd3.client("127.0.0.1", 2379)
+    client = Any()
+
+    @default("client")
+    def _default_client(self):
+        return etcd3.client("127.0.0.1", 2379)
 
     command = "traefik"
     traefik_port = traefik_utils.get_port(command)
 
+    etcd_traefik_prefix = Unicode(
+        "/traefik/",
+        config=True,
+        help="""the etcd key prefix for traefik configuration""",
+    )
+
+    etcd_jupyterhub_prefix = Unicode(
+        "/jupyterhub/",
+        config=True,
+        help="""the etcd key prefix for traefik configuration""",
+    )
+
     def _setup_etcd(self):
         self.log.info("Seting up etcd...")
-        self.client.put(traefik_utils.traefik_prefix + "/debug", "true")
-        self.client.put(traefik_utils.traefik_prefix + "/defaultentrypoints/0", "http")
+        self.client.put(self.etcd_traefik_prefix + "debug", "true")
+        self.client.put(self.etcd_traefik_prefix + "defaultentrypoints/0", "http")
         self.client.put(
-            traefik_utils.traefik_prefix + "/entrypoints/http/address",
+            self.etcd_traefik_prefix + "entrypoints/http/address",
             ":" + str(self.traefik_port),
         )
-        self.client.put(traefik_utils.traefik_prefix + "/api/dashboard", "true")
-        self.client.put(traefik_utils.traefik_prefix + "/api/entrypoint", "http")
-        self.client.put(traefik_utils.traefik_prefix + "/loglevel", "ERROR")
+        self.client.put(self.etcd_traefik_prefix + "api/dashboard", "true")
+        self.client.put(self.etcd_traefik_prefix + "api/entrypoint", "http")
+        self.client.put(self.etcd_traefik_prefix + "loglevel", "ERROR")
+        self.client.put(self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379")
         self.client.put(
-            traefik_utils.traefik_prefix + "/etcd/endpoint", "127.0.0.1:2379"
+            self.etcd_traefik_prefix + "etcd/prefix", self.etcd_traefik_prefix
         )
-        self.client.put(
-            traefik_utils.traefik_prefix + "/etcd/prefix", traefik_utils.traefik_prefix
-        )
-        self.client.put(traefik_utils.traefik_prefix + "/etcd/useapiv3", "true")
-        self.client.put(traefik_utils.traefik_prefix + "/etcd/watch", "true")
+        self.client.put(self.etcd_traefik_prefix + "etcd/useapiv3", "true")
+        self.client.put(self.etcd_traefik_prefix + "etcd/watch", "true")
 
     def _start_traefik(self):
         self.log.info("Starting %s proxy...", self.command)
@@ -125,16 +139,20 @@ class TraefikEtcdProxy(Proxy):
         self.log.info("Adding route for %s to %s.", routespec, target)
 
         backend_alias = traefik_utils.create_backend_alias_from_url(target)
-        backend_url_path = traefik_utils.create_backend_url_path(backend_alias)
-        backend_weight_path = traefik_utils.create_backend_weight_path(backend_alias)
+        backend_url_path = traefik_utils.create_backend_url_path(self, backend_alias)
+        backend_weight_path = traefik_utils.create_backend_weight_path(
+            self, backend_alias
+        )
         frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
         frontend_backend_path = traefik_utils.create_frontend_backend_path(
-            frontend_alias
+            self, frontend_alias
         )
-        frontend_rule_path = traefik_utils.create_frontend_rule_path(frontend_alias)
+        frontend_rule_path = traefik_utils.create_frontend_rule_path(
+            self, frontend_alias
+        )
 
         # To be able to delete the route when routespec is provided
-        jupyterhub_routespec = traefik_utils.jupyterhub_prefix + routespec
+        jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
         self.client.put(jupyterhub_routespec, target)
 
         # Store the data dict passed in by JupyterHub
@@ -169,7 +187,7 @@ class TraefikEtcdProxy(Proxy):
 
         **Subclasses must define this method**
         """
-        jupyterhub_routespec = traefik_utils.jupyterhub_prefix + routespec
+        jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
         value, _ = self.client.get(jupyterhub_routespec)
         if value is None:
             self.log.warning("Route %s doesn't exist. Nothing to delete", routespec)
@@ -191,10 +209,10 @@ class TraefikEtcdProxy(Proxy):
             routespec,
         )
         self.client.delete_prefix(
-            traefik_utils.traefik_prefix + "/backends/" + backend_alias
+            self.etcd_traefik_prefix + "backends/" + backend_alias
         )
         self.client.delete_prefix(
-            traefik_utils.traefik_prefix + "/frontends/" + frontend_alias
+            self.etcd_traefik_prefix + "frontends/" + frontend_alias
         )
 
     async def get_all_routes(self):
@@ -213,13 +231,11 @@ class TraefikEtcdProxy(Proxy):
           }
         """
         all_routes = {}
-        routes = self.client.get_prefix(traefik_utils.jupyterhub_prefix)
+        routes = self.client.get_prefix(self.etcd_jupyterhub_prefix)
 
         for value, metadata in routes:
             # Strip the "/jupyterhub" prefix from the routespec
-            routespec = metadata.key.decode().replace(
-                traefik_utils.jupyterhub_prefix, ""
-            )
+            routespec = metadata.key.decode().replace(self.etcd_jupyterhub_prefix, "")
             target = value.decode()
 
             value, _ = self.client.get(target)
@@ -256,7 +272,7 @@ class TraefikEtcdProxy(Proxy):
 
             None: if there are no routes matching the given routespec
         """
-        jupyterhub_routespec = traefik_utils.jupyterhub_prefix + routespec
+        jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
         value, _ = self.client.get(jupyterhub_routespec)
         if value == None:
             return None
