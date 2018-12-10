@@ -262,7 +262,7 @@ async def test_etcd_routing(proxy, launch_backends):
     routespec = ["/", "/user/first", "/user/second"]
     target = ["http://127.0.0.1:9000", "http://127.0.0.1:9090", "http://127.0.0.1:9099"]
     routes_no = len(target)
-    traefik_port = urlparse(proxy.traefik_url).port
+    traefik_port = urlparse(proxy.public_url).port
 
     data = [{}, {}, {}]
     await proxy.add_route(routespec[0], target[0], data[0])
@@ -272,10 +272,10 @@ async def test_etcd_routing(proxy, launch_backends):
         utils.check_traefik_up(traefik_port)
         utils.check_backends_up()
 
-        utils.check_traefik_etcd_static_conf_ready(proxy.traefik_url)
-        utils.check_traefik_etcd_dynamic_conf_ready(proxy.traefik_url, routes_no)
+        utils.check_traefik_etcd_static_conf_ready(proxy.public_url)
+        utils.check_traefik_etcd_dynamic_conf_ready(proxy.public_url, routes_no)
 
-        utils.check_routing(proxy.traefik_url)
+        utils.check_routing(proxy.public_url)
     finally:
         cleanup_test_route(proxy, routespec[0], target[0], data[0])
         cleanup_test_route(proxy, routespec[1], target[1], data[1])

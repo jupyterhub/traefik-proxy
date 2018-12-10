@@ -12,7 +12,7 @@ from subprocess import Popen
 @pytest.fixture
 async def proxy():
     """Fixture returning a configured Traefik Proxy"""
-    proxy = TraefikEtcdProxy()
+    proxy = TraefikEtcdProxy(public_url="http://127.0.0.1:8000")
     try:
         await proxy.start()
         yield proxy

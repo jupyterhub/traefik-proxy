@@ -58,10 +58,6 @@ class TraefikEtcdProxy(Proxy):
             endpoint=str(etcd_service.hostname) + ":" + str(etcd_service.port)
         )
 
-    traefik_url = Unicode(
-        "http://127.0.0.1:8000", config=True, help="""The URL of the etcd server"""
-    )
-
     etcd_traefik_prefix = Unicode(
         "/traefik/",
         config=True,
@@ -84,7 +80,7 @@ class TraefikEtcdProxy(Proxy):
                 KV.put.txn(self.etcd_traefik_prefix + "defaultentrypoints/0", "http"),
                 KV.put.txn(
                     self.etcd_traefik_prefix + "entrypoints/http/address",
-                    ":" + str(urlparse(self.traefik_url).port),
+                    ":" + str(urlparse(self.public_url).port),
                 ),
                 KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
                 KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "http"),
