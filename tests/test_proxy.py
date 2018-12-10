@@ -159,11 +159,8 @@ def check_route_with_etcdctl(proxy, routespec, target, data, test_deletion=False
 async def test_add_route_to_etcd(proxy, routespec, target, data):
     await proxy.add_route(routespec, target, data)
 
-    try:
-        check_route_with_etcdctl(proxy, routespec, target, data)
-        cleanup_test_route(proxy, routespec, target, data)
-    finally:
-        await proxy.stop()
+    check_route_with_etcdctl(proxy, routespec, target, data)
+    cleanup_test_route(proxy, routespec, target, data)
 
 
 @pytest.mark.parametrize(
@@ -179,11 +176,8 @@ async def test_delete_route_from_etcd(proxy, routespec, target, data):
     add_route_with_etcdctl(proxy, routespec, target, data)
     await proxy.delete_route(routespec)
 
-    try:
-        # Test that (routespec, target) pair has been added to etcd
-        check_route_with_etcdctl(proxy, routespec, target, data, True)
-    finally:
-        await proxy.stop()
+    # Test that (routespec, target) pair has been added to etcd
+    check_route_with_etcdctl(proxy, routespec, target, data, True)
 
 
 @pytest.mark.parametrize(
@@ -223,7 +217,6 @@ async def test_get_route(proxy, routespec, target, data, expected_output):
     cleanup_test_route(proxy, routespec, target, data)
 
     assert route == expected_output
-    await proxy.stop()
 
 
 async def test_get_all_routes(proxy):
@@ -260,7 +253,6 @@ async def test_get_all_routes(proxy):
         cleanup_test_route(proxy, routespec[0], target[0], data[0])
         cleanup_test_route(proxy, routespec[1], target[1], data[1])
         cleanup_test_route(proxy, routespec[2], target[2], data[2])
-        await proxy.stop()
 
 
 async def test_etcd_routing(proxy, restart_traefik_proc):
@@ -288,7 +280,6 @@ async def test_etcd_routing(proxy, restart_traefik_proc):
         default_backend.wait()
         first_backend.wait()
         second_backend.wait()
-        await proxy.stop()
         cleanup_test_route(proxy, routespec[0], target[0], data[0])
         cleanup_test_route(proxy, routespec[1], target[1], data[1])
         cleanup_test_route(proxy, routespec[2], target[2], data[2])

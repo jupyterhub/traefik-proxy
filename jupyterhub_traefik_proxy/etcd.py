@@ -22,6 +22,8 @@ import asyncio
 import json
 import os
 
+from urllib.parse import urlparse
+
 from aioetcd3.client import client
 
 from aioetcd3 import transaction
@@ -45,9 +47,16 @@ class TraefikEtcdProxy(Proxy):
     traefik_process = Any()
     etcd_client = Any()
 
+    etcd_url = Unicode(
+        "http://127.0.0.1:2379", config=True, help="""The URL of the etcd server"""
+    )
+
     @default("etcd_client")
     def _default_client(self):
-        return client(endpoint="127.0.0.1:2379")
+        etcd_service = urlparse(self.etcd_url)
+        return client(
+            endpoint=str(etcd_service.hostname) + ":" + str(etcd_service.port)
+        )
 
     command = "traefik"
     traefik_port = traefik_utils.get_port(command)
@@ -64,29 +73,32 @@ class TraefikEtcdProxy(Proxy):
         help="""the etcd key prefix for traefik configuration""",
     )
 
-    async def _setup_etcd(self):
-        self.log.info("Seting up etcd...")
-        await self.etcd_client.put(self.etcd_traefik_prefix + "debug", "true")
-        await self.etcd_client.put(
-            self.etcd_traefik_prefix + "defaultentrypoints/0", "http"
-        )
-        await self.etcd_client.put(
-            self.etcd_traefik_prefix + "entrypoints/http/address",
-            ":" + str(self.traefik_port),
-        )
-        await self.etcd_client.put(self.etcd_traefik_prefix + "api/dashboard", "true")
-        await self.etcd_client.put(self.etcd_traefik_prefix + "api/entrypoint", "http")
-        await self.etcd_client.put(self.etcd_traefik_prefix + "loglevel", "ERROR")
-        await self.etcd_client.put(
-            self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379"
-        )
-        await self.etcd_client.put(
-            self.etcd_traefik_prefix + "etcd/prefix", self.etcd_traefik_prefix
-        )
-        await self.etcd_client.put(self.etcd_traefik_prefix + "etcd/useapiv3", "true")
-        await self.etcd_client.put(self.etcd_traefik_prefix + "etcd/watch", "true")
-        await self.etcd_client.put(
-            self.etcd_traefik_prefix + "providersThrottleDuration", "1"
+    async def _setup_traefik_static_config(self):
+        self.log.info("Seting up traefik's static config...")
+
+        status, response = await self.etcd_client.txn(
+            compare=[],
+            success=[
+                KV.put.txn(self.etcd_traefik_prefix + "debug", "true"),
+                KV.put.txn(self.etcd_traefik_prefix + "defaultentrypoints/0", "http"),
+                KV.put.txn(
+                    self.etcd_traefik_prefix + "entrypoints/http/address",
+                    ":" + str(self.traefik_port),
+                ),
+                KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
+                KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "http"),
+                KV.put.txn(self.etcd_traefik_prefix + "loglevel", "ERROR"),
+                KV.put.txn(
+                    self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379"
+                ),
+                KV.put.txn(
+                    self.etcd_traefik_prefix + "etcd/prefix", self.etcd_traefik_prefix
+                ),
+                KV.put.txn(self.etcd_traefik_prefix + "etcd/useapiv3", "true"),
+                KV.put.txn(self.etcd_traefik_prefix + "etcd/watch", "true"),
+                KV.put.txn(self.etcd_traefik_prefix + "providersThrottleDuration", "1"),
+            ],
+            fail=[],
         )
 
     def _start_traefik(self):
@@ -115,7 +127,7 @@ class TraefikEtcdProxy(Proxy):
         """
         # TODO: investigate deploying a traefik cluster instead of a single instance!
         self._start_traefik()
-        await self._setup_etcd()
+        await self._setup_traefik_static_config()
 
     async def stop(self):
         """Stop the proxy.
@@ -197,7 +209,9 @@ class TraefikEtcdProxy(Proxy):
                 routespec,
             )
         else:
-            self.log.error("Couldn't add route for %s.", routespec)
+            self.log.error(
+                "Couldn't add route for %s. Response: %s", routespec, response
+            )
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
@@ -239,7 +253,9 @@ class TraefikEtcdProxy(Proxy):
         if status:
             self.log.info("Routespec %s was deleted.", routespec)
         else:
-            self.log.error("Couldn't delete route %s.", routespec)
+            self.log.error(
+                "Couldn't delete route %s. Response: %s", routespec, response
+            )
 
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
