@@ -9,8 +9,11 @@ from jupyterhub_traefik_proxy import TraefikEtcdProxy
 async def proxy():
     """Fixture returning a configured Traefik Proxy"""
     proxy = TraefikEtcdProxy()
-    await proxy.start()
-    yield proxy
+    try:
+        await proxy.start()
+        yield proxy
+    finally:
+        await proxy.stop()
 
 
 @pytest.fixture
