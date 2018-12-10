@@ -74,6 +74,7 @@ class TraefikEtcdProxy(Proxy):
         )
         self.client.put(self.etcd_traefik_prefix + "etcd/useapiv3", "true")
         self.client.put(self.etcd_traefik_prefix + "etcd/watch", "true")
+        self.client.put(self.etcd_traefik_prefix + "providersThrottleDuration", "1")
 
     def _start_traefik(self):
         self.log.info("Starting %s proxy...", self.command)
@@ -91,9 +92,6 @@ class TraefikEtcdProxy(Proxy):
         self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
         self.traefik_process.kill()
 
-    def _restart_traefik(self):
-        self._stop_traefik()
-        self._start_traefik()
 
     async def start(self):
         """Start the proxy.

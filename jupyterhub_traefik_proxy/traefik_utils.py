@@ -58,9 +58,9 @@ def traefik_routes_to_correct_backend(path, expected_port):
     assert int(resp.text) == expected_port
 
 
-def check_traefik_etcd_conf_ready():
+def check_traefik_etcd_static_conf_ready():
     base_url = "http://localhost:" + str(get_port("traefik"))
-    """ Allow traefik up to 10 sec to load its configuration from the
+    """ Allow traefik up to 10 sec to load its static configuration from the
     etcd cluster """
     timeout = time.time() + 10
     ready = False
@@ -73,6 +73,27 @@ def check_traefik_etcd_conf_ready():
             time.sleep(t)
     assert ready  # Check that we got here because we are ready
 
+def check_traefik_etcd_dynamic_conf_ready(expected_no_of_entries):
+    base_url = "http://localhost:" + str(get_port("traefik"))
+    """ Allow traefik up to 10 sec to load its dynamic configuration from the
+    etcd cluster """
+    timeout = time.time() + 10
+    ready = False
+    t = 0.05
+    while not ready and time.time() < timeout:
+        resp_backends = requests.get(base_url + "/api/providers/etcdv3/backends")
+        resp_frontends = requests.get(base_url + "/api/providers/etcdv3/frontends")
+        no_of_backend_entries = 0
+        no_of_frontend_entries = 0
+        if resp_backends.status_code == 200:
+            no_of_backend_entries = len(resp_backends.json())
+        if resp_frontends.status_code == 200:
+            no_of_frontend_entries = len(resp_frontends.json())
+        ready = no_of_backend_entries == expected_no_of_entries and no_of_frontend_entries == expected_no_of_entries
+        if not ready:
+            t = min(2, t * 2)
+            time.sleep(t)
+    assert ready  # Check that we got here because we are ready
 
 def get_backend_ports():
     default_backend_port = get_port("default_backend")

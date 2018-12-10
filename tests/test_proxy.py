@@ -263,24 +263,23 @@ async def test_get_all_routes(proxy):
         await proxy.stop()
 
 
-async def test_etcd_routing(proxy):
+async def test_etcd_routing(proxy, restart_traefik_proc):
     routespec = ["/", "/user/first", "/user/second"]
     target = ["http://127.0.0.1:9000", "http://127.0.0.1:9090", "http://127.0.0.1:9099"]
+    routes_no = len(target)
+
     data = [{}, {}, {}]
+    await proxy.add_route(routespec[0], target[0], data[0])
+    await proxy.add_route(routespec[1], target[1], data[1])
+    await proxy.add_route(routespec[2], target[2], data[2])
+    default_backend, first_backend, second_backend = traefik_utils.launch_backends()
     try:
-        await proxy.add_route(routespec[0], target[0], data[0])
-        await proxy.add_route(routespec[1], target[1], data[1])
-        await proxy.add_route(routespec[2], target[2], data[2])
-        """ Force the proxy reload its configuration from etcd, otherwise
-            we have no other way to ensure traefik loaded the newly added routes
-            from etcd.
-        """
-        proxy._stop_traefik()
-        proxy._start_traefik()
         traefik_utils.check_traefik_up()
-        traefik_utils.check_traefik_etcd_conf_ready()
-        default_backend, first_backend, second_backend = traefik_utils.launch_backends()
         traefik_utils.check_backends_up()
+
+        traefik_utils.check_traefik_etcd_static_conf_ready()
+        traefik_utils.check_traefik_etcd_dynamic_conf_ready(routes_no)
+
         traefik_utils.check_routing()
     finally:
         default_backend.kill()

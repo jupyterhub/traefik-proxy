@@ -11,3 +11,8 @@ async def proxy():
     proxy = TraefikEtcdProxy()
     await proxy.start()
     yield proxy
+
+@pytest.fixture
+def restart_traefik_proc(proxy):
+    proxy._stop_traefik()
+    proxy._start_traefik()
