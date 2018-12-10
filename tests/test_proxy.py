@@ -1,12 +1,15 @@
 """Tests for the base traefik proxy"""
 
+import asyncio
 import pytest
 import json
-from os.path import abspath, dirname, join, pardir
 import subprocess
 import sys
+import utils
 from jupyterhub_traefik_proxy import traefik_utils
-import asyncio
+from os.path import abspath, dirname, join, pardir
+from urllib.parse import urlparse
+
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
@@ -255,31 +258,25 @@ async def test_get_all_routes(proxy):
         cleanup_test_route(proxy, routespec[2], target[2], data[2])
 
 
-async def test_etcd_routing(proxy, restart_traefik_proc):
+async def test_etcd_routing(proxy, launch_backends):
     routespec = ["/", "/user/first", "/user/second"]
     target = ["http://127.0.0.1:9000", "http://127.0.0.1:9090", "http://127.0.0.1:9099"]
     routes_no = len(target)
+    traefik_port = urlparse(proxy.traefik_url).port
 
     data = [{}, {}, {}]
     await proxy.add_route(routespec[0], target[0], data[0])
     await proxy.add_route(routespec[1], target[1], data[1])
     await proxy.add_route(routespec[2], target[2], data[2])
-    default_backend, first_backend, second_backend = traefik_utils.launch_backends()
     try:
-        traefik_utils.check_traefik_up()
-        traefik_utils.check_backends_up()
+        utils.check_traefik_up(traefik_port)
+        utils.check_backends_up()
 
-        traefik_utils.check_traefik_etcd_static_conf_ready()
-        traefik_utils.check_traefik_etcd_dynamic_conf_ready(routes_no)
+        utils.check_traefik_etcd_static_conf_ready(proxy.traefik_url)
+        utils.check_traefik_etcd_dynamic_conf_ready(proxy.traefik_url, routes_no)
 
-        traefik_utils.check_routing()
+        utils.check_routing(proxy.traefik_url)
     finally:
-        default_backend.kill()
-        first_backend.kill()
-        second_backend.kill()
-        default_backend.wait()
-        first_backend.wait()
-        second_backend.wait()
         cleanup_test_route(proxy, routespec[0], target[0], data[0])
         cleanup_test_route(proxy, routespec[1], target[1], data[1])
         cleanup_test_route(proxy, routespec[2], target[2], data[2])

@@ -58,8 +58,9 @@ class TraefikEtcdProxy(Proxy):
             endpoint=str(etcd_service.hostname) + ":" + str(etcd_service.port)
         )
 
-    command = "traefik"
-    traefik_port = traefik_utils.get_port(command)
+    traefik_url = Unicode(
+        "http://127.0.0.1:8000", config=True, help="""The URL of the etcd server"""
+    )
 
     etcd_traefik_prefix = Unicode(
         "/traefik/",
@@ -83,7 +84,7 @@ class TraefikEtcdProxy(Proxy):
                 KV.put.txn(self.etcd_traefik_prefix + "defaultentrypoints/0", "http"),
                 KV.put.txn(
                     self.etcd_traefik_prefix + "entrypoints/http/address",
-                    ":" + str(self.traefik_port),
+                    ":" + str(urlparse(self.traefik_url).port),
                 ),
                 KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
                 KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "http"),
@@ -102,14 +103,13 @@ class TraefikEtcdProxy(Proxy):
         )
 
     def _start_traefik(self):
-        self.log.info("Starting %s proxy...", self.command)
+        self.log.info("Starting traefik...")
         try:
             self.traefik_process = traefik_utils.launch_traefik_with_etcd()
         except FileNotFoundError as e:
             self.log.error(
-                "Failed to find proxy %s\n"
+                "Failed to find traefik \n"
                 "The proxy can be downloaded from https://github.com/containous/traefik/releases/download."
-                % self.command
             )
             raise
 
