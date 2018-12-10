@@ -7,6 +7,7 @@ python:
 env:
   global:
     - ASYNC_TEST_TIMEOUT=15
+    - ETCDCTL_API=3
 
 # installing dependencies
 before_install:
@@ -14,7 +15,14 @@ before_install:
   - pip install --pre -r dev-requirements.txt
 install:
   - pip install --pre -r dev-requirements.txt .
-  # TODO: setup etcd
+  - pip install pytest-travis-fold
+  - wget https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64
+  - sudo chmod +x traefik_linux-amd64
+  - sudo ln -s -T `pwd`/traefik_linux-amd64 /usr/local/bin/traefik
+  - ls -l /usr/local/bin
+  - wget https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz
+  - tar xzvf etcd-v3.3.10-linux-amd64.tar.gz
+  - ./etcd-v3.3.10-linux-amd64/etcd &
   - pip freeze
 
 # running tests
@@ -22,4 +30,3 @@ script:
   - pytest -v
 after_success:
   - codecov
-

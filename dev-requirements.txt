@@ -1,4 +1,6 @@
 pytest
 pytest-asyncio
+etcd3
+requests
 codecov
 black

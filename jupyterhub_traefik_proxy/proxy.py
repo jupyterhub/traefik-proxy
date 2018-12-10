@@ -18,8 +18,6 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-import asyncio
-
 from jupyterhub.proxy import Proxy
 
 
@@ -110,7 +108,4 @@ class TraefikProxy(Proxy):
 
             None: if there are no routes matching the given routespec
         """
-        # default implementation relies on get_all_routes
-        routespec = self.validate_routespec(routespec)
-        routes = await self.get_all_routes()
-        return routes.get(routespec)
+        raise NotImplementedError()

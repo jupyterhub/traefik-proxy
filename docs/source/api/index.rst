@@ -14,3 +14,9 @@ Module: :mod:`jupyterhub_traefik_proxy`
 
 .. autoconfigurable:: TraefikProxy
     :members:
+
+:class:`TraefikEtcdProxy`
+---------------------
+
+.. autoconfigurable:: TraefikEtcdProxy
+    :members:
