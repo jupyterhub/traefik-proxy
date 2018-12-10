@@ -2,7 +2,6 @@ import time
 import socket
 import sys
 import requests
-import etcd3
 from os.path import abspath, dirname, join
 from subprocess import Popen
 from urllib.parse import urlparse
