@@ -67,7 +67,9 @@ class TraefikEtcdProxy(Proxy):
     async def _setup_etcd(self):
         self.log.info("Seting up etcd...")
         await self.etcd_client.put(self.etcd_traefik_prefix + "debug", "true")
-        await self.etcd_client.put(self.etcd_traefik_prefix + "defaultentrypoints/0", "http")
+        await self.etcd_client.put(
+            self.etcd_traefik_prefix + "defaultentrypoints/0", "http"
+        )
         await self.etcd_client.put(
             self.etcd_traefik_prefix + "entrypoints/http/address",
             ":" + str(self.traefik_port),
@@ -75,13 +77,17 @@ class TraefikEtcdProxy(Proxy):
         await self.etcd_client.put(self.etcd_traefik_prefix + "api/dashboard", "true")
         await self.etcd_client.put(self.etcd_traefik_prefix + "api/entrypoint", "http")
         await self.etcd_client.put(self.etcd_traefik_prefix + "loglevel", "ERROR")
-        await self.etcd_client.put(self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379")
+        await self.etcd_client.put(
+            self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379"
+        )
         await self.etcd_client.put(
             self.etcd_traefik_prefix + "etcd/prefix", self.etcd_traefik_prefix
         )
         await self.etcd_client.put(self.etcd_traefik_prefix + "etcd/useapiv3", "true")
         await self.etcd_client.put(self.etcd_traefik_prefix + "etcd/watch", "true")
-        await self.etcd_client.put(self.etcd_traefik_prefix + "providersThrottleDuration", "1")
+        await self.etcd_client.put(
+            self.etcd_traefik_prefix + "providersThrottleDuration", "1"
+        )
 
     def _start_traefik(self):
         self.log.info("Starting %s proxy...", self.command)
@@ -177,7 +183,7 @@ class TraefikEtcdProxy(Proxy):
                 KV.put.txn(backend_url_path, target),
                 KV.put.txn(backend_weight_path, "1"),
                 KV.put.txn(frontend_backend_path, backend_alias),
-                KV.put.txn(frontend_rule_path, rule)
+                KV.put.txn(frontend_rule_path, rule),
             ],
             fail=[],
         )
