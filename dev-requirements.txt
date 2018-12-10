@@ -1,6 +1,5 @@
 pytest
 pytest-asyncio
-aioetcd3
 requests
 codecov
 black
