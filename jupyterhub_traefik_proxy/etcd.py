@@ -92,7 +92,6 @@ class TraefikEtcdProxy(Proxy):
         self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
         self.traefik_process.kill()
 
-
     async def start(self):
         """Start the proxy.
 

@@ -12,6 +12,7 @@ async def proxy():
     await proxy.start()
     yield proxy
 
+
 @pytest.fixture
 def restart_traefik_proc(proxy):
     proxy._stop_traefik()
