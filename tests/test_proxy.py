@@ -9,7 +9,7 @@ import utils
 from jupyterhub_traefik_proxy import traefik_utils
 from os.path import abspath, dirname, join, pardir
 from urllib.parse import urlparse
-
+from jupyterhub.utils import exponential_backoff
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
@@ -162,8 +162,10 @@ def check_route_with_etcdctl(proxy, routespec, target, data, test_deletion=False
 async def test_add_route_to_etcd(proxy, routespec, target, data):
     await proxy.add_route(routespec, target, data)
 
-    check_route_with_etcdctl(proxy, routespec, target, data)
-    cleanup_test_route(proxy, routespec, target, data)
+    try:
+        check_route_with_etcdctl(proxy, routespec, target, data)
+    finally:
+        cleanup_test_route(proxy, routespec, target, data)
 
 
 @pytest.mark.parametrize(
@@ -179,8 +181,8 @@ async def test_delete_route_from_etcd(proxy, routespec, target, data):
     add_route_with_etcdctl(proxy, routespec, target, data)
     await proxy.delete_route(routespec)
 
-    # Test that (routespec, target) pair has been added to etcd
-    check_route_with_etcdctl(proxy, routespec, target, data, True)
+    # Test that (routespec, target) pair has been deleted from etcd
+    check_route_with_etcdctl(proxy, routespec, target, data, test_deletion=True)
 
 
 @pytest.mark.parametrize(
@@ -218,7 +220,6 @@ async def test_get_route(proxy, routespec, target, data, expected_output):
     add_route_with_etcdctl(proxy, routespec, target, data)
     route = await proxy.get_route(routespec)
     cleanup_test_route(proxy, routespec, target, data)
-
     assert route == expected_output
 
 
@@ -246,11 +247,11 @@ async def test_get_all_routes(proxy):
         },
     }
 
-    add_route_with_etcdctl(proxy, routespec[0], target[0], data[0])
-    add_route_with_etcdctl(proxy, routespec[1], target[1], data[1])
-    add_route_with_etcdctl(proxy, routespec[2], target[2], data[2])
-    routes = await proxy.get_all_routes()
     try:
+        add_route_with_etcdctl(proxy, routespec[0], target[0], data[0])
+        add_route_with_etcdctl(proxy, routespec[1], target[1], data[1])
+        add_route_with_etcdctl(proxy, routespec[2], target[2], data[2])
+        routes = await proxy.get_all_routes()
         assert routes == expected_output
     finally:
         cleanup_test_route(proxy, routespec[0], target[0], data[0])
@@ -261,21 +262,31 @@ async def test_get_all_routes(proxy):
 async def test_etcd_routing(proxy, launch_backends):
     routespec = ["/", "/user/first", "/user/second"]
     target = ["http://127.0.0.1:9000", "http://127.0.0.1:9090", "http://127.0.0.1:9099"]
+    data = [{}, {}, {}]
+
     routes_no = len(target)
     traefik_port = urlparse(proxy.public_url).port
 
-    data = [{}, {}, {}]
+    backends_aliases = [traefik_utils.create_backend_alias_from_url(t) for t in target]
+    frontends_aliases = [
+        traefik_utils.create_frontend_alias_from_url(t) for t in target
+    ]
+
+    # Check if traefik process is reacheable
+    await exponential_backoff(
+        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
+    )
+
+    # Check if backend are reacheable
+    await exponential_backoff(utils.check_backends_up, "Backends not reacheable")
+
+    # Add testing routes
     await proxy.add_route(routespec[0], target[0], data[0])
     await proxy.add_route(routespec[1], target[1], data[1])
     await proxy.add_route(routespec[2], target[2], data[2])
+
     try:
-        utils.check_traefik_up(traefik_port)
-        utils.check_backends_up()
-
-        utils.check_traefik_etcd_static_conf_ready(proxy.public_url)
-        utils.check_traefik_etcd_dynamic_conf_ready(proxy.public_url, routes_no)
-
-        utils.check_routing(proxy.public_url)
+        await utils.check_routing(proxy.public_url)
     finally:
         cleanup_test_route(proxy, routespec[0], target[0], data[0])
         cleanup_test_route(proxy, routespec[1], target[1], data[1])
