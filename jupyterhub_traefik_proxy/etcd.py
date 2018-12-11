@@ -118,7 +118,7 @@ class TraefikEtcdProxy(Proxy):
     async def _wait_for_route(self, target):
         await exponential_backoff(
             traefik_utils.check_traefik_dynamic_conf_ready,
-            "Traefik route for %s configuration not available" %target,
+            "Traefik route for %s configuration not available" % target,
             traefik_url=self.public_url,
             target=target,
         )
@@ -129,7 +129,6 @@ class TraefikEtcdProxy(Proxy):
             "Traefik static configuration not available",
             traefik_url=self.public_url,
         )
-
 
     async def start(self):
         """Start the proxy.
