@@ -7,23 +7,18 @@ import subprocess
 import sys
 import utils
 from jupyterhub_traefik_proxy import traefik_utils
-from os.path import abspath, dirname, join, pardir
 from urllib.parse import urlparse
 from jupyterhub.utils import exponential_backoff
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
 
-etcdctl_path = abspath(
-    join(dirname(__file__), pardir, "etcd-v3.3.10-linux-amd64/etcdctl")
-)
-
 default_backend_weight = "1"
 
 
 def assert_etcdctl_get(key, expected_rv):
     assert (
-        subprocess.check_output([etcdctl_path, "get", key])
+        subprocess.check_output(["etcdctl", "get", key])
         .decode(sys.stdout.encoding)
         .strip()
         == expected_rv
@@ -32,7 +27,7 @@ def assert_etcdctl_get(key, expected_rv):
 
 def assert_etcdctl_put(key, value, expected_rv):
     assert (
-        subprocess.check_output([etcdctl_path, "put", key, value])
+        subprocess.check_output(["etcdctl", "put", key, value])
         .decode(sys.stdout.encoding)
         .strip()
         == expected_rv
@@ -41,7 +36,7 @@ def assert_etcdctl_put(key, value, expected_rv):
 
 def assert_etcdctl_del(key, expected_rv):
     assert (
-        subprocess.check_output([etcdctl_path, "del", key])
+        subprocess.check_output(["etcdctl", "del", key])
         .decode(sys.stdout.encoding)
         .strip()
         == expected_rv

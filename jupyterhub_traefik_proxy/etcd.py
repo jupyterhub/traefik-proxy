@@ -32,8 +32,6 @@ from aioetcd3.kv import KV
 
 from aioetcd3.help import range_prefix
 
-from subprocess import Popen
-
 from traitlets import Any, default, Unicode
 
 from jupyterhub.proxy import Proxy
