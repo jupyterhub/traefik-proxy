@@ -23,8 +23,7 @@ install:
   - tar xzvf etcd-v3.3.10-linux-amd64.tar.gz
   - sudo ln -s -T `pwd`/etcd-v3.3.10-linux-amd64/etcd /usr/local/bin/etcd
   - sudo ln -s -T `pwd`/etcd-v3.3.10-linux-amd64/etcdctl /usr/local/bin/etcdctl
-  - ls -l /usr/local/bin
-  - etcd &
+  - etcd &> /dev/null &
   - pip freeze
 
 # running tests
