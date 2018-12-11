@@ -1,6 +1,6 @@
 import socket
 import json
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+from tornado.httpclient import AsyncHTTPClient
 
 _ports = {"default_backend": 9000, "first_backend": 9090, "second_backend": 9099}
 

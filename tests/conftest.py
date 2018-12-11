@@ -50,3 +50,16 @@ def launch_backends(request):
     request.addfinalizer(default_backend.kill)
     request.addfinalizer(first_backend.kill)
     request.addfinalizer(second_backend.kill)
+
+
+@pytest.fixture
+def default_backend(request):
+    default_backend_port, _, _ = utils.get_backend_ports()
+
+    dummy_server_path = abspath(join(dirname(__file__), "dummy_http_server.py"))
+
+    default_backend = Popen(
+        [sys.executable, dummy_server_path, str(default_backend_port)], stdout=None
+    )
+
+    request.addfinalizer(default_backend.kill)
