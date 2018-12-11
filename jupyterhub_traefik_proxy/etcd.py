@@ -40,6 +40,8 @@ from jupyterhub.proxy import Proxy
 
 from . import traefik_utils
 
+from jupyterhub.utils import exponential_backoff
+
 
 class TraefikEtcdProxy(Proxy):
     """JupyterHub Proxy implementation using traefik and etcd"""
@@ -113,6 +115,22 @@ class TraefikEtcdProxy(Proxy):
         self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
         self.traefik_process.kill()
 
+    async def _wait_for_route(self, target):
+        await exponential_backoff(
+            traefik_utils.check_traefik_dynamic_conf_ready,
+            "Traefik route for %s configuration not available" %target,
+            traefik_url=self.public_url,
+            target=target,
+        )
+
+    async def _wait_for_static_config(self):
+        await exponential_backoff(
+            traefik_utils.check_traefik_static_conf_ready,
+            "Traefik static configuration not available",
+            traefik_url=self.public_url,
+        )
+
+
     async def start(self):
         """Start the proxy.
 
@@ -124,6 +142,7 @@ class TraefikEtcdProxy(Proxy):
         # TODO: investigate deploying a traefik cluster instead of a single instance!
         self._start_traefik()
         await self._setup_traefik_static_config()
+        await self._wait_for_static_config()
 
     async def stop(self):
         """Stop the proxy.
@@ -208,6 +227,16 @@ class TraefikEtcdProxy(Proxy):
             self.log.error(
                 "Couldn't add route for %s. Response: %s", routespec, response
             )
+
+        try:
+            # Check if traefik was launched
+            pid = self.traefik_process.pid
+            await self._wait_for_route(target)
+        except AttributeError:
+            self.log.error(
+                "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
+            )
+            raise
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
