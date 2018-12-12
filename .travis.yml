@@ -21,8 +21,8 @@ install:
   - sudo ln -s -T `pwd`/traefik_linux-amd64 /usr/local/bin/traefik
   - wget https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz
   - tar xzvf etcd-v3.3.10-linux-amd64.tar.gz
-  - sudo ln -s -T `pwd`/etcd-v3.3.10-linux-amd64/etcd /usr/local/bin/etcd
-  - sudo ln -s -T `pwd`/etcd-v3.3.10-linux-amd64/etcdctl /usr/local/bin/etcdctl
+  - sudo cp ./etcd-v3.3.10-linux-amd64/etcd /usr/local/bin
+  - sudo cp ./etcd-v3.3.10-linux-amd64/etcdctl /usr/local/bin
   - etcd &> /dev/null &
   - pip freeze
 

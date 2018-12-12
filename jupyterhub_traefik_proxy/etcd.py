@@ -23,22 +23,15 @@ import json
 import os
 
 from urllib.parse import urlparse
-
 from aioetcd3.client import client
-
 from aioetcd3 import transaction
-
 from aioetcd3.kv import KV
-
 from aioetcd3.help import range_prefix
-
 from traitlets import Any, default, Unicode
 
-from jupyterhub.proxy import Proxy
-
 from . import traefik_utils
-
 from jupyterhub.utils import exponential_backoff
+from jupyterhub.proxy import Proxy
 
 
 class TraefikEtcdProxy(Proxy):
