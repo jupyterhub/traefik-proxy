@@ -10,6 +10,8 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 async def check_traefik_dynamic_conf_ready(traefik_url, target):
     """ Check if traefik loaded its dynamic configuration from the
         etcd cluster """
+    if traefik_url.endswith("/"):
+        traefik_url = traefik_url[:-1]
     expected_backend = create_backend_alias_from_url(target)
     expected_frontend = create_frontend_alias_from_url(target)
     ready = False
@@ -38,6 +40,8 @@ async def check_traefik_dynamic_conf_ready(traefik_url, target):
 async def check_traefik_static_conf_ready(traefik_url):
     """ Check if traefik loaded its static configuration from the
     etcd cluster """
+    if traefik_url.endswith("/"):
+        traefik_url = traefik_url[:-1]
     try:
         resp = await AsyncHTTPClient().fetch(traefik_url + "/api/providers/etcdv3")
         rc = resp.code

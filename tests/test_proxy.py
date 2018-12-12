@@ -7,23 +7,19 @@ import subprocess
 import sys
 import utils
 from jupyterhub_traefik_proxy import traefik_utils
-from os.path import abspath, dirname, join, pardir
 from urllib.parse import urlparse
 from jupyterhub.utils import exponential_backoff
+from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
-
-etcdctl_path = abspath(
-    join(dirname(__file__), pardir, "etcd-v3.3.10-linux-amd64/etcdctl")
-)
 
 default_backend_weight = "1"
 
 
 def assert_etcdctl_get(key, expected_rv):
     assert (
-        subprocess.check_output([etcdctl_path, "get", key])
+        subprocess.check_output(["etcdctl", "get", key])
         .decode(sys.stdout.encoding)
         .strip()
         == expected_rv
@@ -32,7 +28,7 @@ def assert_etcdctl_get(key, expected_rv):
 
 def assert_etcdctl_put(key, value, expected_rv):
     assert (
-        subprocess.check_output([etcdctl_path, "put", key, value])
+        subprocess.check_output(["etcdctl", "put", key, value])
         .decode(sys.stdout.encoding)
         .strip()
         == expected_rv
@@ -41,7 +37,7 @@ def assert_etcdctl_put(key, value, expected_rv):
 
 def assert_etcdctl_del(key, expected_rv):
     assert (
-        subprocess.check_output([etcdctl_path, "del", key])
+        subprocess.check_output(["etcdctl", "del", key])
         .decode(sys.stdout.encoding)
         .strip()
         == expected_rv
@@ -267,17 +263,12 @@ async def test_etcd_routing(proxy, launch_backends):
     routes_no = len(target)
     traefik_port = urlparse(proxy.public_url).port
 
-    backends_aliases = [traefik_utils.create_backend_alias_from_url(t) for t in target]
-    frontends_aliases = [
-        traefik_utils.create_frontend_alias_from_url(t) for t in target
-    ]
-
     # Check if traefik process is reacheable
     await exponential_backoff(
         utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
     )
 
-    # Check if backend are reacheable
+    # Check if backends are reacheable
     await exponential_backoff(utils.check_backends_up, "Backends not reacheable")
 
     # Add testing routes
@@ -285,9 +276,57 @@ async def test_etcd_routing(proxy, launch_backends):
     await proxy.add_route(routespec[1], target[1], data[1])
     await proxy.add_route(routespec[2], target[2], data[2])
 
+    if proxy.public_url.endswith("/"):
+        req_url = proxy.public_url[:-1]
+    else:
+        req_url = proxy.public_url
+
     try:
-        await utils.check_routing(proxy.public_url)
+        await utils.check_routing(req_url)
     finally:
         cleanup_test_route(proxy, routespec[0], target[0], data[0])
         cleanup_test_route(proxy, routespec[1], target[1], data[1])
         cleanup_test_route(proxy, routespec[2], target[2], data[2])
+
+
+async def test_host_origin_headers(proxy, default_backend):
+    routespec = "/user/username"
+    target = "http://127.0.0.1:9000"
+    data = {}
+
+    traefik_port = urlparse(proxy.public_url).port
+    traefik_host = urlparse(proxy.public_url).hostname
+    default_backend_port = 9000
+
+    await exponential_backoff(
+        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
+    )
+
+    # Check if default backend is reacheable
+    await exponential_backoff(
+        utils.check_host_up,
+        "Backends not reacheable",
+        ip="localhost",
+        port=default_backend_port,
+    )
+    # Add route to default_backend
+    await proxy.add_route(routespec, target, data)
+
+    if proxy.public_url.endswith("/"):
+        req_url = proxy.public_url[:-1] + routespec
+    else:
+        req_url = proxy.public_url + routespec
+
+    expected_host_header = traefik_host + ":" + str(traefik_port)
+    expected_origin_header = proxy.public_url + routespec
+
+    req = HTTPRequest(
+        req_url,
+        method="GET",
+        headers={"Host": expected_host_header, "Origin": expected_origin_header},
+    )
+    resp = await AsyncHTTPClient().fetch(req)
+    cleanup_test_route(proxy, routespec, target, data)
+
+    assert resp.headers["Host"] == expected_host_header
+    assert resp.headers["Origin"] == expected_origin_header
