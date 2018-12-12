@@ -75,7 +75,7 @@ class TraefikEtcdProxy(Proxy):
                     self.etcd_traefik_prefix + "entrypoints/http/address",
                     ":" + str(urlparse(self.public_url).port),
                 ),
-                KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
+                KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "false"),
                 KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "http"),
                 KV.put.txn(self.etcd_traefik_prefix + "loglevel", "ERROR"),
                 KV.put.txn(
@@ -206,7 +206,7 @@ class TraefikEtcdProxy(Proxy):
         )
 
         if status:
-            self.log.info("Added backend %s with the alias.", target, backend_alias)
+            self.log.info("Added backend %s with the alias %s.", target, backend_alias)
             self.log.info(
                 "Added frontend %s for backend %s with the following routing rule %s.",
                 frontend_alias,
