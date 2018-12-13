@@ -1,7 +1,7 @@
 # traefik-proxy
 JupyterHub proxy implementation with traefik
 
-### How to start Jupyterhub with traefik-proxy using sample `jupyterhub_config.py`:
+### How to start Jupyterhub with traefik-proxy using `jupyterhub_config.py`:
 
 # 1. Install Jupyterhub:
 
@@ -47,6 +47,6 @@ Add etcd and etcdl to PATH
 # 5. Start Jupyterhub:
 
 ```
-jupyterhub --ip 127.0.0.1 --port=8080 -f ./examples/jupyterhub_config.py
+jupyterhub --ip 127.0.0.1 --port=8000 -f ./examples/jupyterhub_config.py
 ```
 Visit https://localhost:8000 in your browser, and sign in using any username and password.
