@@ -27,8 +27,8 @@ async def check_traefik_dynamic_conf_ready(traefik_url, target):
 
         if resp_backends.code == 200 and resp_frontends.code == 200:
             ready = (
-                expected_backend in backends_data.keys()
-                and expected_frontend in frontends_data.keys()
+                expected_backend in backends_data
+                and expected_frontend in frontends_data
             )
     except Exception as e:
         backends_rc, frontends_rc = e.response.code
