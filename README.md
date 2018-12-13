@@ -14,40 +14,32 @@ Please visit [Jupyterhub installation guide](https://jupyterhub.readthedocs.io/e
 
 Grab the latest binary for your platform from [traefik realeases page](https://github.com/containous/traefik/releases)
 
-    Example:
-
-    ```
-    wget https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64
-    ```
-
+```
+Example:
+wget https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64
+```
 Mark the binary as executable
 
-    Example:
-
-    ```
-    chmod 755 traefik_linux-amd64
-    ```
-
+```
+Example:
+chmod 755 traefik_linux-amd64
+```
 Add the traefik binary to PATH and make sure it is system-wide availabe as "traefik"
 
 # 3. Install etcd
 
 Download the latest archive for your platform from [etcd realeases page](https://github.com/etcd-io/etcd/releases)
 
-    Example:
-
-    ```
-    wget https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz
-    ```
-
+```
+Example:
+wget https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz
+```
 Extract etcd and etcdctl executables from the archive
 
-    Example:
-
-    ```
-    tar xzvf etcd-v3.3.10-linux-amd64.tar.gz
-    ```
-
+```
+Example:
+tar xzvf etcd-v3.3.10-linux-amd64.tar.gz
+```
 Add etcd and etcdl to PATH
 
 # 4. Start the etcd cluster
