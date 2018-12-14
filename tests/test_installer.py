@@ -31,24 +31,24 @@ def test_default_conf():
     default_deps_dir = os.path.join(parent_dir, "dependencies")
     traefik_bin, etcd_bin, etcdctl_bin = construct_binaries_path(default_deps_dir)
 
-    subprocess.run([sys.executable, "-m", installer_module])
-
-    assert os.path.exists(default_deps_dir)
-    assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
-
-    cleanup(default_deps_dir)
+    try:
+        subprocess.run([sys.executable, "-m", installer_module])
+        assert os.path.exists(default_deps_dir)
+        assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
+    finally:
+        cleanup(default_deps_dir)
 
 
 def test_output_arg_new_dir():
     deps_dir = "./deps/out"
     traefik_bin, etcd_bin, etcdctl_bin = construct_binaries_path(deps_dir)
 
-    subprocess.run([sys.executable, "-m", installer_module, f"--output={deps_dir}"])
-
-    assert os.path.exists(deps_dir)
-    assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
-
-    cleanup("./deps")
+    try:
+        subprocess.run([sys.executable, "-m", installer_module, f"--output={deps_dir}"])
+        assert os.path.exists(deps_dir)
+        assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
+    finally:
+        cleanup("./deps")
 
 
 def test_output_arg_existing_dir():
@@ -57,69 +57,69 @@ def test_output_arg_existing_dir():
 
     traefik_bin, etcd_bin, etcdctl_bin = construct_binaries_path(deps_dir)
 
-    subprocess.run([sys.executable, "-m", installer_module, f"--output={deps_dir}"])
-
-    assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
-
-    cleanup(deps_dir)
+    try:
+        subprocess.run([sys.executable, "-m", installer_module, f"--output={deps_dir}"])
+        assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
+    finally:
+        cleanup(deps_dir)
 
 
 def test_version():
     deps_dir = "./deps"
     traefik_bin, etcd_bin, etcdctl_bin = construct_binaries_path(deps_dir)
 
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            installer_module,
-            f"--output={deps_dir}",
-            "--traefik-version=1.7.0",
-            "--etcd-version=3.2.25",
-        ]
-    )
-
-    assert os.path.exists(deps_dir)
-    assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
-
-    cleanup("./deps")
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                installer_module,
+                f"--output={deps_dir}",
+                "--traefik-version=1.7.0",
+                "--etcd-version=3.2.25",
+            ]
+        )
+        assert os.path.exists(deps_dir)
+        assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
+    finally:
+        cleanup(deps_dir)
 
 
 def test_linux_platform():
     deps_dir = "./deps"
     traefik_bin, etcd_bin, etcdctl_bin = construct_binaries_path(deps_dir)
 
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            installer_module,
-            f"--output={deps_dir}",
-            "--platform=linux-amd64",
-        ]
-    )
-
-    assert os.path.exists(deps_dir)
-    assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
-
-    cleanup("./deps")
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                installer_module,
+                f"--output={deps_dir}",
+                "--platform=linux-amd64",
+            ]
+        )
+        assert os.path.exists(deps_dir)
+        assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
+    finally:
+        cleanup(deps_dir)
 
 
 def test_mac_platform():
     deps_dir = "./deps"
     traefik_bin, etcd_bin, etcdctl_bin = construct_binaries_path(deps_dir)
 
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            installer_module,
-            f"--output={deps_dir}",
-            "--platform=darwin-amd64",
-        ]
-    )
-
-    assert os.path.exists(deps_dir)
-    assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
-
-    cleanup("./deps")
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                installer_module,
+                f"--output={deps_dir}",
+                "--platform=darwin-amd64",
+            ]
+        )
+        assert os.path.exists(deps_dir)
+        assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
+    finally:
+        cleanup(deps_dir)

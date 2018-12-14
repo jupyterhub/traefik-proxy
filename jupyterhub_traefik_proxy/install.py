@@ -6,6 +6,37 @@ import zipfile
 import shutil
 import argparse
 import textwrap
+import hashlib
+
+checksums_traefik = {
+    "v1.7.5-linux-amd64": "4417a9d83753e1ad6bdd64bbbeaeb4b279bcc71542e779b7bcb3b027c6e3356e",
+    "v1.7.5-darwin-amd64": "379d4af242743a3fe44b44a1ee6df68ea8332578d85de35f264e062c19fd20a0",
+    "v1.7.0-linux-amd64": "b84cb03e8a175b8b7d1a30246d19705f607c6ae5ee89f2dca7a1adccab919135",
+    "v1.7.0-darwin-amd64": "3000cb9f8ed567e9bc567cce33107f6877f2017c69fae8ac235b51a7a94229bf",
+}
+
+checksums_etcd = {
+    "v3.3.10-linux-amd64": "9627d4fe4f402b52ec715aa50491539aded62dd7d426bdec764571818efd2ff8",
+    "v3.3.10-darwin-amd64": "670e22467ba6c63b2af08cc156cd7b84d94c98319893d105fe7f33fbbbe3c68f",
+    "v3.2.25-linux-amd64": "fd006bc79a49453bf42ea0a245535ad1917f125f740ba100b8300c012c581612",
+    "v3.2.25-darwin-amd64": "f5ab88a91eeb27aae7600d00f41807cec373ad6da9c40a6c28acbc8b850f1c10",
+}
+
+checksums_etcdctl = {
+    "v3.3.10-linux-amd64": "519e571cf605236bdd7f3b6e3f51505de72b16747863a573503a1b806d35d975",
+    "v3.3.10-darwin-amd64": "5a7ea25b70974bb39597420a4e2a7ee3c14d0e793509b3a5ce5704eb1ada01f1",
+    "v3.2.25-linux-amd64": "cdadcad2894078c1c07bf0b83d61bb4bb47f929951429750bb2a573190deb84e",
+    "v3.2.25-darwin-amd64": "4996b2513c8c9f445fcf0604f12573e49ad09c73d022576792e4cd28daecfd41",
+}
+
+
+def checksum_file(path):
+    """Compute the sha256 checksum of a path"""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def install_traefik(prefix, plat, traefik_version):
@@ -13,9 +44,14 @@ def install_traefik(prefix, plat, traefik_version):
 
     if os.path.exists(traefik_bin):
         print(f"Traefik already exists")
-        os.chmod(traefik_bin, 0o755)
-        print("--- Done ---")
-        return
+        checksum = checksum_file(traefik_bin)
+        if checksum == checksums_traefik[f"v{traefik_version}-{plat}"]:
+            os.chmod(traefik_bin, 0o755)
+            print("--- Done ---")
+            return
+        else:
+            print(f"checksum mismatch on {traefik_bin}")
+            os.remove(traefik_bin)
 
     traefik_url = (
         "https://github.com/containous/traefik/releases"
@@ -24,6 +60,11 @@ def install_traefik(prefix, plat, traefik_version):
 
     print(f"Downloading traefik {traefik_version}...")
     urlretrieve(traefik_url, traefik_bin)
+
+    checksum = checksum_file(traefik_bin)
+    if checksum != checksums_traefik[f"v{traefik_version}-{plat}"]:
+        raise IOError("Checksum failed")
+
     os.chmod(traefik_bin, 0o755)
 
     print("--- Done ---")
@@ -44,12 +85,22 @@ def install_etcd(prefix, plat, etcd_version):
     etcd_bin = os.path.join(prefix, "etcd")
     etcdctl_bin = os.path.join(prefix, "etcdctl")
 
-    if os.path.exists(etcd_bin):
-        print(f"Etcd already exists")
-        os.chmod(etcd_bin, 0o755)
-        os.chmod(etcdctl_bin, 0o755)
-        print("--- Done ---")
-        return
+    if os.path.exists(etcd_bin) and os.path.exists(etcdctl_bin):
+        print(f"Etcd and etcdctl already exist")
+        checksum_etcd = checksum_file(etcd_bin)
+        checksum_etcdctl = checksum_file(etcdctl_bin)
+        if (
+            checksum_etcd == checksums_etcd[f"v{etcd_version}-{plat}"]
+            and checksum_etcdctl == checksums_etcdctl[f"v{etcd_version}-{plat}"]
+        ):
+            os.chmod(etcd_bin, 0o755)
+            os.chmod(etcdctl_bin, 0o755)
+            print("--- Done ---")
+            return
+        else:
+            print(f"checksum mismatch on etcd")
+            os.remove(etcd_bin)
+            os.remove(etcdctl_bin)
 
     etcd_url = (
         "https://github.com/etcd-io/etcd/releases/"
@@ -75,6 +126,15 @@ def install_etcd(prefix, plat, etcd_version):
     shutil.copy(
         os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcdctl"), etcdctl_bin
     )
+
+    checksum_etcd = checksum_file(etcd_bin)
+    checksum_etcdctl = checksum_file(etcdctl_bin)
+    if (
+        checksum_etcd != checksums_etcd[f"v{etcd_version}-{plat}"]
+        and checksum_etcdctl != checksums_etcdctl[f"v{etcd_version}-{plat}"]
+    ):
+        raise IOError("Checksum failed")
+
     os.chmod(etcd_bin, 0o755)
     os.chmod(etcdctl_bin, 0o755)
 
