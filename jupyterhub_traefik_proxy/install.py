@@ -2,21 +2,17 @@ import sys
 import os
 from urllib.request import urlretrieve
 import tarfile
+import zipfile
+import shutil
 import argparse
 import textwrap
 
-HERE = os.path.abspath(os.path.dirname(__file__))
-
 
 def install_traefik(prefix, plat, traefik_version):
-    traefik_dir = os.path.join(prefix, "traefik")
-    traefik_version_dir = os.path.join(
-        traefik_dir, f"traefik-v{traefik_version}-{plat}"
-    )
-    traefik_bin = os.path.join(traefik_version_dir, "traefik")
+    traefik_bin = os.path.join(prefix, "traefik")
 
     if os.path.exists(traefik_bin):
-        print(f"Traefik {traefik_version} already exists")
+        print(f"Traefik already exists")
         os.chmod(traefik_bin, 0o755)
         print("--- Done ---")
         return
@@ -25,17 +21,6 @@ def install_traefik(prefix, plat, traefik_version):
         "https://github.com/containous/traefik/releases"
         f"/download/v{traefik_version}/traefik_{plat}"
     )
-    if not os.path.exists(traefik_dir):
-        print(f"Creating traefik directory {traefik_dir}...")
-        os.mkdir(traefik_dir)
-    else:
-        print(f"Directory {traefik_dir} already exists")
-
-    if not os.path.exists(traefik_version_dir):
-        print(f"Creating directory {traefik_version_dir}...")
-        os.mkdir(traefik_version_dir)
-    else:
-        print(f"Directory {traefik_version_dir} already exists")
 
     print(f"Downloading traefik {traefik_version}...")
     urlretrieve(traefik_url, traefik_bin)
@@ -45,35 +30,53 @@ def install_traefik(prefix, plat, traefik_version):
 
 
 def install_etcd(prefix, plat, etcd_version):
-    """Download and install the traefik binary"""
-    etcd_dir = os.path.join(prefix, "etcd")
-    etcd_arhive_name = os.path.join(etcd_dir, f"etcd-v{etcd_version}.tar.gz")
-    etcd_bin = os.path.join(etcd_dir, f"etcd-v{etcd_version}-{plat}", "etcd")
+    etcd_downloaded_dir_name = f"etcd-v{etcd_version}-{plat}"
+    etcd_archive_extension = ".tar.gz"
+    if "linux" in plat:
+        etcd_archive_extension = "tar.gz"
+    else:
+        etcd_archive_extension = "zip"
+    etcd_downloaded_archive = os.path.join(prefix, etcd_downloaded_dir_name + "." + etcd_archive_extension)
+    etcd_binaries = os.path.join(prefix, "etcd_binaries")
+
+    etcd_bin = os.path.join(prefix, "etcd")
+    etcdctl_bin = os.path.join(prefix, "etcdctl")
 
     if os.path.exists(etcd_bin):
-        print(f"Etcd {etcd_version} already exists")
+        print(f"Etcd already exists")
+        os.chmod(etcd_bin, 0o755)
+        os.chmod(etcdctl_bin, 0o755)
         print("--- Done ---")
         return
 
     etcd_url = (
         "https://github.com/etcd-io/etcd/releases/"
-        f"/download/v{etcd_version}/etcd-v{etcd_version}-{plat}.tar.gz"
+        f"/download/v{etcd_version}/etcd-v{etcd_version}-{plat}.{etcd_archive_extension}"
     )
-    if not os.path.exists(etcd_dir):
-        print(f"Creating etcd directory {etcd_dir}...")
-        os.mkdir(etcd_dir)
+    if not os.path.exists(etcd_downloaded_archive):
+        print(f"Downloading {etcd_downloaded_dir_name} archive...")
+        urlretrieve(etcd_url, etcd_downloaded_archive)
     else:
-        print(f"Directory {etcd_dir} already exists")
+        print(f"Archive {etcd_downloaded_dir_name} already exists")
 
-    if not os.path.exists(etcd_arhive_name):
-        print(f"Downloading {etcd_version} archive...")
-        urlretrieve(etcd_url, etcd_arhive_name)
+    if etcd_archive_extension == "zip":
+        with zipfile.ZipFile(etcd_downloaded_archive, 'r') as zip_ref:
+            zip_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
+            zip_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
     else:
-        print(f"Archive {etcd_arhive_name} already exists")
+        with (tarfile.open(etcd_downloaded_archive, "r")) as tar_ref:
+            print("Extracting the archive...")
+            tar_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
+            tar_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
 
-    with (tarfile.open(etcd_arhive_name, "r")) as tar_ref:
-        print("Extracting the archive...")
-        tar_ref.extractall(etcd_dir)
+    shutil.copy(os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcd"), etcd_bin)
+    shutil.copy(os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcdctl"), etcdctl_bin)
+    os.chmod(etcd_bin, 0o755)
+    os.chmod(etcdctl_bin, 0o755)
+
+    #Cleanup
+    shutil.rmtree(etcd_binaries)
+    os.remove(etcd_downloaded_archive)
 
     print("--- Done ---")
 
@@ -88,7 +91,7 @@ def main():
     parser.add_argument(
         "--output",
         dest="installation_dir",
-        default=os.path.join(HERE, "dependencies"),
+        default="./dependencies",
         help=textwrap.dedent(
             """\
             The installation directory (absolute or relative path).
@@ -99,10 +102,12 @@ def main():
         ),
     )
 
+    default_platform = sys.platform + "-amd64"
+
     parser.add_argument(
         "--platform",
         dest="plat",
-        default="linux-amd64",
+        default=default_platform,
         help=textwrap.dedent(
             """\
             The platform to download for.
@@ -113,7 +118,7 @@ def main():
     )
 
     parser.add_argument(
-        "--traefik_version",
+        "--traefik-version",
         dest="traefik_version",
         default="1.7.5",
         help=textwrap.dedent(
@@ -126,7 +131,7 @@ def main():
     )
 
     parser.add_argument(
-        "--etcd_version",
+        "--etcd-version",
         dest="etcd_version",
         default="3.3.10",
         help=textwrap.dedent(
@@ -148,7 +153,7 @@ def main():
         print(f"Dependencies directory already exists.")
     else:
         print(f"Creating output directory {deps_dir}...")
-        os.mkdir(deps_dir)
+        os.makedirs(deps_dir)
 
     install_traefik(deps_dir, plat, traefik_version)
     install_etcd(deps_dir, plat, etcd_version)

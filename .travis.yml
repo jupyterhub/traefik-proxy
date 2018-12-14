@@ -16,10 +16,7 @@ before_install:
 install:
   - pip install --pre -r dev-requirements.txt .
   - pip install pytest-travis-fold
-  - python -m jupyterhub_traefik_proxy.install --output=./dependencies
-  - sudo cp ./dependencies/traefik/traefik-v1.7.5-linux-amd64/traefik /usr/local/bin
-  - sudo cp ./dependencies/etcd/etcd-v3.3.10-linux-amd64/etcd /usr/local/bin
-  - sudo cp ./dependencies/etcd/etcd-v3.3.10-linux-amd64/etcdctl /usr/local/bin
+  - python -m jupyterhub_traefik_proxy.install --output=/usr/local/bin
   - etcd &> /dev/null &
   - pip freeze
 
