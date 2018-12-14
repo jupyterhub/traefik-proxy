@@ -36,7 +36,9 @@ def install_etcd(prefix, plat, etcd_version):
         etcd_archive_extension = "tar.gz"
     else:
         etcd_archive_extension = "zip"
-    etcd_downloaded_archive = os.path.join(prefix, etcd_downloaded_dir_name + "." + etcd_archive_extension)
+    etcd_downloaded_archive = os.path.join(
+        prefix, etcd_downloaded_dir_name + "." + etcd_archive_extension
+    )
     etcd_binaries = os.path.join(prefix, "etcd_binaries")
 
     etcd_bin = os.path.join(prefix, "etcd")
@@ -60,7 +62,7 @@ def install_etcd(prefix, plat, etcd_version):
         print(f"Archive {etcd_downloaded_dir_name} already exists")
 
     if etcd_archive_extension == "zip":
-        with zipfile.ZipFile(etcd_downloaded_archive, 'r') as zip_ref:
+        with zipfile.ZipFile(etcd_downloaded_archive, "r") as zip_ref:
             zip_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
             zip_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
     else:
@@ -70,11 +72,13 @@ def install_etcd(prefix, plat, etcd_version):
             tar_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
 
     shutil.copy(os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcd"), etcd_bin)
-    shutil.copy(os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcdctl"), etcdctl_bin)
+    shutil.copy(
+        os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcdctl"), etcdctl_bin
+    )
     os.chmod(etcd_bin, 0o755)
     os.chmod(etcdctl_bin, 0o755)
 
-    #Cleanup
+    # Cleanup
     shutil.rmtree(etcd_binaries)
     os.remove(etcd_downloaded_archive)
 
