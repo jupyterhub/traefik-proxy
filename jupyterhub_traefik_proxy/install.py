@@ -7,9 +7,12 @@ import textwrap
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
+
 def install_traefik(prefix, plat, traefik_version):
     traefik_dir = os.path.join(prefix, "traefik")
-    traefik_version_dir = os.path.join(traefik_dir, f"traefik-v{traefik_version}-{plat}")
+    traefik_version_dir = os.path.join(
+        traefik_dir, f"traefik-v{traefik_version}-{plat}"
+    )
     traefik_bin = os.path.join(traefik_version_dir, "traefik")
 
     if os.path.exists(traefik_bin):
@@ -39,6 +42,7 @@ def install_traefik(prefix, plat, traefik_version):
     os.chmod(traefik_bin, 0o755)
 
     print("--- Done ---")
+
 
 def install_etcd(prefix, plat, etcd_version):
     """Download and install the traefik binary"""
@@ -76,48 +80,63 @@ def install_etcd(prefix, plat, etcd_version):
 
 def main():
 
-    parser = argparse.ArgumentParser(description="Dependencies intaller", formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description="Dependencies intaller",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
 
     parser.add_argument(
         "--output",
         dest="installation_dir",
         default=os.path.join(HERE, "dependencies"),
-        help=textwrap.dedent('''\
+        help=textwrap.dedent(
+            """\
             The installation directory (absolute or relative path).
             If it doesn't exist, it will be created.
             If no directory is provided, it defaults to:
             --- %(default)s ---
-            '''))
+            """
+        ),
+    )
 
     parser.add_argument(
         "--platform",
         dest="plat",
         default="linux-amd64",
-        help=textwrap.dedent('''\
+        help=textwrap.dedent(
+            """\
             The platform to download for.
             If no platform is provided, it defaults to:
             --- %(default)s ---
-            '''))
+            """
+        ),
+    )
 
     parser.add_argument(
         "--traefik_version",
         dest="traefik_version",
         default="1.7.5",
-        help=textwrap.dedent('''\
+        help=textwrap.dedent(
+            """\
             The version of traefik to download.
             If no version is provided, it defaults to:
             --- %(default)s ---
-            '''))
+            """
+        ),
+    )
 
     parser.add_argument(
         "--etcd_version",
         dest="etcd_version",
         default="3.3.10",
-        help=textwrap.dedent('''\
+        help=textwrap.dedent(
+            """\
             The version of etcd to download.
             If no version is provided, it defaults to:
             --- %(default)s ---
-            '''))
+            """
+        ),
+    )
 
     args = parser.parse_args()
     deps_dir = args.installation_dir
