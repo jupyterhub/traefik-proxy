@@ -2,6 +2,7 @@ import pytest
 import sys
 import subprocess
 import os
+import warnings
 
 installer_module = "jupyterhub_traefik_proxy.install"
 
@@ -121,5 +122,28 @@ def test_mac_platform():
         )
         assert os.path.exists(deps_dir)
         assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
+    finally:
+        cleanup(deps_dir)
+
+
+def test_warning():
+    deps_dir = "./deps"
+    traefik_bin, etcd_bin, etcdctl_bin = construct_binaries_path(deps_dir)
+
+    try:
+        output = subprocess.check_output(
+            [
+                sys.executable,
+                "-m",
+                installer_module,
+                f"--output={deps_dir}",
+                "--traefik-version=1.6.6",
+                "--etcd-version=3.2.24",
+            ],
+            stderr=subprocess.STDOUT,
+        )
+        assert os.path.exists(deps_dir)
+        assert_binaries_existence(traefik_bin, etcd_bin, etcdctl_bin)
+        assert output.decode().count("UserWarning") == 2
     finally:
         cleanup(deps_dir)
