@@ -16,13 +16,8 @@ before_install:
 install:
   - pip install --pre -r dev-requirements.txt .
   - pip install pytest-travis-fold
-  - wget https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64
-  - sudo chmod +x traefik_linux-amd64
-  - sudo ln -s -T `pwd`/traefik_linux-amd64 /usr/local/bin/traefik
-  - wget https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz
-  - tar xzvf etcd-v3.3.10-linux-amd64.tar.gz
-  - sudo cp ./etcd-v3.3.10-linux-amd64/etcd /usr/local/bin
-  - sudo cp ./etcd-v3.3.10-linux-amd64/etcdctl /usr/local/bin
+  - python -m jupyterhub_traefik_proxy.install --output=./bin
+  - export PATH=$PWD/bin:$PATH
   - etcd &> /dev/null &
   - pip freeze
 
