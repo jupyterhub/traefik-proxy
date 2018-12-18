@@ -35,7 +35,7 @@ def test_default_conf():
 
 
 def test_output_arg_new_dir(tmpdir):
-    deps_dir = str(tmpdir.join('deps/out'))
+    deps_dir = str(tmpdir.join("deps/out"))
     subprocess.run([sys.executable, "-m", installer_module, f"--output={deps_dir}"])
 
     assert os.path.exists(deps_dir)
@@ -49,7 +49,7 @@ def test_output_arg_existing_dir(tmpdir):
 
 
 def test_version(tmpdir):
-    deps_dir = str(tmpdir.join('deps'))
+    deps_dir = str(tmpdir.join("deps"))
     subprocess.run(
         [
             sys.executable,
@@ -66,7 +66,7 @@ def test_version(tmpdir):
 
 
 def test_linux_platform(tmpdir):
-    deps_dir = str(tmpdir.join('deps'))
+    deps_dir = str(tmpdir.join("deps"))
     subprocess.run(
         [
             sys.executable,
@@ -82,7 +82,7 @@ def test_linux_platform(tmpdir):
 
 
 def test_mac_platform(tmpdir):
-    deps_dir = str(tmpdir.join('deps'))
+    deps_dir = str(tmpdir.join("deps"))
     subprocess.run(
         [
             sys.executable,
@@ -98,7 +98,7 @@ def test_mac_platform(tmpdir):
 
 
 def test_warning(tmpdir):
-    deps_dir = str(tmpdir.join('deps'))
+    deps_dir = str(tmpdir.join("deps"))
     output = subprocess.check_output(
         [
             sys.executable,

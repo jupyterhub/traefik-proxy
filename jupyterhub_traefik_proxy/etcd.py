@@ -83,7 +83,7 @@ class TraefikEtcdProxy(Proxy):
                     self.etcd_traefik_prefix + "entrypoints/auth_api/address",
                     ":" + self.traefik_auth_api_port,
                 ),
-                 KV.put.txn(
+                KV.put.txn(
                     self.etcd_traefik_prefix
                     + "/entrypoints/auth_api/auth/basic/users/0",
                     "test:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/",
@@ -91,7 +91,7 @@ class TraefikEtcdProxy(Proxy):
                 KV.put.txn(
                     self.etcd_traefik_prefix
                     + "/entrypoints/auth_api/auth/basic/usersFile",
-                    "/path/to/.htpasswd", #TODO add users
+                    "/path/to/.htpasswd",  # TODO add users
                 ),
                 KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
                 KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "auth_api"),
