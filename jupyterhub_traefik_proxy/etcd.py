@@ -63,8 +63,12 @@ class TraefikEtcdProxy(Proxy):
         help="""the etcd key prefix for traefik configuration""",
     )
 
+    traefik_auth_api_port = Unicode(
+        "8099", config=True, help="""traefik api authenticated endpoint port"""
+    )
+
     async def _setup_traefik_static_config(self):
-        self.log.info("Seting up traefik's static config...")
+        self.log.info("Setting up traefik's static config...")
 
         status, response = await self.etcd_client.txn(
             compare=[],
@@ -75,8 +79,22 @@ class TraefikEtcdProxy(Proxy):
                     self.etcd_traefik_prefix + "entrypoints/http/address",
                     ":" + str(urlparse(self.public_url).port),
                 ),
-                KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "false"),
-                KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "http"),
+                KV.put.txn(
+                    self.etcd_traefik_prefix + "entrypoints/auth_api/address",
+                    ":" + self.traefik_auth_api_port,
+                ),
+                 KV.put.txn(
+                    self.etcd_traefik_prefix
+                    + "/entrypoints/auth_api/auth/basic/users/0",
+                    "test:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/",
+                ),
+                KV.put.txn(
+                    self.etcd_traefik_prefix
+                    + "/entrypoints/auth_api/auth/basic/usersFile",
+                    "/path/to/.htpasswd", #TODO add users
+                ),
+                KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
+                KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "auth_api"),
                 KV.put.txn(self.etcd_traefik_prefix + "loglevel", "ERROR"),
                 KV.put.txn(
                     self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379"
@@ -110,7 +128,8 @@ class TraefikEtcdProxy(Proxy):
         await exponential_backoff(
             traefik_utils.check_traefik_dynamic_conf_ready,
             "Traefik route for %s configuration not available" % target,
-            traefik_url=self.public_url,
+            timeout=20,
+            api_url="http://127.0.0.1:" + self.traefik_auth_api_port,
             target=target,
         )
 
@@ -118,7 +137,8 @@ class TraefikEtcdProxy(Proxy):
         await exponential_backoff(
             traefik_utils.check_traefik_static_conf_ready,
             "Traefik static configuration not available",
-            traefik_url=self.public_url,
+            timeout=20,
+            api_url="http://127.0.0.1:" + self.traefik_auth_api_port,
         )
 
     async def start(self):

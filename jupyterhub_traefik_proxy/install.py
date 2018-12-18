@@ -43,7 +43,7 @@ def install_traefik(prefix, plat, traefik_version):
 
     if os.path.exists(traefik_bin):
         print(f"Traefik already exists")
-        if traefik_url not in checksums_traefik.keys():
+        if traefik_url not in checksums_traefik:
             warnings.warn(
                 "Couldn't verify checksum for traefik-v{traefik_version}-{plat}."
             )
