@@ -21,6 +21,7 @@ Route Specification:
 import asyncio
 import json
 import os
+import base64
 
 from urllib.parse import urlparse
 from aioetcd3.client import client
@@ -63,8 +64,24 @@ class TraefikEtcdProxy(Proxy):
         help="""the etcd key prefix for traefik configuration""",
     )
 
-    traefik_auth_api_port = Unicode(
-        "8099", config=True, help="""traefik api authenticated endpoint port"""
+    traefik_api_url = Unicode(
+        "http://127.0.0.1:8099",
+        config=True,
+        help="""traefik authenticated api endpoint url""",
+    )
+
+    traefik_api_basic_auth_hashed_password = Unicode(
+        "$apr1$LD7Rp6hQ$QzRELO5C153vGLFIDorKJ0",
+        config=True,
+        help="""traefik api basic authentication password""",
+    )
+
+    traefik_api_basic_auth_password = Unicode(
+        "admin", config=True, help="""traefik api basic authentication password"""
+    )
+
+    traefik_api_basic_auth_username = Unicode(
+        "api_admin", config=True, help="""traefik api basic authentication username"""
     )
 
     async def _setup_traefik_static_config(self):
@@ -81,17 +98,14 @@ class TraefikEtcdProxy(Proxy):
                 ),
                 KV.put.txn(
                     self.etcd_traefik_prefix + "entrypoints/auth_api/address",
-                    ":" + self.traefik_auth_api_port,
+                    ":" + str(urlparse(self.traefik_api_url).port),
                 ),
                 KV.put.txn(
                     self.etcd_traefik_prefix
-                    + "/entrypoints/auth_api/auth/basic/users/0",
-                    "test:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/",
-                ),
-                KV.put.txn(
-                    self.etcd_traefik_prefix
-                    + "/entrypoints/auth_api/auth/basic/usersFile",
-                    "/path/to/.htpasswd",  # TODO add users
+                    + "entrypoints/auth_api/auth/basic/users/0",
+                    self.traefik_api_basic_auth_username
+                    + ":"
+                    + self.traefik_api_basic_auth_hashed_password,
                 ),
                 KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
                 KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "auth_api"),
@@ -123,13 +137,16 @@ class TraefikEtcdProxy(Proxy):
     def _stop_traefik(self):
         self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
         self.traefik_process.kill()
+        self.traefik_process.wait()
 
     async def _wait_for_route(self, target):
         await exponential_backoff(
             traefik_utils.check_traefik_dynamic_conf_ready,
             "Traefik route for %s configuration not available" % target,
+            username=self.traefik_api_basic_auth_username,
+            psw=self.traefik_api_basic_auth_password,
             timeout=20,
-            api_url="http://127.0.0.1:" + self.traefik_auth_api_port,
+            api_url=self.traefik_api_url,
             target=target,
         )
 
@@ -137,8 +154,10 @@ class TraefikEtcdProxy(Proxy):
         await exponential_backoff(
             traefik_utils.check_traefik_static_conf_ready,
             "Traefik static configuration not available",
+            username=self.traefik_api_basic_auth_username,
+            psw=self.traefik_api_basic_auth_password,
             timeout=20,
-            api_url="http://127.0.0.1:" + self.traefik_auth_api_port,
+            api_url=self.traefik_api_url,
         )
 
     async def start(self):
