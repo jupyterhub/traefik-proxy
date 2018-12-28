@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 
 
-async def check_traefik_dynamic_conf_ready(username, psw, api_url, target):
+async def check_traefik_dynamic_conf_ready(username, password, api_url, target):
     """ Check if traefik loaded its dynamic configuration from the
         etcd cluster """
     expected_backend = create_backend_alias_from_url(target)
@@ -17,12 +17,12 @@ async def check_traefik_dynamic_conf_ready(username, psw, api_url, target):
         resp_backends = await AsyncHTTPClient().fetch(
             api_url + "/api/providers/etcdv3/backends",
             auth_username=username,
-            auth_password=psw,
+            auth_password=password,
         )
         resp_frontends = await AsyncHTTPClient().fetch(
             api_url + "/api/providers/etcdv3/frontends",
             auth_username=username,
-            auth_password=psw,
+            auth_password=password,
         )
         backends_data = json.loads(resp_backends.body)
         frontends_data = json.loads(resp_frontends.body)
@@ -39,12 +39,14 @@ async def check_traefik_dynamic_conf_ready(username, psw, api_url, target):
         return ready
 
 
-async def check_traefik_static_conf_ready(username, psw, api_url):
+async def check_traefik_static_conf_ready(username, password, api_url):
     """ Check if traefik loaded its static configuration from the
     etcd cluster """
     try:
         resp = await AsyncHTTPClient().fetch(
-            api_url + "/api/providers/etcdv3", auth_username=username, auth_password=psw
+            api_url + "/api/providers/etcdv3",
+            auth_username=username,
+            auth_password=password,
         )
         rc = resp.code
     except ConnectionRefusedError:

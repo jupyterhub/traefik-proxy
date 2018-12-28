@@ -110,8 +110,8 @@ async def test_traefik_api_wit_auth(etcd, clean_etcd, proxy, default_backend):
     try:
         resp = await AsyncHTTPClient().fetch(
             proxy.traefik_api_url + "/dashboard",
-            auth_username=proxy.traefik_api_basic_auth_username,
-            auth_password=proxy.traefik_api_basic_auth_password,
+            auth_username=proxy.traefik_api_username,
+            auth_password=proxy.traefik_api_password,
         )
 
         rc = resp.code

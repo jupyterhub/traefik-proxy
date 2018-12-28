@@ -21,6 +21,7 @@ Route Specification:
 import asyncio
 import json
 import os
+import hashlib
 import base64
 
 from urllib.parse import urlparse
@@ -55,13 +56,13 @@ class TraefikEtcdProxy(Proxy):
     etcd_traefik_prefix = Unicode(
         "/traefik/",
         config=True,
-        help="""the etcd key prefix for traefik configuration""",
+        help="""the etcd key prefix for traefik static configuration""",
     )
 
     etcd_jupyterhub_prefix = Unicode(
         "/jupyterhub/",
         config=True,
-        help="""the etcd key prefix for traefik configuration""",
+        help="""the etcd key prefix for traefik dynamic configuration""",
     )
 
     traefik_api_url = Unicode(
@@ -70,22 +71,20 @@ class TraefikEtcdProxy(Proxy):
         help="""traefik authenticated api endpoint url""",
     )
 
-    traefik_api_basic_auth_hashed_password = Unicode(
-        "$apr1$LD7Rp6hQ$QzRELO5C153vGLFIDorKJ0",
-        config=True,
-        help="""traefik api basic authentication password""",
-    )
+    traefik_api_password = Unicode()
+    traefik_api_username = Unicode()
+    traefik_api_hashed_password = Unicode()
 
-    traefik_api_basic_auth_password = Unicode(
-        "admin", config=True, help="""traefik api basic authentication password"""
-    )
+    def _create_htpassword(self):
+        from passlib.apache import HtpasswdFile
 
-    traefik_api_basic_auth_username = Unicode(
-        "api_admin", config=True, help="""traefik api basic authentication username"""
-    )
+        ht = HtpasswdFile()
+        ht.set_password(self.traefik_api_username, self.traefik_api_password)
+        self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
 
     async def _setup_traefik_static_config(self):
         self.log.info("Setting up traefik's static config...")
+        self._create_htpassword()
 
         status, response = await self.etcd_client.txn(
             compare=[],
@@ -103,9 +102,7 @@ class TraefikEtcdProxy(Proxy):
                 KV.put.txn(
                     self.etcd_traefik_prefix
                     + "entrypoints/auth_api/auth/basic/users/0",
-                    self.traefik_api_basic_auth_username
-                    + ":"
-                    + self.traefik_api_basic_auth_hashed_password,
+                    self.traefik_api_username + ":" + self.traefik_api_hashed_password,
                 ),
                 KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
                 KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "auth_api"),
@@ -143,8 +140,8 @@ class TraefikEtcdProxy(Proxy):
         await exponential_backoff(
             traefik_utils.check_traefik_dynamic_conf_ready,
             "Traefik route for %s configuration not available" % target,
-            username=self.traefik_api_basic_auth_username,
-            psw=self.traefik_api_basic_auth_password,
+            username=self.traefik_api_username,
+            password=self.traefik_api_password,
             timeout=20,
             api_url=self.traefik_api_url,
             target=target,
@@ -154,8 +151,8 @@ class TraefikEtcdProxy(Proxy):
         await exponential_backoff(
             traefik_utils.check_traefik_static_conf_ready,
             "Traefik static configuration not available",
-            username=self.traefik_api_basic_auth_username,
-            psw=self.traefik_api_basic_auth_password,
+            username=self.traefik_api_username,
+            password=self.traefik_api_password,
             timeout=20,
             api_url=self.traefik_api_url,
         )
@@ -369,6 +366,7 @@ class TraefikEtcdProxy(Proxy):
             None: if there are no routes matching the given routespec
         """
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
+
         value, _ = await self.etcd_client.get(jupyterhub_routespec)
         if value == None:
             return None

@@ -14,7 +14,11 @@ from os.path import abspath, dirname, join
 @pytest.fixture
 async def proxy():
     """Fixture returning a configured Traefik Proxy"""
-    proxy = TraefikEtcdProxy(public_url="http://127.0.0.1:8000")
+    proxy = TraefikEtcdProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
+    )
     await proxy.start()
     yield proxy
     await proxy.stop()
