@@ -56,23 +56,27 @@ class TraefikEtcdProxy(Proxy):
     etcd_traefik_prefix = Unicode(
         "/traefik/",
         config=True,
-        help="""the etcd key prefix for traefik static configuration""",
+        help="""The etcd key prefix for traefik static configuration""",
     )
 
     etcd_jupyterhub_prefix = Unicode(
         "/jupyterhub/",
         config=True,
-        help="""the etcd key prefix for traefik dynamic configuration""",
+        help="""The etcd key prefix for traefik dynamic configuration""",
     )
 
     traefik_api_url = Unicode(
         "http://127.0.0.1:8099",
         config=True,
-        help="""traefik authenticated api endpoint url""",
+        help="""Traefik authenticated api endpoint url""",
     )
 
-    traefik_api_password = Unicode()
-    traefik_api_username = Unicode()
+    traefik_api_password = Unicode(
+        config=True, help="""The password for traefik api login"""
+    )
+    traefik_api_username = Unicode(
+        config=True, help="""The username for traefik api login"""
+    )
     traefik_api_hashed_password = Unicode()
 
     def _create_htpassword(self):
