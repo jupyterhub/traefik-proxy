@@ -1,2 +1,3 @@
 jupyterhub>=0.9
 aioetcd3
+passlib

@@ -21,6 +21,8 @@ Route Specification:
 import asyncio
 import json
 import os
+import hashlib
+import base64
 
 from urllib.parse import urlparse
 from aioetcd3.client import client
@@ -54,17 +56,39 @@ class TraefikEtcdProxy(Proxy):
     etcd_traefik_prefix = Unicode(
         "/traefik/",
         config=True,
-        help="""the etcd key prefix for traefik configuration""",
+        help="""The etcd key prefix for traefik static configuration""",
     )
 
     etcd_jupyterhub_prefix = Unicode(
         "/jupyterhub/",
         config=True,
-        help="""the etcd key prefix for traefik configuration""",
+        help="""The etcd key prefix for traefik dynamic configuration""",
     )
 
+    traefik_api_url = Unicode(
+        "http://127.0.0.1:8099",
+        config=True,
+        help="""Traefik authenticated api endpoint url""",
+    )
+
+    traefik_api_password = Unicode(
+        config=True, help="""The password for traefik api login"""
+    )
+    traefik_api_username = Unicode(
+        config=True, help="""The username for traefik api login"""
+    )
+    traefik_api_hashed_password = Unicode()
+
+    def _create_htpassword(self):
+        from passlib.apache import HtpasswdFile
+
+        ht = HtpasswdFile()
+        ht.set_password(self.traefik_api_username, self.traefik_api_password)
+        self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
+
     async def _setup_traefik_static_config(self):
-        self.log.info("Seting up traefik's static config...")
+        self.log.info("Setting up traefik's static config...")
+        self._create_htpassword()
 
         status, response = await self.etcd_client.txn(
             compare=[],
@@ -75,8 +99,17 @@ class TraefikEtcdProxy(Proxy):
                     self.etcd_traefik_prefix + "entrypoints/http/address",
                     ":" + str(urlparse(self.public_url).port),
                 ),
-                KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "false"),
-                KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "http"),
+                KV.put.txn(
+                    self.etcd_traefik_prefix + "entrypoints/auth_api/address",
+                    ":" + str(urlparse(self.traefik_api_url).port),
+                ),
+                KV.put.txn(
+                    self.etcd_traefik_prefix
+                    + "entrypoints/auth_api/auth/basic/users/0",
+                    self.traefik_api_username + ":" + self.traefik_api_hashed_password,
+                ),
+                KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
+                KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "auth_api"),
                 KV.put.txn(self.etcd_traefik_prefix + "loglevel", "ERROR"),
                 KV.put.txn(
                     self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379"
@@ -105,12 +138,16 @@ class TraefikEtcdProxy(Proxy):
     def _stop_traefik(self):
         self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
         self.traefik_process.kill()
+        self.traefik_process.wait()
 
     async def _wait_for_route(self, target):
         await exponential_backoff(
             traefik_utils.check_traefik_dynamic_conf_ready,
             "Traefik route for %s configuration not available" % target,
-            traefik_url=self.public_url,
+            username=self.traefik_api_username,
+            password=self.traefik_api_password,
+            timeout=20,
+            api_url=self.traefik_api_url,
             target=target,
         )
 
@@ -118,7 +155,10 @@ class TraefikEtcdProxy(Proxy):
         await exponential_backoff(
             traefik_utils.check_traefik_static_conf_ready,
             "Traefik static configuration not available",
-            traefik_url=self.public_url,
+            username=self.traefik_api_username,
+            password=self.traefik_api_password,
+            timeout=20,
+            api_url=self.traefik_api_url,
         )
 
     async def start(self):
@@ -330,6 +370,7 @@ class TraefikEtcdProxy(Proxy):
             None: if there are no routes matching the given routespec
         """
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
+
         value, _ = await self.etcd_client.get(jupyterhub_routespec)
         if value == None:
             return None

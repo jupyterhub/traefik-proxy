@@ -3,21 +3,39 @@
 import pytest
 import sys
 import utils
+import subprocess
+import os
+import shutil
 
 from jupyterhub_traefik_proxy import TraefikEtcdProxy
 from os.path import abspath, dirname, join
-from subprocess import Popen
 
 
 @pytest.fixture
 async def proxy():
     """Fixture returning a configured Traefik Proxy"""
-    proxy = TraefikEtcdProxy(public_url="http://127.0.0.1:8000")
-    try:
-        await proxy.start()
-        yield proxy
-    finally:
-        await proxy.stop()
+    proxy = TraefikEtcdProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
+    )
+    await proxy.start()
+    yield proxy
+    await proxy.stop()
+
+
+@pytest.fixture(scope="module")
+def etcd():
+    etcd_proc = subprocess.Popen("etcd", stdout=None, stderr=None)
+    yield etcd_proc
+    etcd_proc.kill()
+    etcd_proc.wait()
+    shutil.rmtree(os.getcwd() + "/default.etcd/")
+
+
+@pytest.fixture()
+def clean_etcd():
+    subprocess.run(["etcdctl", "del", '""', "--from-key=true"])
 
 
 @pytest.fixture
@@ -37,13 +55,13 @@ def launch_backends(request):
 
     dummy_server_path = abspath(join(dirname(__file__), "dummy_http_server.py"))
 
-    default_backend = Popen(
+    default_backend = subprocess.Popen(
         [sys.executable, dummy_server_path, str(default_backend_port)], stdout=None
     )
-    first_backend = Popen(
+    first_backend = subprocess.Popen(
         [sys.executable, dummy_server_path, str(first_backend_port)], stdout=None
     )
-    second_backend = Popen(
+    second_backend = subprocess.Popen(
         [sys.executable, dummy_server_path, str(second_backend_port)], stdout=None
     )
 
@@ -58,7 +76,7 @@ def default_backend(request):
 
     dummy_server_path = abspath(join(dirname(__file__), "dummy_http_server.py"))
 
-    default_backend = Popen(
+    default_backend = subprocess.Popen(
         [sys.executable, dummy_server_path, str(default_backend_port)], stdout=None
     )
 

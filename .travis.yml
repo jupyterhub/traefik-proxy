@@ -18,7 +18,6 @@ install:
   - pip install pytest-travis-fold
   - python -m jupyterhub_traefik_proxy.install --output=./bin
   - export PATH=$PWD/bin:$PATH
-  - etcd &> /dev/null &
   - pip freeze
 
 # running tests
