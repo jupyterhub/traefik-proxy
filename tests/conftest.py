@@ -8,6 +8,7 @@ import os
 import shutil
 
 from jupyterhub_traefik_proxy import TraefikEtcdProxy
+from jupyterhub_traefik_proxy import TraefikTomlProxy
 from os.path import abspath, dirname, join
 
 
@@ -15,6 +16,19 @@ from os.path import abspath, dirname, join
 async def proxy():
     """Fixture returning a configured Traefik Proxy"""
     proxy = TraefikEtcdProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
+    )
+    await proxy.start()
+    yield proxy
+    await proxy.stop()
+
+
+@pytest.fixture
+async def toml_proxy():
+    """Fixture returning a configured Traefik Proxy"""
+    proxy = TraefikTomlProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",

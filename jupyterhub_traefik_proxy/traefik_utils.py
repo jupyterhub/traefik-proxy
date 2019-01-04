@@ -1,5 +1,6 @@
 import sys
 import json
+import re
 
 from os.path import abspath, dirname, join
 from subprocess import Popen
@@ -58,7 +59,7 @@ async def check_traefik_static_conf_ready(username, password, api_url):
 
 
 def launch_traefik_with_toml():
-    config_file_path = abspath(join(dirname(__file__), "traefik.toml"))
+    config_file_path = abspath(join(dirname(__file__), "../traefik.toml"))
     traefik = Popen(["traefik", "-c", config_file_path], stdout=None)
     return traefik
 
@@ -72,36 +73,69 @@ def generate_traefik_toml():
     pass  # Not implemented
 
 
+def replace_special_chars(string):
+    return re.sub("[.:/]", "_", string)
+
+
+def create_alias(url, routespec, server_type=""):
+    return (
+        server_type
+        + replace_special_chars(urlparse(url).netloc)
+        + replace_special_chars(routespec)
+    )
+
+
 def create_backend_alias_from_url(url):
     target = urlparse(url)
-    return "jupyterhub_backend_" + target.netloc
+    alias = re.sub("[.:]", "_", target.netloc)
+    return "jupyterhub_backend_" + alias
 
 
 def create_frontend_alias_from_url(url):
     target = urlparse(url)
-    return "jupyterhub_frontend_" + target.netloc
+    alias = re.sub("[.:]", "_", target.netloc)
+    return "jupyterhub_frontend_" + alias
 
 
-def create_backend_url_path(proxy, backend_alias):
-    return (
-        proxy.etcd_traefik_prefix + "backends/" + backend_alias + "/servers/server1/url"
-    )
-
-
-def create_backend_weight_path(proxy, backend_alias):
-    return (
-        proxy.etcd_traefik_prefix
-        + "backends/"
+def create_backend_entry(proxy, backend_alias, separator="/", url=False, weight=False):
+    backend_entry = ""
+    if separator is "/":
+        backend_entry = proxy.etcd_traefik_prefix
+    backend_entry += (
+        "backends"
+        + separator
         + backend_alias
-        + "/servers/server1/weight"
+        + separator
+        + "servers"
+        + separator
+        + "server1"
     )
+    if url is True:
+        backend_entry += separator + "url"
+    elif weight is True:
+        backend_entry += separator + "weight"
+
+    return backend_entry
 
 
-def create_frontend_backend_path(proxy, frontend_alias):
+def create_frontend_backend_entry(proxy, frontend_alias):
     return proxy.etcd_traefik_prefix + "frontends/" + frontend_alias + "/backend"
 
 
-def create_frontend_rule_path(proxy, frontend_alias):
-    return (
-        proxy.etcd_traefik_prefix + "frontends/" + frontend_alias + "/routes/test/rule"
+def create_frontend_rule_entry(proxy, frontend_alias, separator="/"):
+    frontend_rule_entry = ""
+    if separator == "/":
+        frontend_rule_entry = proxy.etcd_traefik_prefix
+    frontend_rule_entry += (
+        "frontends"
+        + separator
+        + frontend_alias
+        + separator
+        + "routes"
+        + separator
+        + "test"
+        + separator
+        + "rule"
     )
+
+    return frontend_rule_entry

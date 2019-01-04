@@ -74,9 +74,11 @@ class TraefikEtcdProxy(Proxy):
     traefik_api_password = Unicode(
         config=True, help="""The password for traefik api login"""
     )
+
     traefik_api_username = Unicode(
         config=True, help="""The username for traefik api login"""
     )
+
     traefik_api_hashed_password = Unicode()
 
     def _create_htpassword(self):
@@ -206,22 +208,24 @@ class TraefikEtcdProxy(Proxy):
         self.log.info("Adding route for %s to %s.", routespec, target)
 
         backend_alias = traefik_utils.create_backend_alias_from_url(target)
-        backend_url_path = traefik_utils.create_backend_url_path(self, backend_alias)
-        backend_weight_path = traefik_utils.create_backend_weight_path(
-            self, backend_alias
+        backend_url_path = traefik_utils.create_backend_entry(
+            self, backend_alias, url=True
+        )
+        backend_weight_path = traefik_utils.create_backend_entry(
+            self, backend_alias, weight=True
         )
         frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
-        frontend_backend_path = traefik_utils.create_frontend_backend_path(
+        frontend_backend_path = traefik_utils.create_frontend_backend_entry(
             self, frontend_alias
         )
-        frontend_rule_path = traefik_utils.create_frontend_rule_path(
+        frontend_rule_path = traefik_utils.create_frontend_rule_entry(
             self, frontend_alias
         )
 
         # To be able to delete the route when routespec is provided
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
         # Store the data dict passed in by JupyterHub
-        encoded_data = data = json.dumps(data)
+        data = json.dumps(data)
 
         if routespec.startswith("/"):
             # Path-based route, e.g. /proxy/path/
@@ -236,7 +240,7 @@ class TraefikEtcdProxy(Proxy):
             compare=[],
             success=[
                 KV.put.txn(jupyterhub_routespec, target),
-                KV.put.txn(target, encoded_data),
+                KV.put.txn(target, data),
                 KV.put.txn(backend_url_path, target),
                 KV.put.txn(backend_weight_path, "1"),
                 KV.put.txn(frontend_backend_path, backend_alias),
@@ -282,14 +286,16 @@ class TraefikEtcdProxy(Proxy):
         target = value.decode()
         backend_alias = traefik_utils.create_backend_alias_from_url(target)
         frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
-        backend_url_path = traefik_utils.create_backend_url_path(self, backend_alias)
-        backend_weight_path = traefik_utils.create_backend_weight_path(
-            self, backend_alias
+        backend_url_path = traefik_utils.create_backend_entry(
+            self, backend_alias, url=True
         )
-        frontend_backend_path = traefik_utils.create_frontend_backend_path(
+        backend_weight_path = traefik_utils.create_backend_entry(
+            self, backend_alias, weight=True
+        )
+        frontend_backend_path = traefik_utils.create_frontend_backend_entry(
             self, frontend_alias
         )
-        frontend_rule_path = traefik_utils.create_frontend_rule_path(
+        frontend_rule_path = traefik_utils.create_frontend_rule_entry(
             self, frontend_alias
         )
 

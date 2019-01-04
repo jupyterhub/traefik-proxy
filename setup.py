@@ -65,6 +65,9 @@ setup(
     include_package_data=True,
     cmdclass=cmdclass,
     entry_points={
-        "jupyterhub.proxies": ["traefik = jupyterhub_traefik_proxy:TraefikEtcdProxy"]
+        "jupyterhub.proxies": [
+            "traefik = jupyterhub_traefik_proxy:TraefikEtcdProxy",
+            "traefik_toml = jupyterhub_traefik_proxy:TraefikTomlProxy",
+        ]
     },
 )

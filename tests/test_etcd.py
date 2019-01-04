@@ -42,13 +42,17 @@ def assert_etcdctl_del(key, expected_rv):
 def add_route_with_etcdctl(proxy, routespec, target, data):
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
     backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_url_path = traefik_utils.create_backend_url_path(proxy, backend_alias)
-    backend_weight_path = traefik_utils.create_backend_weight_path(proxy, backend_alias)
+    backend_url_path = traefik_utils.create_backend_entry(
+        proxy, backend_alias, url=True
+    )
+    backend_weight_path = traefik_utils.create_backend_entry(
+        proxy, backend_alias, weight=True
+    )
     frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
-    frontend_backend_path = traefik_utils.create_frontend_backend_path(
+    frontend_backend_path = traefik_utils.create_frontend_backend_entry(
         proxy, frontend_alias
     )
-    frontend_rule_path = traefik_utils.create_frontend_rule_path(proxy, frontend_alias)
+    frontend_rule_path = traefik_utils.create_frontend_rule_entry(proxy, frontend_alias)
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
         rule = "PathPrefix:" + routespec
@@ -70,14 +74,18 @@ def add_route_with_etcdctl(proxy, routespec, target, data):
 def check_route_with_etcdctl(proxy, routespec, target, data, test_deletion=False):
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
     backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_url_path = traefik_utils.create_backend_url_path(proxy, backend_alias)
+    backend_url_path = traefik_utils.create_backend_entry(
+        proxy, backend_alias, url=True
+    )
     backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_weight_path = traefik_utils.create_backend_weight_path(proxy, backend_alias)
+    backend_weight_path = traefik_utils.create_backend_entry(
+        proxy, backend_alias, weight=True
+    )
     frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
-    frontend_backend_path = traefik_utils.create_frontend_backend_path(
+    frontend_backend_path = traefik_utils.create_frontend_backend_entry(
         proxy, frontend_alias
     )
-    frontend_rule_path = traefik_utils.create_frontend_rule_path(proxy, frontend_alias)
+    frontend_rule_path = traefik_utils.create_frontend_rule_entry(proxy, frontend_alias)
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
         rule = "PathPrefix:" + routespec

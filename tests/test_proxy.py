@@ -97,7 +97,7 @@ async def test_traefik_api_without_auth(etcd, clean_etcd, proxy, default_backend
     except Exception as e:
         rc = e.response.code
     finally:
-        return rc == 401 or rc == 403
+        assert rc in {401, 403}
 
 
 async def test_traefik_api_wit_auth(etcd, clean_etcd, proxy, default_backend):
@@ -107,6 +107,9 @@ async def test_traefik_api_wit_auth(etcd, clean_etcd, proxy, default_backend):
         utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
     )
 
+    print(proxy.traefik_api_username)
+    print(proxy.traefik_api_password)
+
     try:
         resp = await AsyncHTTPClient().fetch(
             proxy.traefik_api_url + "/dashboard",
@@ -115,9 +118,10 @@ async def test_traefik_api_wit_auth(etcd, clean_etcd, proxy, default_backend):
         )
 
         rc = resp.code
+        print(rc)
     except ConnectionRefusedError:
         rc = None
     except Exception as e:
         rc = e.response.code
     finally:
-        return rc == 200
+        assert rc == 200
