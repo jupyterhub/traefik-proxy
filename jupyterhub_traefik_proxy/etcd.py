@@ -18,7 +18,6 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-import asyncio
 import json
 import os
 import hashlib
@@ -207,14 +206,14 @@ class TraefikEtcdProxy(Proxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        backend_alias = traefik_utils.create_backend_alias_from_url(target)
+        backend_alias = traefik_utils.create_alias(target, "backend")
         backend_url_path = traefik_utils.create_backend_entry(
             self, backend_alias, url=True
         )
         backend_weight_path = traefik_utils.create_backend_entry(
             self, backend_alias, weight=True
         )
-        frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
+        frontend_alias = traefik_utils.create_alias(target, "frontend")
         frontend_backend_path = traefik_utils.create_frontend_backend_entry(
             self, frontend_alias
         )
@@ -284,8 +283,8 @@ class TraefikEtcdProxy(Proxy):
             return
 
         target = value.decode()
-        backend_alias = traefik_utils.create_backend_alias_from_url(target)
-        frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
+        backend_alias = traefik_utils.create_alias(target, routespec, "backend")
+        frontend_alias = traefik_utils.create_alias(target, "frontend")
         backend_url_path = traefik_utils.create_backend_entry(
             self, backend_alias, url=True
         )

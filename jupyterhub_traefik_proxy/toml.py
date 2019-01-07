@@ -20,12 +20,15 @@ Route Specification:
 
 import json
 import os
+import asyncio
+from functools import wraps
 
 from urllib.parse import urlparse
 from traitlets import Any, default, Unicode
 
 from . import traefik_utils
 from jupyterhub.proxy import Proxy
+from jupyterhub.utils import exponential_backoff
 
 
 class TraefikTomlProxy(Proxy):
@@ -57,14 +60,32 @@ class TraefikTomlProxy(Proxy):
 
     traefik_api_hashed_password = Unicode()
 
+    mutex = asyncio.Lock()
+
     routes_cache = {}
 
-    def _create_htpassword(self):
-        from passlib.apache import HtpasswdFile
+    async def _wait_for_route(self, target):
+        await exponential_backoff(
+            traefik_utils.check_traefik_dynamic_conf_ready,
+            "Traefik route for %s configuration not available" % target,
+            username=self.traefik_api_username,
+            password=self.traefik_api_password,
+            timeout=20,
+            api_url=self.traefik_api_url,
+            target=target,
+            provider="file"
+        )
 
-        ht = HtpasswdFile()
-        ht.set_password(self.traefik_api_username, self.traefik_api_password)
-        self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
+    async def _wait_for_static_config(self):
+        await exponential_backoff(
+            traefik_utils.check_traefik_static_conf_ready,
+            "Traefik static configuration not available",
+            username=self.traefik_api_username,
+            password=self.traefik_api_password,
+            timeout=20,
+            api_url=self.traefik_api_url,
+            provider="file"
+        )
 
     async def _setup_traefik_static_config(self):
         self.log.info("Setting up traefik's static config...")
@@ -78,7 +99,7 @@ class TraefikTomlProxy(Proxy):
             f.write("[entryPoints]\n"),
             f.write("\t[entryPoints.http]\n")
             f.write('\t\taddress = ":' + str(urlparse(self.public_url).port) + '"\n')
-            f.write("[entryPoints.auth_api]\n")
+            f.write("\t[entryPoints.auth_api]\n")
             f.write(
                 '\t\taddress = ":' + str(urlparse(self.traefik_api_url).port) + '"\n'
             )
@@ -99,7 +120,7 @@ class TraefikTomlProxy(Proxy):
             f.write("[file]\n")
             f.write('\tfilename = "' + self.toml_dynamic_config_file + '"\n')
             f.write("\twatch = true\n")
-            f.close()
+        open(self.toml_dynamic_config_file, "a").close()
 
     def _start_traefik(self):
         self.log.info("Starting traefik...")
@@ -117,21 +138,47 @@ class TraefikTomlProxy(Proxy):
         self.traefik_process.kill()
         self.traefik_process.wait()
 
-    def _update_config_file(self):
-        tmp = open("tmp.toml", "w")
-        self._write_routes_to_file(tmp)
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        tmp.close()
-        os.rename("tmp.toml", self.toml_dynamic_config_file)
+    def _cleanup_config_files(self):
+        try:
+            os.remove(self.toml_static_config_file)
+            os.remove(self.toml_dynamic_config_file)
+        except:
+            self.log.error("Failed to remove traefik's configuration files \n")
+            raise
 
-    def _write_routes_to_file(self, config_fd):
+    def _get_route_unsafe(self, routespec):
+        result = {
+            "routespec": routespec,
+            "target": self.routes_cache[routespec]["target"],
+            "data": self.routes_cache[routespec]["data"],
+        }
+        return result
+
+    def _create_htpassword(self):
+        from passlib.apache import HtpasswdFile
+
+        ht = HtpasswdFile()
+        ht.set_password(self.traefik_api_username, self.traefik_api_password)
+        self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
+
+    def _persist_routes(self, config_fd):
         config_fd.write("[frontends]\n")
         for key, value in self.routes_cache.items():
             config_fd.write("".join(value["frontend"]))
         config_fd.write("[backends]\n")
         for key, value in self.routes_cache.items():
             config_fd.write("".join(value["backend"]))
+
+    def _update_config_file(self):
+        tmp = open("tmp.toml", "w")
+        self._persist_routes(tmp)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        tmp.close()
+        try:
+            os.rename("tmp.toml", self.toml_dynamic_config_file)
+        except Exception as e:
+            self.log.error("Failed to update traefik's dynamic configuration file")
 
     async def start(self):
         """Start the proxy.
@@ -143,6 +190,8 @@ class TraefikTomlProxy(Proxy):
         """
         self._start_traefik()
         await self._setup_traefik_static_config()
+        await self._wait_for_static_config()
+
 
     async def stop(self):
         """Stop the proxy.
@@ -153,6 +202,7 @@ class TraefikTomlProxy(Proxy):
         if the proxy is to be started by the Hub
         """
         self._stop_traefik()
+        self._cleanup_config_files()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
@@ -175,11 +225,11 @@ class TraefikTomlProxy(Proxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        backend_alias = traefik_utils.create_alias(target, routespec, "backend")
+        backend_alias = traefik_utils.create_alias(target, "backend")
         backend_url_path = traefik_utils.create_backend_entry(
             self, backend_alias, separator="."
         )
-        frontend_alias = traefik_utils.create_alias(target, routespec, "frontend")
+        frontend_alias = traefik_utils.create_alias(target, "frontend")
         frontend_rule_path = traefik_utils.create_frontend_rule_entry(
             self, frontend_alias, separator="."
         )
@@ -194,31 +244,49 @@ class TraefikTomlProxy(Proxy):
             path_prefix = "/" + path_prefix
             rule = "Host:" + host + ";PathPrefix:" + path_prefix
 
-        self.routes_cache[routespec] = {
-            "backend": [
-                "\t[backends." + backend_alias + "]\n",
-                "\t\t[" + backend_url_path + "]\n",
-                "\t\t\turl = " + '"' + target + '"\n',
-                "\t\t\tweight = " + "1\n",
-            ],
-            "frontend": [
-                "\t[frontends." + frontend_alias + "]\n",
-                "\t\tbackend = " + '"' + backend_alias + '"\n',
-                "\t\t[" + frontend_rule_path.rsplit(".", 1)[0] + "]\n",
-                "\t\t\trule = " + '"' + rule + '"\n',
-            ],
-            "data": data,
-            "target": target,
-        }
-        self._update_config_file()
+        await self.mutex.acquire()
+        try:
+            self.routes_cache[routespec] = {
+                "backend": [
+                    "\t[backends." + backend_alias + "]\n",
+                    "\t\t[" + backend_url_path + "]\n",
+                    "\t\t\turl = " + '"' + target + '"\n',
+                    "\t\t\tweight = " + "1\n",
+                ],
+                "frontend": [
+                    "\t[frontends." + frontend_alias + "]\n",
+                    "\t\tbackend = " + '"' + backend_alias + '"\n',
+                    "\t\t[" + frontend_rule_path.rsplit(".", 1)[0] + "]\n",
+                    "\t\t\trule = " + '"' + rule + '"\n',
+                ],
+                "data": data,
+                "target": target,
+            }
+            self._update_config_file()
+        finally:
+            self.mutex.release()
+
+        try:
+            # Check if traefik was launched
+            pid = self.traefik_process.pid
+            await self._wait_for_route(target)
+        except AttributeError:
+            self.log.error(
+                "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
+            )
+            raise
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
 
         **Subclasses must define this method**
         """
-        del self.routes_cache[routespec]
-        self._update_config_file()
+        await self.mutex.acquire()
+        try:
+            del self.routes_cache[routespec]
+            self._update_config_file()
+        finally:
+            self.mutex.release()
 
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
@@ -236,12 +304,12 @@ class TraefikTomlProxy(Proxy):
           }
         """
         all_routes = {}
-        for key, value in self.routes_cache.items():
-            all_routes[key] = {
-                "routespec": key,
-                "target": value["target"],
-                "data": value["data"],
-            }
+        await self.mutex.acquire()
+        try:
+            for key, value in self.routes_cache.items():
+                all_routes[key] = self._get_route_unsafe(key)
+        finally:
+            self.mutex.release()
 
         return all_routes
 
@@ -253,7 +321,7 @@ class TraefikTomlProxy(Proxy):
                 A URI that was used to add this route,
                 e.g. `host.tld/path/`
 
-        Returns:
+        Resuper.turns:
             result (dict):
                 dict with the following keys::
 
@@ -265,9 +333,9 @@ class TraefikTomlProxy(Proxy):
 
             None: if there are no routes matching the given routespec
         """
-        result = {
-            "routespec": routespec,
-            "target": self.routes_cache[routespec]["target"],
-            "data": self.routes_cache[routespec]["data"],
-        }
+        await self.mutex.acquire()
+        try:
+            result = self._get_route_unsafe(routespec)
+        finally:
+            self.mutex.release()
         return result

@@ -11,6 +11,36 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 pytestmark = pytest.mark.asyncio
 
 
+# async def test_etcd_routing_toml(toml_proxy, launch_backends):
+#     proxy = toml_proxy
+#     routespec = ["/", "/user/first", "/user/second"]
+#     target = ["http://127.0.0.1:9000", "http://127.0.0.1:9090", "http://127.0.0.1:9099"]
+#     data = [{}, {}, {}]
+
+#     routes_no = len(target)
+#     traefik_port = urlparse(proxy.public_url).port
+
+#     # Check if traefik process is reacheable
+#     await exponential_backoff(
+#         utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
+#     )
+
+#     # Check if backends are reacheable
+#     await exponential_backoff(utils.check_backends_up, "Backends not reacheable")
+
+#     # Add testing routes
+#     await proxy.add_route(routespec[0], target[0], data[0])
+#     await proxy.add_route(routespec[1], target[1], data[1])
+#     await proxy.add_route(routespec[2], target[2], data[2])
+
+#     if proxy.public_url.endswith("/"):
+#         req_url = proxy.public_url[:-1]
+#     else:
+#         req_url = proxy.public_url
+
+#     await utils.check_routing(req_url)
+
+
 async def test_etcd_routing(etcd, clean_etcd, proxy, launch_backends):
     routespec = ["/", "/user/first", "/user/second"]
     target = ["http://127.0.0.1:9000", "http://127.0.0.1:9090", "http://127.0.0.1:9099"]
@@ -92,33 +122,31 @@ async def test_traefik_api_without_auth(etcd, clean_etcd, proxy, default_backend
     try:
         resp = await AsyncHTTPClient().fetch(proxy.traefik_api_url + "/dashboard")
         rc = resp.code
+        print(rc)
     except ConnectionRefusedError:
         rc = None
     except Exception as e:
         rc = e.response.code
+        print(rc)
     finally:
         assert rc in {401, 403}
 
 
-async def test_traefik_api_wit_auth(etcd, clean_etcd, proxy, default_backend):
+async def test_traefik_api_with_auth(etcd, clean_etcd, proxy, default_backend):
     traefik_port = urlparse(proxy.public_url).port
 
     await exponential_backoff(
         utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
     )
 
-    print(proxy.traefik_api_username)
-    print(proxy.traefik_api_password)
-
     try:
         resp = await AsyncHTTPClient().fetch(
-            proxy.traefik_api_url + "/dashboard",
+            proxy.traefik_api_url + "/dashboard/",
             auth_username=proxy.traefik_api_username,
             auth_password=proxy.traefik_api_password,
         )
 
         rc = resp.code
-        print(rc)
     except ConnectionRefusedError:
         rc = None
     except Exception as e:
