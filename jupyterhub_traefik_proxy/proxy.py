@@ -19,10 +19,111 @@ Route Specification:
 # Distributed under the terms of the Modified BSD License.
 
 from jupyterhub.proxy import Proxy
+from jupyterhub.utils import exponential_backoff
+from . import traefik_utils
+
+from traitlets import Any, Unicode
+from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+
+import json
+import hashlib
 
 
 class TraefikProxy(Proxy):
     """JupyterHub Proxy implementation using traefik"""
+
+    traefik_process = Any()
+
+    traefik_api_url = Unicode(
+        "http://127.0.0.1:8099",
+        config=True,
+        help="""traefik authenticated api endpoint url""",
+    )
+
+    traefik_api_password = Unicode(
+        config=True, help="""The password for traefik api login"""
+    )
+
+    traefik_api_username = Unicode(
+        config=True, help="""The username for traefik api login"""
+    )
+
+    traefik_api_hashed_password = Unicode()
+
+    def _generate_htpassword(self):
+        from passlib.apache import HtpasswdFile
+
+        ht = HtpasswdFile()
+        ht.set_password(self.traefik_api_username, self.traefik_api_password)
+        self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
+
+
+    async def _wait_for_route(self, target, provider):
+        async def _check_traefik_dynamic_conf_ready():
+            """ Check if traefik loaded its dynamic configuration from the
+                etcd cluster """
+            expected_backend = traefik_utils.generate_alias(target, "backend")
+            expected_frontend = traefik_utils.generate_alias(target, "frontend")
+            ready = False
+            try:
+                resp_backends = await AsyncHTTPClient().fetch(
+                    self.traefik_api_url + "/api/providers/" + provider + "/backends",
+                    auth_username=self.traefik_api_username,
+                    auth_password=self.traefik_api_password,
+                )
+                resp_frontends = await AsyncHTTPClient().fetch(
+                    self.traefik_api_url + "/api/providers/" + provider + "/frontends",
+                    auth_username=self.traefik_api_username,
+                    auth_password=self.traefik_api_password,
+                )
+                backends_data = json.loads(resp_backends.body)
+                frontends_data = json.loads(resp_frontends.body)
+
+                if resp_backends.code == 200 and resp_frontends.code == 200:
+                    ready = (
+                        expected_backend in backends_data
+                        and expected_frontend in frontends_data
+                    )
+            except Exception as e:
+                backends_rc, frontends_rc = e.response.code
+                ready = False
+            finally:
+                return ready
+
+        await exponential_backoff(
+            _check_traefik_dynamic_conf_ready,
+            "Traefik route for %s configuration not available" % target,
+            timeout=20,
+        )
+
+    async def _wait_for_static_config(self, provider):
+        async def _check_traefik_static_conf_ready():
+            """ Check if traefik loaded its static configuration from the
+            etcd cluster """
+            try:
+                resp = await AsyncHTTPClient().fetch(
+                    self.traefik_api_url + "/api/providers/" + provider,
+                    auth_username=self.traefik_api_username,
+                    auth_password=self.traefik_api_password,
+                )
+                rc = resp.code
+            except ConnectionRefusedError:
+                rc = None
+            except Exception as e:
+                rc = e.response.code
+            finally:
+                return rc == 200
+
+        await exponential_backoff(
+            _check_traefik_static_conf_ready,
+            "Traefik static configuration not available",
+            timeout=20,
+        )
+
+    def _stop_traefik(self):
+        self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
+        self.traefik_process.kill()
+        self.traefik_process.wait()
 
     async def start(self):
         """Start the proxy.
@@ -32,7 +133,8 @@ class TraefikProxy(Proxy):
         **Subclasses must define this method**
         if the proxy is to be started by the Hub
         """
-        raise NotImplementedError()
+        self._start_traefik()
+        await self._setup_traefik_static_config()
 
     async def stop(self):
         """Stop the proxy.
@@ -42,7 +144,7 @@ class TraefikProxy(Proxy):
         **Subclasses must define this method**
         if the proxy is to be started by the Hub
         """
-        raise NotImplementedError()
+        self._stop_traefik()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.

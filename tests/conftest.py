@@ -12,51 +12,35 @@ from jupyterhub_traefik_proxy import TraefikTomlProxy
 from os.path import abspath, dirname, join
 
 
-def create_etcd_proxy():
-    """Function returning a TraefikEtcdProxy object"""
+@pytest.fixture()
+async def etcd_proxy():
+    """Fixture returning a configured TraefikEtcdProxy"""
     proxy = TraefikEtcdProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
     )
-    return proxy
-
-
-def create_toml_proxy():
-    """Function returning a TraefikTomlProxy object"""
-    proxy = TraefikTomlProxy(
-        public_url="http://127.0.0.1:8000",
-        traefik_api_password="admin",
-        traefik_api_username="api_admin",
-    )
-    return proxy
-
-
-@pytest.fixture(params=[create_etcd_proxy, create_toml_proxy])
-async def proxy(request):
-    """Fixture returning a configured Traefik Proxy"""
-    proxy = request.param()
     await proxy.start()
     yield proxy
     await proxy.stop()
 
 
 @pytest.fixture()
-async def etcd_proxy():
-    """Fixture returning a configured Traefik Proxy"""
-    proxy = create_etcd_proxy()
-    await proxy.start()
-    yield proxy
-    # await proxy.stop()
-
-
-@pytest.fixture()
 async def toml_proxy():
-    """Fixture returning a configured Traefik Proxy"""
-    proxy = create_toml_proxy()
+    """Fixture returning a configured TraefikTomlProxy"""
+    proxy = TraefikTomlProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
+    )
     await proxy.start()
     yield proxy
-    # await proxy.stop()
+    await proxy.stop()
+
+
+@pytest.fixture(params=["etcd_proxy", "toml_proxy"])
+def proxy(request):
+    return request.getfixturevalue(request.param)
 
 
 @pytest.fixture(scope="module")

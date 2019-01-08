@@ -32,7 +32,6 @@ async def check_host_up(ip, port):
 async def traefik_routes_to_correct_backend(traefik_url, path, expected_port):
     """ Check if traefik followed the configuration and routed the
     request to the right backend """
-    print(traefik_url + path)
     resp = await AsyncHTTPClient().fetch(traefik_url + path)
     data = json.loads(resp.body)
     assert data == expected_port

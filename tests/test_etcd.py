@@ -39,28 +39,19 @@ def assert_etcdctl_del(key, expected_rv):
     )
 
 
-def add_route_with_etcdctl(proxy, routespec, target, data):
+def add_route_with_etcdctl(etcd_proxy, routespec, target, data):
+    proxy = etcd_proxy
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
-    backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_url_path = traefik_utils.create_backend_entry(
-        proxy, backend_alias, url=True
-    )
-    backend_weight_path = traefik_utils.create_backend_entry(
-        proxy, backend_alias, weight=True
-    )
-    frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
-    frontend_backend_path = traefik_utils.create_frontend_backend_entry(
-        proxy, frontend_alias
-    )
-    frontend_rule_path = traefik_utils.create_frontend_rule_entry(proxy, frontend_alias)
-    if routespec.startswith("/"):
-        # Path-based route, e.g. /proxy/path/
-        rule = "PathPrefix:" + routespec
-    else:
-        # Host-based routing, e.g. host.tld/proxy/path/
-        host, path_prefix = routespec.split("/", 1)
-        path_prefix = "/" + path_prefix
-        rule = "Host:" + host + ";PathPrefix:" + path_prefix
+    (
+        backend_alias,
+        backend_url_path,
+        backend_weight_path,
+        frontend_alias,
+        frontend_backend_path,
+        frontend_rule_path,
+    ) = traefik_utils.generate_route_keys(proxy, target, routespec)
+
+    rule = traefik_utils.generate_rule(routespec)
     expected_rv = "OK"
 
     assert_etcdctl_put(jupyterhub_routespec, target, expected_rv)
@@ -71,29 +62,18 @@ def add_route_with_etcdctl(proxy, routespec, target, data):
     assert_etcdctl_put(frontend_rule_path, rule, expected_rv)
 
 
-def check_route_with_etcdctl(proxy, routespec, target, data, test_deletion=False):
+def check_route_with_etcdctl(etcd_proxy, routespec, target, data, test_deletion=False):
+    proxy = etcd_proxy
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
-    backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_url_path = traefik_utils.create_backend_entry(
-        proxy, backend_alias, url=True
-    )
-    backend_alias = traefik_utils.create_backend_alias_from_url(target)
-    backend_weight_path = traefik_utils.create_backend_entry(
-        proxy, backend_alias, weight=True
-    )
-    frontend_alias = traefik_utils.create_frontend_alias_from_url(target)
-    frontend_backend_path = traefik_utils.create_frontend_backend_entry(
-        proxy, frontend_alias
-    )
-    frontend_rule_path = traefik_utils.create_frontend_rule_entry(proxy, frontend_alias)
-    if routespec.startswith("/"):
-        # Path-based route, e.g. /proxy/path/
-        rule = "PathPrefix:" + routespec
-    else:
-        # Host-based routing, e.g. host.tld/proxy/path/
-        host, path_prefix = routespec.split("/", 1)
-        path_prefix = "/" + path_prefix
-        rule = "Host:" + host + ";PathPrefix:" + path_prefix
+    (
+        backend_alias,
+        backend_url_path,
+        backend_weight_path,
+        frontend_alias,
+        frontend_backend_path,
+        frontend_rule_path,
+    ) = traefik_utils.generate_route_keys(proxy, target, routespec)
+    rule = traefik_utils.generate_rule(routespec)
 
     if test_deletion:
         expected_rv = ""
@@ -129,30 +109,22 @@ def check_route_with_etcdctl(proxy, routespec, target, data, test_deletion=False
     assert_etcdctl_get(frontend_rule_path, expected_rv)
 
 
-@pytest.mark.parametrize(
-    "routespec, target, data",
-    [
-        ("/proxy/path", "http://127.0.0.1:99", {"test": "test1"}),  # Path-based routing
-        ("/proxy/path", "http://127.0.0.1:99", {}),  # Path-based routing, no data dict
-        # Host-based routing
-        ("host/proxy/path", "http://127.0.0.1:99", {"test": "test2"}),
-    ],
-)
-async def test_add_route_to_etcd(etcd, clean_etcd, proxy, routespec, target, data):
+@pytest.mark.parametrize("routespec", ["/proxy/path", "host/proxy/path"])
+@pytest.mark.parametrize("target", ["http://127.0.0.1:99"])
+@pytest.mark.parametrize("data", [{"test": "test1"}, {}])
+async def test_add_route_to_etcd(etcd, clean_etcd, etcd_proxy, routespec, target, data):
+    proxy = etcd_proxy
     await proxy.add_route(routespec, target, data)
     check_route_with_etcdctl(proxy, routespec, target, data)
 
 
-@pytest.mark.parametrize(
-    "routespec, target, data",
-    [
-        ("/proxy/path", "http://127.0.0.1:99", {"test": "test1"}),  # Path-based routing
-        ("/proxy/path", "http://127.0.0.1:99", {}),  # Path-based routing, no data dict
-        # Host-based routing
-        ("host/proxy/path", "http://127.0.0.1:99", {"test": "test2"}),
-    ],
-)
-async def test_delete_route_from_etcd(etcd, clean_etcd, proxy, routespec, target, data):
+@pytest.mark.parametrize("routespec", ["/proxy/path", "host/proxy/path"])
+@pytest.mark.parametrize("target", ["http://127.0.0.1:99"])
+@pytest.mark.parametrize("data", [{"test": "test1"}, {}])
+async def test_delete_route_from_etcd(
+    etcd, clean_etcd, etcd_proxy, routespec, target, data
+):
+    proxy = etcd_proxy
     add_route_with_etcdctl(proxy, routespec, target, data)
     await proxy.delete_route(routespec)
 
@@ -192,14 +164,16 @@ async def test_delete_route_from_etcd(etcd, clean_etcd, proxy, routespec, target
     ],
 )
 async def test_get_route(
-    etcd, clean_etcd, proxy, routespec, target, data, expected_output
+    etcd, clean_etcd, etcd_proxy, routespec, target, data, expected_output
 ):
+    proxy = etcd_proxy
     add_route_with_etcdctl(proxy, routespec, target, data)
     route = await proxy.get_route(routespec)
     assert route == expected_output
 
 
-async def test_get_all_routes(etcd, clean_etcd, proxy):
+async def test_get_all_routes(etcd, clean_etcd, etcd_proxy):
+    proxy = etcd_proxy
     routespec = ["/proxy/path1", "/proxy/path2", "host/proxy/path"]
     target = ["http://127.0.0.1:990", "http://127.0.0.1:909", "http://127.0.0.1:999"]
     data = [{"test": "test1"}, {}, {"test": "test2"}]

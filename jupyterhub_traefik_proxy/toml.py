@@ -28,13 +28,17 @@ from traitlets import Any, default, Unicode
 
 from . import traefik_utils
 from jupyterhub.proxy import Proxy
-from jupyterhub.utils import exponential_backoff
+from jupyterhub_traefik_proxy import TraefikProxy
 
 
-class TraefikTomlProxy(Proxy):
+class TraefikTomlProxy(TraefikProxy):
     """JupyterHub Proxy implementation using traefik and toml config file"""
 
-    traefik_process = Any()
+    mutex = Any()
+
+    @default("mutex")
+    def _default_semaphore(self):
+        return asyncio.Lock()
 
     toml_static_config_file = Unicode(
         "traefik.toml", config=True, help="""traefik's configuration file"""
@@ -44,52 +48,13 @@ class TraefikTomlProxy(Proxy):
         "rules.toml", config=True, help="""traefik's configuration file"""
     )
 
-    traefik_api_url = Unicode(
-        "http://127.0.0.1:8099",
-        config=True,
-        help="""traefik authenticated api endpoint url""",
-    )
-
-    traefik_api_password = Unicode(
-        config=True, help="""The password for traefik api login"""
-    )
-
-    traefik_api_username = Unicode(
-        config=True, help="""The username for traefik api login"""
-    )
-
-    traefik_api_hashed_password = Unicode()
-
-    mutex = asyncio.Lock()
-
-    routes_cache = {}
-
-    async def _wait_for_route(self, target):
-        await exponential_backoff(
-            traefik_utils.check_traefik_dynamic_conf_ready,
-            "Traefik route for %s configuration not available" % target,
-            username=self.traefik_api_username,
-            password=self.traefik_api_password,
-            timeout=20,
-            api_url=self.traefik_api_url,
-            target=target,
-            provider="file"
-        )
-
-    async def _wait_for_static_config(self):
-        await exponential_backoff(
-            traefik_utils.check_traefik_static_conf_ready,
-            "Traefik static configuration not available",
-            username=self.traefik_api_username,
-            password=self.traefik_api_password,
-            timeout=20,
-            api_url=self.traefik_api_url,
-            provider="file"
-        )
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.routes_cache = {}
 
     async def _setup_traefik_static_config(self):
         self.log.info("Setting up traefik's static config...")
-        self._create_htpassword()
+        self._generate_htpassword()
 
         with open(self.toml_static_config_file, "w") as f:
             f.write('defaultEntryPoints = ["http"]\n')
@@ -133,12 +98,7 @@ class TraefikTomlProxy(Proxy):
             )
             raise
 
-    def _stop_traefik(self):
-        self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
-        self.traefik_process.kill()
-        self.traefik_process.wait()
-
-    def _cleanup_config_files(self):
+    def _clean_resources(self):
         try:
             os.remove(self.toml_static_config_file)
             os.remove(self.toml_dynamic_config_file)
@@ -153,13 +113,6 @@ class TraefikTomlProxy(Proxy):
             "data": self.routes_cache[routespec]["data"],
         }
         return result
-
-    def _create_htpassword(self):
-        from passlib.apache import HtpasswdFile
-
-        ht = HtpasswdFile()
-        ht.set_password(self.traefik_api_username, self.traefik_api_password)
-        self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
 
     def _persist_routes(self, config_fd):
         config_fd.write("[frontends]\n")
@@ -188,10 +141,8 @@ class TraefikTomlProxy(Proxy):
         **Subclasses must define this method**
         if the proxy is to be started by the Hub
         """
-        self._start_traefik()
-        await self._setup_traefik_static_config()
-        await self._wait_for_static_config()
-
+        await super().start()
+        await self._wait_for_static_config(provider="file")
 
     async def stop(self):
         """Stop the proxy.
@@ -201,8 +152,8 @@ class TraefikTomlProxy(Proxy):
         **Subclasses must define this method**
         if the proxy is to be started by the Hub
         """
-        self._stop_traefik()
-        self._cleanup_config_files()
+        await super().stop()
+        self._clean_resources()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
@@ -225,24 +176,15 @@ class TraefikTomlProxy(Proxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        backend_alias = traefik_utils.create_alias(target, "backend")
-        backend_url_path = traefik_utils.create_backend_entry(
-            self, backend_alias, separator="."
-        )
-        frontend_alias = traefik_utils.create_alias(target, "frontend")
-        frontend_rule_path = traefik_utils.create_frontend_rule_entry(
-            self, frontend_alias, separator="."
-        )
-        data = json.dumps(data)
+        (
+            backend_alias,
+            backend_url_path,
+            frontend_alias,
+            frontend_rule_path,
+        ) = traefik_utils.generate_route_keys(self, target, routespec, separator=".")
 
-        if routespec.startswith("/"):
-            # Path-based route, e.g. /proxy/path/
-            rule = "PathPrefix:" + routespec
-        else:
-            # Host-based routing, e.g. host.tld/proxy/path/
-            host, path_prefix = routespec.split("/", 1)
-            path_prefix = "/" + path_prefix
-            rule = "Host:" + host + ";PathPrefix:" + path_prefix
+        data = json.dumps(data)
+        rule = traefik_utils.generate_rule(routespec)
 
         await self.mutex.acquire()
         try:
@@ -256,7 +198,8 @@ class TraefikTomlProxy(Proxy):
                 "frontend": [
                     "\t[frontends." + frontend_alias + "]\n",
                     "\t\tbackend = " + '"' + backend_alias + '"\n',
-                    "\t\t[" + frontend_rule_path.rsplit(".", 1)[0] + "]\n",
+                    "\t\tpassHostHeader = true\n",
+                    "\t\t[" + frontend_rule_path + "]\n",
                     "\t\t\trule = " + '"' + rule + '"\n',
                 ],
                 "data": data,
@@ -269,7 +212,7 @@ class TraefikTomlProxy(Proxy):
         try:
             # Check if traefik was launched
             pid = self.traefik_process.pid
-            await self._wait_for_route(target)
+            await self._wait_for_route(target, provider="file")
         except AttributeError:
             self.log.error(
                 "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"

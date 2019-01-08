@@ -20,7 +20,6 @@ Route Specification:
 
 import json
 import os
-import hashlib
 import base64
 
 from urllib.parse import urlparse
@@ -31,19 +30,13 @@ from aioetcd3.help import range_prefix
 from traitlets import Any, default, Unicode
 
 from . import traefik_utils
-from jupyterhub.utils import exponential_backoff
-from jupyterhub.proxy import Proxy
+from jupyterhub_traefik_proxy import TraefikProxy
 
 
-class TraefikEtcdProxy(Proxy):
+class TraefikEtcdProxy(TraefikProxy):
     """JupyterHub Proxy implementation using traefik and etcd"""
 
-    traefik_process = Any()
     etcd_client = Any()
-
-    etcd_url = Unicode(
-        "http://127.0.0.1:2379", config=True, help="""The URL of the etcd server"""
-    )
 
     @default("etcd_client")
     def _default_client(self):
@@ -51,6 +44,10 @@ class TraefikEtcdProxy(Proxy):
         return client(
             endpoint=str(etcd_service.hostname) + ":" + str(etcd_service.port)
         )
+
+    etcd_url = Unicode(
+        "http://127.0.0.1:2379", config=True, help="""The URL of the etcd server"""
+    )
 
     etcd_traefik_prefix = Unicode(
         "/traefik/",
@@ -64,32 +61,9 @@ class TraefikEtcdProxy(Proxy):
         help="""The etcd key prefix for traefik dynamic configuration""",
     )
 
-    traefik_api_url = Unicode(
-        "http://127.0.0.1:8099",
-        config=True,
-        help="""Traefik authenticated api endpoint url""",
-    )
-
-    traefik_api_password = Unicode(
-        config=True, help="""The password for traefik api login"""
-    )
-
-    traefik_api_username = Unicode(
-        config=True, help="""The username for traefik api login"""
-    )
-
-    traefik_api_hashed_password = Unicode()
-
-    def _create_htpassword(self):
-        from passlib.apache import HtpasswdFile
-
-        ht = HtpasswdFile()
-        ht.set_password(self.traefik_api_username, self.traefik_api_password)
-        self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
-
     async def _setup_traefik_static_config(self):
         self.log.info("Setting up traefik's static config...")
-        self._create_htpassword()
+        self._generate_htpassword()
 
         status, response = await self.etcd_client.txn(
             compare=[],
@@ -136,32 +110,6 @@ class TraefikEtcdProxy(Proxy):
             )
             raise
 
-    def _stop_traefik(self):
-        self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
-        self.traefik_process.kill()
-        self.traefik_process.wait()
-
-    async def _wait_for_route(self, target):
-        await exponential_backoff(
-            traefik_utils.check_traefik_dynamic_conf_ready,
-            "Traefik route for %s configuration not available" % target,
-            username=self.traefik_api_username,
-            password=self.traefik_api_password,
-            timeout=20,
-            api_url=self.traefik_api_url,
-            target=target,
-        )
-
-    async def _wait_for_static_config(self):
-        await exponential_backoff(
-            traefik_utils.check_traefik_static_conf_ready,
-            "Traefik static configuration not available",
-            username=self.traefik_api_username,
-            password=self.traefik_api_password,
-            timeout=20,
-            api_url=self.traefik_api_url,
-        )
-
     async def start(self):
         """Start the proxy.
 
@@ -171,9 +119,8 @@ class TraefikEtcdProxy(Proxy):
         if the proxy is to be started by the Hub
         """
         # TODO: investigate deploying a traefik cluster instead of a single instance!
-        self._start_traefik()
-        await self._setup_traefik_static_config()
-        await self._wait_for_static_config()
+        await super().start()
+        await self._wait_for_static_config(provider="etcdv3")
 
     async def stop(self):
         """Stop the proxy.
@@ -183,7 +130,7 @@ class TraefikEtcdProxy(Proxy):
         **Subclasses must define this method**
         if the proxy is to be started by the Hub
         """
-        self._stop_traefik()
+        await super().stop()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
@@ -206,35 +153,22 @@ class TraefikEtcdProxy(Proxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        backend_alias = traefik_utils.create_alias(target, "backend")
-        backend_url_path = traefik_utils.create_backend_entry(
-            self, backend_alias, url=True
-        )
-        backend_weight_path = traefik_utils.create_backend_entry(
-            self, backend_alias, weight=True
-        )
-        frontend_alias = traefik_utils.create_alias(target, "frontend")
-        frontend_backend_path = traefik_utils.create_frontend_backend_entry(
-            self, frontend_alias
-        )
-        frontend_rule_path = traefik_utils.create_frontend_rule_entry(
-            self, frontend_alias
-        )
+        (
+            backend_alias,
+            backend_url_path,
+            backend_weight_path,
+            frontend_alias,
+            frontend_backend_path,
+            frontend_rule_path,
+        ) = traefik_utils.generate_route_keys(self, target, routespec)
+
+        # Store the data dict passed in by JupyterHub
+        data = json.dumps(data)
+        rule = traefik_utils.generate_rule(routespec)
 
         # To be able to delete the route when routespec is provided
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
-        # Store the data dict passed in by JupyterHub
-        data = json.dumps(data)
-
-        if routespec.startswith("/"):
-            # Path-based route, e.g. /proxy/path/
-            rule = "PathPrefix:" + routespec
-        else:
-            # Host-based routing, e.g. host.tld/proxy/path/
-            host, path_prefix = routespec.split("/", 1)
-            path_prefix = "/" + path_prefix
-            rule = "Host:" + host + ";PathPrefix:" + path_prefix
-
+        
         status, response = await self.etcd_client.txn(
             compare=[],
             success=[
@@ -264,7 +198,7 @@ class TraefikEtcdProxy(Proxy):
         try:
             # Check if traefik was launched
             pid = self.traefik_process.pid
-            await self._wait_for_route(target)
+            await self._wait_for_route(target, provider="etcdv3")
         except AttributeError:
             self.log.error(
                 "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
@@ -283,20 +217,14 @@ class TraefikEtcdProxy(Proxy):
             return
 
         target = value.decode()
-        backend_alias = traefik_utils.create_alias(target, routespec, "backend")
-        frontend_alias = traefik_utils.create_alias(target, "frontend")
-        backend_url_path = traefik_utils.create_backend_entry(
-            self, backend_alias, url=True
-        )
-        backend_weight_path = traefik_utils.create_backend_entry(
-            self, backend_alias, weight=True
-        )
-        frontend_backend_path = traefik_utils.create_frontend_backend_entry(
-            self, frontend_alias
-        )
-        frontend_rule_path = traefik_utils.create_frontend_rule_entry(
-            self, frontend_alias
-        )
+        (
+            backend_alias,
+            backend_url_path,
+            backend_weight_path,
+            frontend_alias,
+            frontend_backend_path,
+            frontend_rule_path,
+        ) = traefik_utils.generate_route_keys(self, target, routespec)
 
         status, response = await self.etcd_client.txn(
             compare=[],
