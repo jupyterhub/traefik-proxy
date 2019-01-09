@@ -57,7 +57,6 @@ class TraefikProxy(Proxy):
         ht.set_password(self.traefik_api_username, self.traefik_api_password)
         self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
 
-
     async def _wait_for_route(self, target, provider):
         async def _check_traefik_dynamic_conf_ready():
             """ Check if traefik loaded its dynamic configuration from the

@@ -168,7 +168,7 @@ class TraefikEtcdProxy(TraefikProxy):
 
         # To be able to delete the route when routespec is provided
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
-        
+
         status, response = await self.etcd_client.txn(
             compare=[],
             success=[
