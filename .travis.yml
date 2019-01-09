@@ -11,6 +11,7 @@ env:
 
 # installing dependencies
 before_install:
+  - pip install --upgrade pytest
   - pip install --upgrade setuptools pip
   - pip install --pre -r dev-requirements.txt
 install:
