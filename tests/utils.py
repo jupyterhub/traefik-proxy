@@ -60,20 +60,20 @@ async def check_routing(traefik_url):
     """ Send GET requests for resources on different paths and check
     they are routed based on their path-prefixes """
     await traefik_routes_to_correct_backend(
-        traefik_url, "/otherthings/", default_backend_port
+        traefik_url, "/otherthings", default_backend_port
     )
     await traefik_routes_to_correct_backend(
-        traefik_url, "/user/somebody/", default_backend_port
+        traefik_url, "/user/somebody", default_backend_port
     )
     await traefik_routes_to_correct_backend(
-        traefik_url, "/user/first/", first_backend_port
+        traefik_url, "/user/first", first_backend_port
     )
     await traefik_routes_to_correct_backend(
-        traefik_url, "/user/second/", second_backend_port
+        traefik_url, "/user/second", second_backend_port
     )
     await traefik_routes_to_correct_backend(
-        traefik_url, "/user/first/otherthings/", first_backend_port
+        traefik_url, "/user/first/otherthings", first_backend_port
     )
     await traefik_routes_to_correct_backend(
-        traefik_url, "/user/second/otherthings/", second_backend_port
+        traefik_url, "/user/second/otherthings", second_backend_port
     )
