@@ -216,6 +216,7 @@ class TraefikTomlProxy(TraefikProxy):
                     "\t\tpassHostHeader = true\n",
                     "\t\t[" + frontend_rule_path + "]\n",
                     "\t\t\trule = " + '"' + rule + '"\n',
+                    "\t\t\tdata = " + "'" + data + "'\n",
                 ],
                 "data": data,
                 "target": target,

@@ -11,11 +11,9 @@ env:
 
 # installing dependencies
 before_install:
-  - pip install --upgrade pytest
   - pip install --upgrade setuptools pip
-  - pip install --pre -r dev-requirements.txt
+  - pip install --pre -r --upgrade dev-requirements.txt
 install:
-  - pip install --pre -r dev-requirements.txt .
   - python -m jupyterhub_traefik_proxy.install --output=./bin
   - export PATH=$PWD/bin:$PATH
   - pip freeze
