@@ -19,15 +19,13 @@ Route Specification:
 # Distributed under the terms of the Modified BSD License.
 
 import json
-import os
-import base64
-
 from urllib.parse import urlparse
+from traitlets import Any, default, Unicode
+
 from aioetcd3.client import client
 from aioetcd3 import transaction
 from aioetcd3.kv import KV
 from aioetcd3.help import range_prefix
-from traitlets import Any, default, Unicode
 
 from . import traefik_utils
 from jupyterhub_traefik_proxy import TraefikProxy
@@ -99,10 +97,15 @@ class TraefikEtcdProxy(TraefikProxy):
             fail=[],
         )
 
+        if status:
+            self.log.error(
+                "Couldn't set up traefik's static config. Response: %s", response
+            )
+
     def _start_traefik(self):
         self.log.info("Starting traefik...")
         try:
-            self.traefik_process = traefik_utils.launch_traefik_with_etcd()
+            self._launch_traefik(config_type="etcd")
         except FileNotFoundError as e:
             self.log.error(
                 "Failed to find traefik \n"
@@ -314,5 +317,4 @@ class TraefikEtcdProxy(TraefikProxy):
         else:
             data = value.decode()
 
-        result = {"routespec": routespec, "target": target, "data": data}
-        return result
+        return {"routespec": routespec, "target": target, "data": data}

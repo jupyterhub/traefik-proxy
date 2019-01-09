@@ -2,24 +2,7 @@ import sys
 import json
 import re
 
-from os.path import abspath, dirname, join
-from subprocess import Popen
 from urllib.parse import urlparse
-
-
-def launch_traefik_with_toml():
-    config_file_path = abspath(join(dirname(__file__), "../traefik.toml"))
-    traefik = Popen(["traefik", "-c", config_file_path], stdout=None)
-    return traefik
-
-
-def launch_traefik_with_etcd():
-    traefik = Popen(["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None)
-    return traefik
-
-
-def replace_special_chars(string):
-    return re.sub("[.:/]", "_", string)
 
 
 def generate_rule(routespec):
@@ -35,7 +18,7 @@ def generate_rule(routespec):
 
 
 def generate_alias(url, server_type=""):
-    return server_type + replace_special_chars(urlparse(url).netloc)
+    return server_type + re.sub("[.:/]", "_", (urlparse(url).netloc))
 
 
 def generate_backend_entry(

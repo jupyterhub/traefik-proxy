@@ -11,13 +11,20 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 pytestmark = pytest.mark.asyncio
 
 
-async def test_routing(etcd, clean_etcd, proxy, launch_backends):
+async def test_routing(etcd, clean_etcd, proxy, launch_backend):
     routespec = ["/", "/user/first", "/user/second"]
     target = ["http://127.0.0.1:9000", "http://127.0.0.1:9090", "http://127.0.0.1:9099"]
     data = [{}, {}, {}]
 
     routes_no = len(target)
     traefik_port = urlparse(proxy.public_url).port
+    default_backend_port, first_backend_port, second_backend_port = (
+        utils.get_backend_ports()
+    )
+
+    launch_backend(default_backend_port)
+    launch_backend(first_backend_port)
+    launch_backend(second_backend_port)
 
     # Check if traefik process is reacheable
     await exponential_backoff(
@@ -40,7 +47,7 @@ async def test_routing(etcd, clean_etcd, proxy, launch_backends):
     await utils.check_routing(req_url)
 
 
-async def test_host_origin_headers(etcd, clean_etcd, proxy, default_backend):
+async def test_host_origin_headers(etcd, clean_etcd, proxy, launch_backend):
     routespec = "/user/username"
     target = "http://127.0.0.1:9000"
     data = {}
@@ -48,6 +55,7 @@ async def test_host_origin_headers(etcd, clean_etcd, proxy, default_backend):
     traefik_port = urlparse(proxy.public_url).port
     traefik_host = urlparse(proxy.public_url).hostname
     default_backend_port = 9000
+    launch_backend(default_backend_port)
 
     await exponential_backoff(
         utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
@@ -82,7 +90,7 @@ async def test_host_origin_headers(etcd, clean_etcd, proxy, default_backend):
     assert resp.headers["Origin"] == expected_origin_header
 
 
-async def test_traefik_api_without_auth(etcd, clean_etcd, proxy, default_backend):
+async def test_traefik_api_without_auth(etcd, clean_etcd, proxy):
     traefik_port = urlparse(proxy.public_url).port
 
     await exponential_backoff(
@@ -100,7 +108,7 @@ async def test_traefik_api_without_auth(etcd, clean_etcd, proxy, default_backend
         assert rc in {401, 403}
 
 
-async def test_traefik_api_with_auth(etcd, clean_etcd, proxy, default_backend):
+async def test_traefik_api_with_auth(etcd, clean_etcd, proxy):
     traefik_port = urlparse(proxy.public_url).port
 
     await exponential_backoff(

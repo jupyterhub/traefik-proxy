@@ -24,6 +24,8 @@ from . import traefik_utils
 
 from traitlets import Any, Unicode
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+from subprocess import Popen
+from os.path import abspath, dirname, join
 
 import json
 import hashlib
@@ -123,6 +125,22 @@ class TraefikProxy(Proxy):
         self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
         self.traefik_process.kill()
         self.traefik_process.wait()
+
+    def _launch_traefik(self, config_type):
+        if config_type == "toml":
+            config_file_path = abspath(join(dirname(__file__), "traefik.toml"))
+            self.traefik_process = Popen(
+                ["traefik", "-c", config_file_path], stdout=None
+            )
+        elif config_type == "etcd":
+            self.traefik_process = Popen(
+                ["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None
+            )
+        else:
+            self.log.error(
+                "Configuration mode not supported \n. The proxy can only be configured through toml and etcd"
+            )
+            raise
 
     async def start(self):
         """Start the proxy.

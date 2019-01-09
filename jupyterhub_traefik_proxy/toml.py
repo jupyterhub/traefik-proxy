@@ -21,7 +21,6 @@ Route Specification:
 import json
 import os
 import asyncio
-from functools import wraps
 
 from urllib.parse import urlparse
 from traitlets import Any, default, Unicode
@@ -37,15 +36,15 @@ class TraefikTomlProxy(TraefikProxy):
     mutex = Any()
 
     @default("mutex")
-    def _default_semaphore(self):
+    def _default_mutex(self):
         return asyncio.Lock()
 
     toml_static_config_file = Unicode(
-        "traefik.toml", config=True, help="""traefik's configuration file"""
+        "traefik.toml", config=True, help="""traefik's static configuration file"""
     )
 
     toml_dynamic_config_file = Unicode(
-        "rules.toml", config=True, help="""traefik's configuration file"""
+        "rules.toml", config=True, help="""traefik's dynamic configuration file"""
     )
 
     def __init__(self, **kwargs):
@@ -56,41 +55,57 @@ class TraefikTomlProxy(TraefikProxy):
         self.log.info("Setting up traefik's static config...")
         self._generate_htpassword()
 
-        with open(self.toml_static_config_file, "w") as f:
-            f.write('defaultEntryPoints = ["http"]\n')
-            f.write("debug = true\n"),
-            f.write('logLevel = "ERROR"\n')
+        try:
+            with open(self.toml_static_config_file, "w") as f:
+                f.write('defaultEntryPoints = ["http"]\n')
+                f.write("debug = true\n"),
+                f.write('logLevel = "ERROR"\n')
 
-            f.write("[entryPoints]\n"),
-            f.write("\t[entryPoints.http]\n")
-            f.write('\t\taddress = ":' + str(urlparse(self.public_url).port) + '"\n')
-            f.write("\t[entryPoints.auth_api]\n")
-            f.write(
-                '\t\taddress = ":' + str(urlparse(self.traefik_api_url).port) + '"\n'
+                f.write("[entryPoints]\n"),
+                f.write("\t[entryPoints.http]\n")
+                f.write(
+                    '\t\taddress = ":' + str(urlparse(self.public_url).port) + '"\n'
+                )
+                f.write("\t[entryPoints.auth_api]\n")
+                f.write(
+                    '\t\taddress = ":'
+                    + str(urlparse(self.traefik_api_url).port)
+                    + '"\n'
+                )
+                f.write("\t\t[entryPoints.auth_api.auth]\n")
+                f.write("\t\t\t[entryPoints.auth_api.auth.basic]\n")
+                f.write(
+                    '\t\t\t\tusers = ["'
+                    + self.traefik_api_username
+                    + ":"
+                    + self.traefik_api_hashed_password
+                    + '"]\n'
+                )
+
+                f.write("[api]\n"),
+                f.write("\tdashboard = true\n"),
+                f.write('\tentrypoint = "auth_api"\n'),
+
+                f.write("[file]\n")
+                f.write('\tfilename = "' + self.toml_dynamic_config_file + '"\n')
+                f.write("\twatch = true\n")
+            open(self.toml_dynamic_config_file, "a").close()
+        except IOError as e:
+            self.log.error(
+                "Couldn't set up traefik's static config. I/O error({0}): {1}".format(
+                    e.errno, e.strerrornse
+                )
             )
-            f.write("\t\t[entryPoints.auth_api.auth]\n")
-            f.write("\t\t\t[entryPoints.auth_api.auth.basic]\n")
-            f.write(
-                '\t\t\t\tusers = ["'
-                + self.traefik_api_username
-                + ":"
-                + self.traefik_api_hashed_password
-                + '"]\n'
+        except:
+            self.log.error(
+                "Couldn't set up traefik's static config. Unexpected error:",
+                sys.exc_info()[0],
             )
-
-            f.write("[api]\n"),
-            f.write("\tdashboard = true\n"),
-            f.write('\tentrypoint = "auth_api"\n'),
-
-            f.write("[file]\n")
-            f.write('\tfilename = "' + self.toml_dynamic_config_file + '"\n')
-            f.write("\twatch = true\n")
-        open(self.toml_dynamic_config_file, "a").close()
 
     def _start_traefik(self):
         self.log.info("Starting traefik...")
         try:
-            self.traefik_process = traefik_utils.launch_traefik_with_toml()
+            self._launch_traefik(config_type="toml")
         except FileNotFoundError as e:
             self.log.error(
                 "Failed to find traefik \n"
@@ -123,14 +138,14 @@ class TraefikTomlProxy(TraefikProxy):
             config_fd.write("".join(value["backend"]))
 
     def _update_config_file(self):
-        tmp = open("tmp.toml", "w")
-        self._persist_routes(tmp)
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        tmp.close()
         try:
+            tmp = open("tmp.toml", "w")
+            self._persist_routes(tmp)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+            tmp.close()
             os.rename("tmp.toml", self.toml_dynamic_config_file)
-        except Exception as e:
+        except:
             self.log.error("Failed to update traefik's dynamic configuration file")
 
     async def start(self):

@@ -63,48 +63,20 @@ def restart_traefik_proc(proxy):
     proxy._start_traefik()
 
 
-_ports = {"default_backend": 9000, "first_backend": 9090, "second_backend": 9099}
-
-
 @pytest.fixture
-def launch_backends():
-    default_backend_port, first_backend_port, second_backend_port = (
-        utils.get_backend_ports()
-    )
-
+def launch_backend():
     dummy_server_path = abspath(join(dirname(__file__), "dummy_http_server.py"))
+    running_backends = []
 
-    default_backend = subprocess.Popen(
-        [sys.executable, dummy_server_path, str(default_backend_port)], stdout=None
-    )
-    first_backend = subprocess.Popen(
-        [sys.executable, dummy_server_path, str(first_backend_port)], stdout=None
-    )
-    second_backend = subprocess.Popen(
-        [sys.executable, dummy_server_path, str(second_backend_port)], stdout=None
-    )
+    def _launch_backend(port):
+        backend = subprocess.Popen(
+            [sys.executable, dummy_server_path, str(port)], stdout=None
+        )
+        running_backends.append(backend)
 
-    yield
+    yield _launch_backend
 
-    default_backend.kill()
-    first_backend.kill()
-    second_backend.kill()
-
-    default_backend.wait()
-    first_backend.wait()
-    second_backend.wait()
-
-
-@pytest.fixture
-def default_backend():
-    default_backend_port, _, _ = utils.get_backend_ports()
-
-    dummy_server_path = abspath(join(dirname(__file__), "dummy_http_server.py"))
-
-    default_backend = subprocess.Popen(
-        [sys.executable, dummy_server_path, str(default_backend_port)], stdout=None
-    )
-
-    yield
-    default_backend.kill()
-    default_backend.wait()
+    for proc in running_backends:
+        proc.kill()
+    for proc in running_backends:
+        proc.wait()
