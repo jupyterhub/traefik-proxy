@@ -52,6 +52,8 @@ class TraefikTomlProxy(TraefikProxy):
         self.routes_cache = {}
 
     async def _setup_traefik_static_config(self):
+        self._generate_htpassword()
+
         await super()._setup_traefik_static_config()
 
         self.static_config["file"] = {"filename": "rules.toml", "watch": True}

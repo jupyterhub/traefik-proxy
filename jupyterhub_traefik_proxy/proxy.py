@@ -149,7 +149,6 @@ class TraefikProxy(Proxy):
 
     async def _setup_traefik_static_config(self):
         self.log.info("Setting up traefik's static config...")
-        self._generate_htpassword()
 
         self.static_config = {}
         self.static_config["defaultentrypoints"] = ["http"]
