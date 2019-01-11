@@ -21,8 +21,8 @@ Route Specification:
 import json
 import os
 import asyncio
+import toml
 
-from urllib.parse import urlparse
 from traitlets import Any, default, Unicode
 
 from . import traefik_utils
@@ -52,43 +52,14 @@ class TraefikTomlProxy(TraefikProxy):
         self.routes_cache = {}
 
     async def _setup_traefik_static_config(self):
-        self.log.info("Setting up traefik's static config...")
-        self._generate_htpassword()
+        await super()._setup_traefik_static_config()
+
+        self.static_config["file"] = {"filename": "rules.toml", "watch": True}
+        toml_string = toml.dumps(self.static_config)
 
         try:
             with open(self.toml_static_config_file, "w") as f:
-                f.write('defaultEntryPoints = ["http"]\n')
-                f.write("debug = true\n"),
-                f.write('logLevel = "ERROR"\n')
-
-                f.write("[entryPoints]\n"),
-                f.write("\t[entryPoints.http]\n")
-                f.write(
-                    '\t\taddress = ":' + str(urlparse(self.public_url).port) + '"\n'
-                )
-                f.write("\t[entryPoints.auth_api]\n")
-                f.write(
-                    '\t\taddress = ":'
-                    + str(urlparse(self.traefik_api_url).port)
-                    + '"\n'
-                )
-                f.write("\t\t[entryPoints.auth_api.auth]\n")
-                f.write("\t\t\t[entryPoints.auth_api.auth.basic]\n")
-                f.write(
-                    '\t\t\t\tusers = ["'
-                    + self.traefik_api_username
-                    + ":"
-                    + self.traefik_api_hashed_password
-                    + '"]\n'
-                )
-
-                f.write("[api]\n"),
-                f.write("\tdashboard = true\n"),
-                f.write('\tentrypoint = "auth_api"\n'),
-
-                f.write("[file]\n")
-                f.write('\tfilename = "' + self.toml_dynamic_config_file + '"\n')
-                f.write("\twatch = true\n")
+                f.write(toml_string)
             open(self.toml_dynamic_config_file, "a").close()
         except IOError as e:
             self.log.error(
@@ -122,20 +93,26 @@ class TraefikTomlProxy(TraefikProxy):
             raise
 
     def _get_route_unsafe(self, routespec):
-        result = {
-            "routespec": routespec,
-            "target": self.routes_cache[routespec]["target"],
-            "data": self.routes_cache[routespec]["data"],
-        }
-        return result
+        try:
+            result = {
+                "routespec": routespec,
+                "target": self.routes_cache[routespec]["target"],
+                "data": self.routes_cache[routespec]["data"],
+            }
+        except KeyError:
+            self.log.info("No route for {} doesn't exist!".format(routespec))
+            result = None
+        finally:
+            return result
 
-    def _persist_routes(self, config_fd):
-        config_fd.write("[frontends]\n")
-        for key, value in self.routes_cache.items():
-            config_fd.write("".join(value["frontend"]))
-        config_fd.write("[backends]\n")
-        for key, value in self.routes_cache.items():
-            config_fd.write("".join(value["backend"]))
+    def _persist_routes(self):
+        with traefik_utils.atomic_writing(self.toml_dynamic_config_file) as config_fd:
+            config_fd.write("[frontends]\n")
+            for key, value in self.routes_cache.items():
+                config_fd.write("".join(value["frontend"]))
+            config_fd.write("[backends]\n")
+            for key, value in self.routes_cache.items():
+                config_fd.write("".join(value["backend"]))
 
     def _update_config_file(self):
         try:
@@ -144,7 +121,7 @@ class TraefikTomlProxy(TraefikProxy):
             tmp.flush()
             os.fsync(tmp.fileno())
             tmp.close()
-            os.rename("tmp.toml", self.toml_dynamic_config_file)
+            os.replace("tmp.toml", self.toml_dynamic_config_file)
         except:
             self.log.error("Failed to update traefik's dynamic configuration file")
 
@@ -221,7 +198,8 @@ class TraefikTomlProxy(TraefikProxy):
                 "data": data,
                 "target": target,
             }
-            self._update_config_file()
+            self._persist_routes()
+            # self._update_config_file()
         finally:
             self.mutex.release()
 
@@ -243,7 +221,8 @@ class TraefikTomlProxy(TraefikProxy):
         await self.mutex.acquire()
         try:
             del self.routes_cache[routespec]
-            self._update_config_file()
+            self._persist_routes()
+            # self._update_config_file()
         finally:
             self.mutex.release()
 
@@ -280,7 +259,7 @@ class TraefikTomlProxy(TraefikProxy):
                 A URI that was used to add this route,
                 e.g. `host.tld/path/`
 
-        Resuper.turns:
+        Returns:
             result (dict):
                 dict with the following keys::
 

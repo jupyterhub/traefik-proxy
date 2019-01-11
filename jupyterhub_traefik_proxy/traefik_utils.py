@@ -1,8 +1,12 @@
 import sys
 import json
 import re
+import shutil
+import io
+import os
 
 from urllib.parse import urlparse
+from contextlib import contextmanager
 
 
 def generate_rule(routespec):
@@ -90,3 +94,33 @@ def generate_route_keys(proxy, target, routespec, separator=""):
     )
 
     return (backend_alias, backend_url_path, frontend_alias, frontend_rule_path)
+
+
+def path_to_intermediate(path):
+    """Name of the intermediate file used in atomic writes.
+    The .~ prefix will make Dropbox ignore the temporary file."""
+    dirname, basename = os.path.split(path)
+    return os.path.join(dirname, ".~" + basename)
+
+
+@contextmanager
+def atomic_writing(path):
+    tmp_path = path_to_intermediate(path)
+    shutil.copy2(path, tmp_path)
+    fileobj = io.open(path, "w")
+
+    try:
+        yield fileobj
+    except:
+        # Failed! Move the backup file back to the real path to avoid corruption
+        fileobj.close()
+        os.replace(tmp_path, path)
+        raise
+
+    # Flush to disk
+    fileobj.flush()
+    os.fsync(fileobj.fileno())
+    fileobj.close()
+
+    # Written successfully, now remove the backup copy
+    os.remove(tmp_path)

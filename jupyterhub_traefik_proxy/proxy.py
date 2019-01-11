@@ -26,6 +26,7 @@ from traitlets import Any, Unicode
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 from subprocess import Popen
 from os.path import abspath, dirname, join
+from urllib.parse import urlparse
 
 import json
 import hashlib
@@ -51,6 +52,10 @@ class TraefikProxy(Proxy):
     )
 
     traefik_api_hashed_password = Unicode()
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.static_config = {}
 
     def _generate_htpassword(self):
         from passlib.apache import HtpasswdFile
@@ -137,10 +142,39 @@ class TraefikProxy(Proxy):
                 ["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None
             )
         else:
-            self.log.error(
-                "Configuration mode not supported \n. The proxy can only be configured through toml and etcd"
+            raise ValueError(
+                "Configuration mode not supported \n.\
+                The proxy can only be configured through toml and etcd"
             )
-            raise
+
+    async def _setup_traefik_static_config(self):
+        self.log.info("Setting up traefik's static config...")
+        self._generate_htpassword()
+
+        self.static_config = {}
+        self.static_config["defaultentrypoints"] = ["http"]
+        self.static_config["debug"] = True
+        self.static_config["logLevel"] = "ERROR"
+        entryPoints = {}
+        entryPoints["http"] = {"address": ":" + str(urlparse(self.public_url).port)}
+        auth = {
+            "basic": {
+                "users": [
+                    self.traefik_api_username + ":" + self.traefik_api_hashed_password
+                ]
+            }
+        }
+        entryPoints["auth_api"] = {
+            "address": ":" + str(urlparse(self.traefik_api_url).port),
+            "auth": auth,
+        }
+        entryPoints["auth_api"]["auth"]["basic"] = {
+            "users": [
+                self.traefik_api_username + ":" + self.traefik_api_hashed_password
+            ]
+        }
+        self.static_config["entryPoints"] = entryPoints
+        self.static_config["api"] = {"dashboard": True, "entrypoint": "auth_api"}
 
     async def start(self):
         """Start the proxy.

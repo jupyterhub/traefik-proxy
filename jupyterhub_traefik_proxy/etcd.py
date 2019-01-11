@@ -60,41 +60,43 @@ class TraefikEtcdProxy(TraefikProxy):
     )
 
     async def _setup_traefik_static_config(self):
-        self.log.info("Setting up traefik's static config...")
-        self._generate_htpassword()
+        await super()._setup_traefik_static_config()
+        keys = []
+        values = []
+
+        def get_etcd_kvs(d, etcd_key):
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    new_key = etcd_key + k + "/"
+                    get_etcd_kvs(d[k], new_key)
+                else:
+                    keys.append(etcd_key + k)
+                    values.append(d[k])
+
+        get_etcd_kvs(self.static_config, self.etcd_traefik_prefix)
+
+        success = [
+            KV.put.txn(self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379"),
+            KV.put.txn(
+                self.etcd_traefik_prefix + "etcd/prefix", self.etcd_traefik_prefix
+            ),
+            KV.put.txn(self.etcd_traefik_prefix + "etcd/useapiv3", "true"),
+            KV.put.txn(self.etcd_traefik_prefix + "etcd/watch", "true"),
+            KV.put.txn(self.etcd_traefik_prefix + "providersThrottleDuration", "1"),
+        ]
+
+        for key, value in zip(keys, values):
+            if type(value) is bool:
+                value = str(value).lower()
+            if type(value) is list:
+                for i in range(len(value)):
+                    key += "/" + str(i)
+                    value = value[i]
+            print(key + " = " + str(value))
+            success.append(KV.put.txn(key.lower(), value))
 
         status, response = await self.etcd_client.txn(
-            compare=[],
-            success=[
-                KV.put.txn(self.etcd_traefik_prefix + "debug", "true"),
-                KV.put.txn(self.etcd_traefik_prefix + "defaultentrypoints/0", "http"),
-                KV.put.txn(
-                    self.etcd_traefik_prefix + "entrypoints/http/address",
-                    ":" + str(urlparse(self.public_url).port),
-                ),
-                KV.put.txn(
-                    self.etcd_traefik_prefix + "entrypoints/auth_api/address",
-                    ":" + str(urlparse(self.traefik_api_url).port),
-                ),
-                KV.put.txn(
-                    self.etcd_traefik_prefix
-                    + "entrypoints/auth_api/auth/basic/users/0",
-                    self.traefik_api_username + ":" + self.traefik_api_hashed_password,
-                ),
-                KV.put.txn(self.etcd_traefik_prefix + "api/dashboard", "true"),
-                KV.put.txn(self.etcd_traefik_prefix + "api/entrypoint", "auth_api"),
-                KV.put.txn(self.etcd_traefik_prefix + "loglevel", "ERROR"),
-                KV.put.txn(
-                    self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379"
-                ),
-                KV.put.txn(
-                    self.etcd_traefik_prefix + "etcd/prefix", self.etcd_traefik_prefix
-                ),
-                KV.put.txn(self.etcd_traefik_prefix + "etcd/useapiv3", "true"),
-                KV.put.txn(self.etcd_traefik_prefix + "etcd/watch", "true"),
-                KV.put.txn(self.etcd_traefik_prefix + "providersThrottleDuration", "1"),
-            ],
-            fail=[],
+            compare=[], success=success, fail=[]
         )
 
         if status:
