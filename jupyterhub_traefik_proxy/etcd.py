@@ -92,7 +92,6 @@ class TraefikEtcdProxy(TraefikProxy):
                 for i in range(len(value)):
                     key += "/" + str(i)
                     value = value[i]
-            print(key + " = " + str(value))
             success.append(KV.put.txn(key.lower(), value))
 
         status, response = await self.etcd_client.txn(
