@@ -61,12 +61,8 @@ class TraefikTomlProxy(TraefikProxy):
             with open(self.toml_static_config_file, "w") as f:
                 f.write(toml_string)
             open(self.toml_dynamic_config_file, "a").close()
-        except IOError as e:
-            self.log.error(
-                "Couldn't set up traefik's static config. I/O error({0}): {1}".format(
-                    e.errno, e.strerrornse
-                )
-            )
+        except IOError:
+            self.log.exception("Couldn't set up traefik's static config.")
         except:
             self.log.error(
                 "Couldn't set up traefik's static config. Unexpected error:",
