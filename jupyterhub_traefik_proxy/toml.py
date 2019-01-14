@@ -64,9 +64,7 @@ class TraefikTomlProxy(TraefikProxy):
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
         except:
-            self.log.error(
-                "Couldn't set up traefik's static config. Unexpected error:",
-            )
+            self.log.error("Couldn't set up traefik's static config. Unexpected error:")
 
     def _start_traefik(self):
         self.log.info("Starting traefik...")

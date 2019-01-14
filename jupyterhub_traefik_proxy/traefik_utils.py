@@ -32,15 +32,7 @@ def generate_backend_entry(
     backend_entry = ""
     if separator is "/":
         backend_entry = proxy.etcd_traefik_prefix
-    backend_entry += (
-        "backends"
-        + separator
-        + backend_alias
-        + separator
-        + "servers"
-        + separator
-        + "server1"
-    )
+    backend_entry += separator.join(["backends", backend_alias, "servers", "server1"])
     if url is True:
         backend_entry += separator + "url"
     elif weight is True:
@@ -54,14 +46,8 @@ def generate_frontend_backend_entry(proxy, frontend_alias):
 
 
 def generate_frontend_rule_entry(proxy, frontend_alias, separator="/"):
-    frontend_rule_entry = (
-        "frontends"
-        + separator
-        + frontend_alias
-        + separator
-        + "routes"
-        + separator
-        + "test"
+    frontend_rule_entry = separator.join(
+        ["frontends", frontend_alias, "routes", "test"]
     )
     if separator == "/":
         frontend_rule_entry = (
@@ -93,7 +79,9 @@ def generate_route_keys(proxy, target, routespec, separator=""):
         backend_weight_path = generate_backend_entry(proxy, backend_alias, weight=True)
         frontend_backend_path = generate_frontend_backend_entry(proxy, frontend_alias)
     else:
-        backend_url_path = generate_backend_entry(proxy, backend_alias, separator=separator)
+        backend_url_path = generate_backend_entry(
+            proxy, backend_alias, separator=separator
+        )
         frontend_rule_path = generate_frontend_rule_entry(
             proxy, frontend_alias, separator=separator
         )
@@ -108,6 +96,7 @@ def generate_route_keys(proxy, target, routespec, separator=""):
         frontend_backend_path,
         frontend_rule_path,
     )
+
 
 def path_to_intermediate(path):
     """Name of the intermediate file used in atomic writes.
