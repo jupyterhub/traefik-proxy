@@ -42,37 +42,26 @@ def assert_etcdctl_del(key, expected_rv):
 def add_route_with_etcdctl(etcd_proxy, routespec, target, data):
     proxy = etcd_proxy
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
-    (
-        backend_alias,
-        backend_url_path,
-        backend_weight_path,
-        frontend_alias,
-        frontend_backend_path,
-        frontend_rule_path,
-    ) = traefik_utils.generate_route_keys(proxy, target, routespec)
-
+    route_keys = traefik_utils.generate_route_keys(proxy, target, routespec)
     rule = traefik_utils.generate_rule(routespec)
     expected_rv = "OK"
 
     assert_etcdctl_put(jupyterhub_routespec, target, expected_rv)
     assert_etcdctl_put(target, json.dumps(data), expected_rv)
-    assert_etcdctl_put(backend_url_path, target, expected_rv)
-    assert_etcdctl_put(backend_weight_path, default_backend_weight, expected_rv)
-    assert_etcdctl_put(frontend_backend_path, backend_alias, expected_rv)
-    assert_etcdctl_put(frontend_rule_path, rule, expected_rv)
+    assert_etcdctl_put(route_keys.backend_url_path, target, expected_rv)
+    assert_etcdctl_put(
+        route_keys.backend_weight_path, default_backend_weight, expected_rv
+    )
+    assert_etcdctl_put(
+        route_keys.frontend_backend_path, route_keys.backend_alias, expected_rv
+    )
+    assert_etcdctl_put(route_keys.frontend_rule_path, rule, expected_rv)
 
 
 def check_route_with_etcdctl(etcd_proxy, routespec, target, data, test_deletion=False):
     proxy = etcd_proxy
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
-    (
-        backend_alias,
-        backend_url_path,
-        backend_weight_path,
-        frontend_alias,
-        frontend_backend_path,
-        frontend_rule_path,
-    ) = traefik_utils.generate_route_keys(proxy, target, routespec)
+    route_keys = traefik_utils.generate_route_keys(proxy, target, routespec)
     rule = traefik_utils.generate_rule(routespec)
 
     if test_deletion:
@@ -90,23 +79,23 @@ def check_route_with_etcdctl(etcd_proxy, routespec, target, data, test_deletion=
 
     # Test that a backend has been added to etcd for this target
     if not test_deletion:
-        expected_rv = backend_url_path + "\n" + target
-    assert_etcdctl_get(backend_url_path, expected_rv)
+        expected_rv = route_keys.backend_url_path + "\n" + target
+    assert_etcdctl_get(route_keys.backend_url_path, expected_rv)
 
     # Test that a backend weight has been added to etcd for this target
     if not test_deletion:
-        expected_rv = backend_weight_path + "\n" + default_backend_weight
-    assert_etcdctl_get(backend_weight_path, expected_rv)
+        expected_rv = route_keys.backend_weight_path + "\n" + default_backend_weight
+    assert_etcdctl_get(route_keys.backend_weight_path, expected_rv)
 
     # Test that a frontend has been added for the prev backend
     if not test_deletion:
-        expected_rv = frontend_backend_path + "\n" + backend_alias
-    assert_etcdctl_get(frontend_backend_path, expected_rv)
+        expected_rv = route_keys.frontend_backend_path + "\n" + route_keys.backend_alias
+    assert_etcdctl_get(route_keys.frontend_backend_path, expected_rv)
 
     # Test that a path-routing rule has been added for this frontend
     if not test_deletion:
-        expected_rv = frontend_rule_path + "\n" + rule
-    assert_etcdctl_get(frontend_rule_path, expected_rv)
+        expected_rv = route_keys.frontend_rule_path + "\n" + rule
+    assert_etcdctl_get(route_keys.frontend_rule_path, expected_rv)
 
 
 @pytest.mark.parametrize("routespec", ["/proxy/path", "host/proxy/path"])

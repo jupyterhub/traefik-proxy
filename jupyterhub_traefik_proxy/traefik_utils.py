@@ -7,6 +7,7 @@ import os
 
 from urllib.parse import urlparse
 from contextlib import contextmanager
+from collections import namedtuple
 
 
 def generate_rule(routespec):
@@ -74,27 +75,39 @@ def generate_route_keys(proxy, target, routespec, separator=""):
     backend_alias = generate_alias(target, "backend")
     frontend_alias = generate_alias(target, "frontend")
 
+    RouteKeys = namedtuple(
+        "RouteKeys",
+        [
+            "backend_alias",
+            "backend_url_path",
+            "backend_weight_path",
+            "frontend_alias",
+            "frontend_backend_path",
+            "frontend_rule_path",
+        ],
+    )
+
     if separator != ".":
         backend_url_path = generate_backend_entry(proxy, backend_alias, url=True)
         frontend_rule_path = generate_frontend_rule_entry(proxy, frontend_alias)
         backend_weight_path = generate_backend_entry(proxy, backend_alias, weight=True)
         frontend_backend_path = generate_frontend_backend_entry(proxy, frontend_alias)
-        return (
-            backend_alias,
-            backend_url_path,
-            backend_weight_path,
-            frontend_alias,
-            frontend_backend_path,
-            frontend_rule_path,
+    else:
+        backend_url_path = generate_backend_entry(proxy, backend_alias, separator=separator)
+        frontend_rule_path = generate_frontend_rule_entry(
+            proxy, frontend_alias, separator=separator
         )
+        backend_weight_path = ""
+        frontend_backend_path = ""
 
-    backend_url_path = generate_backend_entry(proxy, backend_alias, separator=separator)
-    frontend_rule_path = generate_frontend_rule_entry(
-        proxy, frontend_alias, separator=separator
+    return RouteKeys(
+        backend_alias,
+        backend_url_path,
+        backend_weight_path,
+        frontend_alias,
+        frontend_backend_path,
+        frontend_rule_path,
     )
-
-    return (backend_alias, backend_url_path, frontend_alias, frontend_rule_path)
-
 
 def path_to_intermediate(path):
     """Name of the intermediate file used in atomic writes.

@@ -55,18 +55,17 @@ class TraefikTomlProxy(TraefikProxy):
         await super()._setup_traefik_static_config()
 
         self.static_config["file"] = {"filename": "rules.toml", "watch": True}
-        toml_string = toml.dumps(self.static_config)
 
         try:
             with open(self.toml_static_config_file, "w") as f:
-                f.write(toml_string)
+                toml.dump(self.static_config, f)
+            # Make sure that the dynamic configuration file exists
             open(self.toml_dynamic_config_file, "a").close()
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
         except:
             self.log.error(
                 "Couldn't set up traefik's static config. Unexpected error:",
-                sys.exc_info()[0],
             )
 
     def _start_traefik(self):
@@ -82,7 +81,8 @@ class TraefikTomlProxy(TraefikProxy):
 
     def _clean_resources(self):
         try:
-            os.remove(self.toml_static_config_file)
+            if self.should_start:
+                os.remove(self.toml_static_config_file)
             os.remove(self.toml_dynamic_config_file)
         except:
             self.log.error("Failed to remove traefik's configuration files \n")
@@ -109,17 +109,6 @@ class TraefikTomlProxy(TraefikProxy):
             config_fd.write("[backends]\n")
             for key, value in self.routes_cache.items():
                 config_fd.write("".join(value["backend"]))
-
-    def _update_config_file(self):
-        try:
-            tmp = open("tmp.toml", "w")
-            self._persist_routes(tmp)
-            tmp.flush()
-            os.fsync(tmp.fileno())
-            tmp.close()
-            os.replace("tmp.toml", self.toml_dynamic_config_file)
-        except:
-            self.log.error("Failed to update traefik's dynamic configuration file")
 
     async def start(self):
         """Start the proxy.
@@ -164,40 +153,32 @@ class TraefikTomlProxy(TraefikProxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        (
-            backend_alias,
-            backend_url_path,
-            frontend_alias,
-            frontend_rule_path,
-        ) = traefik_utils.generate_route_keys(self, target, routespec, separator=".")
-
+        route_keys = traefik_utils.generate_route_keys(
+            self, target, routespec, separator="."
+        )
         data = json.dumps(data)
         rule = traefik_utils.generate_rule(routespec)
 
-        await self.mutex.acquire()
-        try:
+        async with self.mutex:
             self.routes_cache[routespec] = {
                 "backend": [
-                    "\t[backends." + backend_alias + "]\n",
-                    "\t\t[" + backend_url_path + "]\n",
-                    "\t\t\turl = " + '"' + target + '"\n',
-                    "\t\t\tweight = " + "1\n",
+                    "[backends." + route_keys.backend_alias + "]\n",
+                    "[" + route_keys.backend_url_path + "]\n",
+                    "url = " + '"' + target + '"\n',
+                    "weight = " + "1\n",
                 ],
                 "frontend": [
-                    "\t[frontends." + frontend_alias + "]\n",
-                    "\t\tbackend = " + '"' + backend_alias + '"\n',
-                    "\t\tpassHostHeader = true\n",
-                    "\t\t[" + frontend_rule_path + "]\n",
-                    "\t\t\trule = " + '"' + rule + '"\n',
-                    "\t\t\tdata = " + "'" + data + "'\n",
+                    "[frontends." + route_keys.frontend_alias + "]\n",
+                    "backend = " + '"' + route_keys.backend_alias + '"\n',
+                    "passHostHeader = true\n",
+                    "[" + route_keys.frontend_rule_path + "]\n",
+                    "rule = " + '"' + rule + '"\n',
+                    "data = " + "'" + data + "'\n",
                 ],
                 "data": data,
                 "target": target,
             }
             self._persist_routes()
-            # self._update_config_file()
-        finally:
-            self.mutex.release()
 
         try:
             # Check if traefik was launched
@@ -214,13 +195,9 @@ class TraefikTomlProxy(TraefikProxy):
 
         **Subclasses must define this method**
         """
-        await self.mutex.acquire()
-        try:
+        async with self.mutex:
             del self.routes_cache[routespec]
             self._persist_routes()
-            # self._update_config_file()
-        finally:
-            self.mutex.release()
 
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the

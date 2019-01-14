@@ -14,17 +14,11 @@ pytestmark = pytest.mark.asyncio
 
 
 async def wait_for_services(proxy, target):
-    traefik_port = urlparse(proxy.public_url).port
-    traefik_ip = urlparse(proxy.public_url).hostname
-    backend_port = urlparse(target).port
-    backend_ip = urlparse(target).hostname
-
     # Wait until traefik and the backend are ready
     await exponential_backoff(
         utils.check_services_ready,
         "Service not reacheable",
-        ips=[traefik_ip, backend_ip],
-        ports=[traefik_port, backend_port],
+        urls=[proxy.public_url, target],
     )
 
 

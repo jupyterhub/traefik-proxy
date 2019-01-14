@@ -3,6 +3,7 @@ import json
 
 from jupyterhub.utils import exponential_backoff
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
+from urllib.parse import urlparse
 
 _ports = {"default_backend": 9000, "first_backend": 9090, "second_backend": 9099}
 
@@ -50,9 +51,11 @@ async def get_responding_backend_port(traefik_url, path):
         raise e
 
 
-async def check_services_ready(ips, ports):
+async def check_services_ready(urls):
     ready = True
-    for ip, port in zip(ips, ports):
+    for url in urls:
+        ip = urlparse(url).hostname
+        port = urlparse(url).port
         status = await check_host_up(ip=ip, port=port)
         ready = ready and status
 

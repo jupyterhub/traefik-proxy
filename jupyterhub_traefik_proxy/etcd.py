@@ -61,8 +61,7 @@ class TraefikEtcdProxy(TraefikProxy):
 
     async def _setup_traefik_static_config(self):
         await super()._setup_traefik_static_config()
-        keys = []
-        values = []
+        kv = {}
 
         def get_etcd_kvs(d, etcd_key):
             for k, v in d.items():
@@ -70,8 +69,7 @@ class TraefikEtcdProxy(TraefikProxy):
                     new_key = etcd_key + k + "/"
                     get_etcd_kvs(d[k], new_key)
                 else:
-                    keys.append(etcd_key + k)
-                    values.append(d[k])
+                    kv[etcd_key + k] = d[k]
 
         get_etcd_kvs(self.static_config, self.etcd_traefik_prefix)
 
@@ -85,10 +83,10 @@ class TraefikEtcdProxy(TraefikProxy):
             KV.put.txn(self.etcd_traefik_prefix + "providersThrottleDuration", "1"),
         ]
 
-        for key, value in zip(keys, values):
-            if type(value) is bool:
+        for key, value in kv.items():
+            if isinstance(value, bool):
                 value = str(value).lower()
-            if type(value) is list:
+            if isinstance(value, list):
                 for i in range(len(value)):
                     key += "/" + str(i)
                     value = value[i]
@@ -157,14 +155,7 @@ class TraefikEtcdProxy(TraefikProxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        (
-            backend_alias,
-            backend_url_path,
-            backend_weight_path,
-            frontend_alias,
-            frontend_backend_path,
-            frontend_rule_path,
-        ) = traefik_utils.generate_route_keys(self, target, routespec)
+        route_keys = traefik_utils.generate_route_keys(self, target, routespec)
 
         # Store the data dict passed in by JupyterHub
         data = json.dumps(data)
@@ -178,20 +169,22 @@ class TraefikEtcdProxy(TraefikProxy):
             success=[
                 KV.put.txn(jupyterhub_routespec, target),
                 KV.put.txn(target, data),
-                KV.put.txn(backend_url_path, target),
-                KV.put.txn(backend_weight_path, "1"),
-                KV.put.txn(frontend_backend_path, backend_alias),
-                KV.put.txn(frontend_rule_path, rule),
+                KV.put.txn(route_keys.backend_url_path, target),
+                KV.put.txn(route_keys.backend_weight_path, "1"),
+                KV.put.txn(route_keys.frontend_backend_path, route_keys.backend_alias),
+                KV.put.txn(route_keys.frontend_rule_path, rule),
             ],
             fail=[],
         )
 
         if status:
-            self.log.info("Added backend %s with the alias %s.", target, backend_alias)
+            self.log.info(
+                "Added backend %s with the alias %s.", target, route_keys.backend_alias
+            )
             self.log.info(
                 "Added frontend %s for backend %s with the following routing rule %s.",
-                frontend_alias,
-                backend_alias,
+                route_keys.frontend_alias,
+                route_keys.backend_alias,
                 routespec,
             )
         else:
@@ -221,24 +214,17 @@ class TraefikEtcdProxy(TraefikProxy):
             return
 
         target = value.decode()
-        (
-            backend_alias,
-            backend_url_path,
-            backend_weight_path,
-            frontend_alias,
-            frontend_backend_path,
-            frontend_rule_path,
-        ) = traefik_utils.generate_route_keys(self, target, routespec)
+        route_keys = traefik_utils.generate_route_keys(self, target, routespec)
 
         status, response = await self.etcd_client.txn(
             compare=[],
             success=[
                 KV.delete.txn(jupyterhub_routespec),
                 KV.delete.txn(target),
-                KV.delete.txn(backend_url_path),
-                KV.delete.txn(backend_weight_path),
-                KV.delete.txn(frontend_backend_path),
-                KV.delete.txn(frontend_rule_path),
+                KV.delete.txn(route_keys.backend_url_path),
+                KV.delete.txn(route_keys.backend_weight_path),
+                KV.delete.txn(route_keys.frontend_backend_path),
+                KV.delete.txn(route_keys.frontend_rule_path),
             ],
             fail=[],
         )
