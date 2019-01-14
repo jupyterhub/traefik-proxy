@@ -64,7 +64,7 @@ async def wait_for_services(proxy, target):
     ],
 )
 async def test_add_get_delete(
-    etcd, clean_etcd, proxy, launch_backend, routespec, target, data, expected_output
+    proxy, launch_backend, routespec, target, data, expected_output
 ):
     backend_port = urlparse(target).port
     launch_backend(backend_port)
@@ -106,7 +106,7 @@ async def test_add_get_delete(
     await exponential_backoff(_wait_for_deletion, "Route still exists")
 
 
-async def test_host_origin_headers(etcd, clean_etcd, proxy, launch_backend):
+async def test_host_origin_headers(proxy, launch_backend):
     routespec = "/user/username"
     target = "http://127.0.0.1:9000"
     data = {}

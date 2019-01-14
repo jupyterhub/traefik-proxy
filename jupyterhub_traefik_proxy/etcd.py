@@ -60,8 +60,6 @@ class TraefikEtcdProxy(TraefikProxy):
     )
 
     async def _setup_traefik_static_config(self):
-        self._generate_htpassword()
-
         await super()._setup_traefik_static_config()
         keys = []
         values = []

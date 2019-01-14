@@ -14,10 +14,7 @@ pytestmark = pytest.mark.asyncio
     "username, password, expected_rc",
     [("api_admin", "admin", 200), ("api_admin", "1234", 401), ("", "", 401)],
 )
-async def test_traefik_api_auth(
-    etcd, clean_etcd, proxy, username, password, expected_rc
-):
-    # proxy = etcd_proxy
+async def test_traefik_api_auth(proxy, username, password, expected_rc):
     traefik_port = urlparse(proxy.public_url).port
 
     await exponential_backoff(

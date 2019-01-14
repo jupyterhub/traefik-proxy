@@ -112,7 +112,7 @@ def check_route_with_etcdctl(etcd_proxy, routespec, target, data, test_deletion=
 @pytest.mark.parametrize("routespec", ["/proxy/path", "host/proxy/path"])
 @pytest.mark.parametrize("target", ["http://127.0.0.1:99"])
 @pytest.mark.parametrize("data", [{"test": "test1"}, {}])
-async def test_add_route_to_etcd(etcd, clean_etcd, etcd_proxy, routespec, target, data):
+async def test_add_route_to_etcd(etcd_proxy, routespec, target, data):
     proxy = etcd_proxy
     await proxy.add_route(routespec, target, data)
     check_route_with_etcdctl(proxy, routespec, target, data)
@@ -121,9 +121,7 @@ async def test_add_route_to_etcd(etcd, clean_etcd, etcd_proxy, routespec, target
 @pytest.mark.parametrize("routespec", ["/proxy/path", "host/proxy/path"])
 @pytest.mark.parametrize("target", ["http://127.0.0.1:99"])
 @pytest.mark.parametrize("data", [{"test": "test1"}, {}])
-async def test_delete_route_from_etcd(
-    etcd, clean_etcd, etcd_proxy, routespec, target, data
-):
+async def test_delete_route_from_etcd(etcd_proxy, routespec, target, data):
     proxy = etcd_proxy
     add_route_with_etcdctl(proxy, routespec, target, data)
     await proxy.delete_route(routespec)
@@ -163,16 +161,14 @@ async def test_delete_route_from_etcd(
         ),  # Host-based routing
     ],
 )
-async def test_get_route(
-    etcd, clean_etcd, etcd_proxy, routespec, target, data, expected_output
-):
+async def test_get_route(etcd_proxy, routespec, target, data, expected_output):
     proxy = etcd_proxy
     add_route_with_etcdctl(proxy, routespec, target, data)
     route = await proxy.get_route(routespec)
     assert route == expected_output
 
 
-async def test_get_all_routes(etcd, clean_etcd, etcd_proxy):
+async def test_get_all_routes(etcd_proxy):
     proxy = etcd_proxy
     routespec = ["/proxy/path1", "/proxy/path2", "host/proxy/path"]
     target = ["http://127.0.0.1:990", "http://127.0.0.1:909", "http://127.0.0.1:999"]

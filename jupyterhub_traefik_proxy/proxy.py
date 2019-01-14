@@ -149,6 +149,7 @@ class TraefikProxy(Proxy):
 
     async def _setup_traefik_static_config(self):
         self.log.info("Setting up traefik's static config...")
+        self._generate_htpassword()
 
         self.static_config = {}
         self.static_config["defaultentrypoints"] = ["http"]
@@ -166,11 +167,6 @@ class TraefikProxy(Proxy):
         entryPoints["auth_api"] = {
             "address": ":" + str(urlparse(self.traefik_api_url).port),
             "auth": auth,
-        }
-        entryPoints["auth_api"]["auth"]["basic"] = {
-            "users": [
-                self.traefik_api_username + ":" + self.traefik_api_hashed_password
-            ]
         }
         self.static_config["entryPoints"] = entryPoints
         self.static_config["api"] = {"dashboard": True, "entrypoint": "auth_api"}

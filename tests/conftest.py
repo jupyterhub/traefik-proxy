@@ -43,7 +43,7 @@ def proxy(request):
     return request.getfixturevalue(request.param)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session", autouse=True)
 def etcd():
     etcd_proc = subprocess.Popen("etcd", stdout=None, stderr=None)
     yield etcd_proc
@@ -52,7 +52,7 @@ def etcd():
     shutil.rmtree(os.getcwd() + "/default.etcd/")
 
 
-@pytest.fixture()
+@pytest.fixture(scope="function", autouse=True)
 def clean_etcd():
     subprocess.run(["etcdctl", "del", '""', "--from-key=true"])
 
