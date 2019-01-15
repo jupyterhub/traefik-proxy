@@ -42,7 +42,7 @@ def assert_etcdctl_del(key, expected_rv):
 def add_route_with_etcdctl(etcd_proxy, routespec, target, data):
     proxy = etcd_proxy
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
-    route_keys = traefik_utils.generate_route_keys(proxy, target, routespec)
+    route_keys = traefik_utils.generate_route_keys(proxy, routespec, routespec)
     rule = traefik_utils.generate_rule(routespec)
     expected_rv = "OK"
 
@@ -61,7 +61,7 @@ def add_route_with_etcdctl(etcd_proxy, routespec, target, data):
 def check_route_with_etcdctl(etcd_proxy, routespec, target, data, test_deletion=False):
     proxy = etcd_proxy
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
-    route_keys = traefik_utils.generate_route_keys(proxy, target, routespec)
+    route_keys = traefik_utils.generate_route_keys(proxy, routespec, routespec)
     rule = traefik_utils.generate_rule(routespec)
 
     if test_deletion:
@@ -162,7 +162,6 @@ async def test_get_all_routes(etcd_proxy):
     routespec = ["/proxy/path1", "/proxy/path2", "host/proxy/path"]
     target = ["http://127.0.0.1:990", "http://127.0.0.1:909", "http://127.0.0.1:999"]
     data = [{"test": "test1"}, {}, {"test": "test2"}]
-    dict_keys = ["routespec", "target", "data"]
 
     expected_output = {
         routespec[0]: {

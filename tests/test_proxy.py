@@ -13,12 +13,12 @@ import json
 pytestmark = pytest.mark.asyncio
 
 
-async def wait_for_services(proxy, target):
+async def wait_for_services(urls):
     # Wait until traefik and the backend are ready
     await exponential_backoff(
         utils.check_services_ready,
         "Service not reacheable",
-        urls=[proxy.public_url, target],
+        urls=urls,
     )
 
 
@@ -62,7 +62,7 @@ async def test_add_get_delete(
 ):
     backend_port = urlparse(target).port
     launch_backend(backend_port)
-    await wait_for_services(proxy, target)
+    await wait_for_services([proxy.public_url, target])
 
     """ Test add and get """
     await proxy.add_route(routespec, target, data)
@@ -98,6 +98,45 @@ async def test_add_get_delete(
     """ If this raises a TimeoutError, the route wasn't properly deleted,
     thus the proxy still has a route for the given routespec"""
     await exponential_backoff(_wait_for_deletion, "Route still exists")
+
+
+async def test_get_all_routes(proxy, launch_backend):
+    routespecs = ["/proxy/path1", "/proxy/path2", "host/proxy/path"]
+    targets = [
+        "http://127.0.0.1:9900",
+        "http://127.0.0.1:9090",
+        "http://127.0.0.1:9999",
+    ]
+    datas = [{"test": "test1"}, {}, {"test": "test2"}]
+
+    expected_output = {
+        routespecs[0]: {
+            "routespec": routespecs[0],
+            "target": targets[0],
+            "data": json.dumps(datas[0]),
+        },
+        routespecs[1]: {
+            "routespec": routespecs[1],
+            "target": targets[1],
+            "data": json.dumps(datas[1]),
+        },
+        routespecs[2]: {
+            "routespec": routespecs[2],
+            "target": targets[2],
+            "data": json.dumps(datas[2]),
+        },
+    }
+
+    for target in targets:
+        launch_backend(urlparse(target).port)
+
+    await wait_for_services([proxy.public_url] + targets)
+
+    for routespec, target, data in zip(routespecs, targets, datas):
+        await proxy.add_route(routespec, target, data)
+
+    routes = await proxy.get_all_routes()
+    assert routes == expected_output
 
 
 async def test_host_origin_headers(proxy, launch_backend):

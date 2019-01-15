@@ -4,6 +4,9 @@ import re
 import shutil
 import io
 import os
+import escapism
+import string
+import toml
 
 from urllib.parse import urlparse
 from contextlib import contextmanager
@@ -22,8 +25,9 @@ def generate_rule(routespec):
     return rule
 
 
-def generate_alias(url, server_type=""):
-    return server_type + re.sub("[.:/]", "_", (urlparse(url).netloc))
+def generate_alias(routespec, server_type=""):
+    safe = string.ascii_letters + string.digits + "_-"
+    return server_type + "_" + escapism.escape(routespec, safe=safe)
 
 
 def generate_backend_entry(
@@ -57,9 +61,9 @@ def generate_frontend_rule_entry(proxy, frontend_alias, separator="/"):
     return frontend_rule_entry
 
 
-def generate_route_keys(proxy, target, routespec, separator=""):
-    backend_alias = generate_alias(target, "backend")
-    frontend_alias = generate_alias(target, "frontend")
+def generate_route_keys(proxy, routespec, separator=""):
+    backend_alias = generate_alias(routespec, "backend")
+    frontend_alias = generate_alias(routespec, "frontend")
 
     RouteKeys = namedtuple(
         "RouteKeys",
@@ -126,3 +130,15 @@ def atomic_writing(path):
 
     # Written successfully, now remove the backup copy
     os.remove(tmp_path)
+
+def persist_static_conf(file, static_conf_dict):
+    with open(file, "w") as f:
+        toml.dump(static_conf_dict, f)
+
+def persist_routes(file, routes_dict):
+    with atomic_writing(file) as config_fd:
+        toml.dump(routes_dict, config_fd)
+
+def load_routes(file, routes_dict):
+    with open(file, "r") as config_fd:
+        toml.load(routes_dict, config_fd)

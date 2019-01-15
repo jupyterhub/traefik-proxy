@@ -67,9 +67,9 @@ class TraefikEtcdProxy(TraefikProxy):
             for k, v in d.items():
                 if isinstance(v, dict):
                     new_key = etcd_key + k + "/"
-                    get_etcd_kvs(d[k], new_key)
+                    get_etcd_kvs(v, new_key)
                 else:
-                    kv[etcd_key + k] = d[k]
+                    kv[etcd_key + k] = v
 
         get_etcd_kvs(self.static_config, self.etcd_traefik_prefix)
 
@@ -155,7 +155,7 @@ class TraefikEtcdProxy(TraefikProxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        route_keys = traefik_utils.generate_route_keys(self, target, routespec)
+        route_keys = traefik_utils.generate_route_keys(self, routespec)
 
         # Store the data dict passed in by JupyterHub
         data = json.dumps(data)
@@ -192,15 +192,16 @@ class TraefikEtcdProxy(TraefikProxy):
                 "Couldn't add route for %s. Response: %s", routespec, response
             )
 
-        try:
-            # Check if traefik was launched
-            pid = self.traefik_process.pid
-            await self._wait_for_route(target, provider="etcdv3")
-        except AttributeError:
-            self.log.error(
-                "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
-            )
-            raise
+        if not self.should_start:
+            try:
+                # Check if traefik was launched
+                pid = self.traefik_process.pid
+            except AttributeError:
+                self.log.error(
+                    "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
+                )
+                raise
+        await self._wait_for_route(routespec, provider="etcdv3")
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
@@ -214,7 +215,7 @@ class TraefikEtcdProxy(TraefikProxy):
             return
 
         target = value.decode()
-        route_keys = traefik_utils.generate_route_keys(self, target, routespec)
+        route_keys = traefik_utils.generate_route_keys(self, routespec)
 
         status, response = await self.etcd_client.txn(
             compare=[],

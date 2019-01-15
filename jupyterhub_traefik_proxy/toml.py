@@ -21,7 +21,8 @@ Route Specification:
 import json
 import os
 import asyncio
-import toml
+import string
+import escapism
 
 from traitlets import Any, default, Unicode
 
@@ -49,7 +50,7 @@ class TraefikTomlProxy(TraefikProxy):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.routes_cache = {}
+        self.routes_cache = {"backends": {}, "frontends": {}}
 
     async def _setup_traefik_static_config(self):
         await super()._setup_traefik_static_config()
@@ -57,14 +58,17 @@ class TraefikTomlProxy(TraefikProxy):
         self.static_config["file"] = {"filename": "rules.toml", "watch": True}
 
         try:
-            with open(self.toml_static_config_file, "w") as f:
-                toml.dump(self.static_config, f)
-            # Make sure that the dynamic configuration file exists
-            open(self.toml_dynamic_config_file, "a").close()
+            traefik_utils.persist_static_conf(self.toml_static_config_file, self.static_config)
+            try:
+                traefik_utils.load_routes(self.toml_dynamic_config_file, self.routes_cache)
+            except FileNotFoundError:
+                # Make sure that the dynamic configuration file exists
+                open(self.toml_dynamic_config_file, "a").close()
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
         except:
             self.log.error("Couldn't set up traefik's static config. Unexpected error:")
+            raise
 
     def _start_traefik(self):
         self.log.info("Starting traefik...")
@@ -87,26 +91,33 @@ class TraefikTomlProxy(TraefikProxy):
             raise
 
     def _get_route_unsafe(self, routespec):
-        try:
-            result = {
-                "routespec": routespec,
-                "target": self.routes_cache[routespec]["target"],
-                "data": self.routes_cache[routespec]["data"],
-            }
-        except KeyError:
-            self.log.info("No route for {} doesn't exist!".format(routespec))
-            result = None
-        finally:
-            return result
+        safe = string.ascii_letters + string.digits + "_-"
+        escaped_routespec = escapism.escape(routespec, safe=safe)
+        result = {"data": "", "target": "", "routespec": routespec}
 
-    def _persist_routes(self):
-        with traefik_utils.atomic_writing(self.toml_dynamic_config_file) as config_fd:
-            config_fd.write("[frontends]\n")
-            for key, value in self.routes_cache.items():
-                config_fd.write("".join(value["frontend"]))
-            config_fd.write("[backends]\n")
-            for key, value in self.routes_cache.items():
-                config_fd.write("".join(value["backend"]))
+        def get_target_data(d, to_find):
+            if to_find == "url":
+                key = "target"
+            else:
+                key = to_find
+            if result[key]:
+                return
+            for k, v in d.items():
+                if k == to_find:
+                    result[key] = v
+                if isinstance(v, dict):
+                    get_target_data(v, to_find)
+
+        for key, value in self.routes_cache["backends"].items():
+            if escaped_routespec in key:
+                get_target_data(value, "url")
+        for key, value in self.routes_cache["frontends"].items():
+            if escaped_routespec in key:
+                get_target_data(value, "data")
+        if not result["data"] and not result["target"]:
+            self.log.info("No route for {} found!".format(routespec))
+            result = None
+        return result
 
     async def start(self):
         """Start the proxy.
@@ -151,51 +162,51 @@ class TraefikTomlProxy(TraefikProxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        route_keys = traefik_utils.generate_route_keys(
-            self, target, routespec, separator="."
-        )
+        route_keys = traefik_utils.generate_route_keys(self, routespec, separator=".")
         data = json.dumps(data)
         rule = traefik_utils.generate_rule(routespec)
 
         async with self.mutex:
-            self.routes_cache[routespec] = {
-                "backend": [
-                    "[backends." + route_keys.backend_alias + "]\n",
-                    "[" + route_keys.backend_url_path + "]\n",
-                    "url = " + '"' + target + '"\n',
-                    "weight = " + "1\n",
-                ],
-                "frontend": [
-                    "[frontends." + route_keys.frontend_alias + "]\n",
-                    "backend = " + '"' + route_keys.backend_alias + '"\n',
-                    "passHostHeader = true\n",
-                    "[" + route_keys.frontend_rule_path + "]\n",
-                    "rule = " + '"' + rule + '"\n',
-                    "data = " + "'" + data + "'\n",
-                ],
-                "data": data,
-                "target": target,
+            self.routes_cache["frontends"][route_keys.frontend_alias] = {
+                "backend": route_keys.backend_alias,
+                "passHostHeader": True,
+                route_keys.frontend_rule_path: {"rule": rule, "data": data},
             }
-            self._persist_routes()
 
-        try:
-            # Check if traefik was launched
-            pid = self.traefik_process.pid
-            await self._wait_for_route(target, provider="file")
-        except AttributeError:
-            self.log.error(
-                "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
-            )
-            raise
+            self.routes_cache["backends"][route_keys.backend_alias] = {
+                "servers": {"server1": {"url": target, "weight": 1}}
+            }
+            traefik_utils.persist_routes(self.toml_dynamic_config_file, self.routes_cache)
+
+        if not self.should_start:
+            try:
+                # Check if traefik was launched
+                pid = self.traefik_process.pid
+            except AttributeError:
+                self.log.error(
+                    "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
+                )
+                raise
+        await self._wait_for_route(routespec, provider="file")
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
 
         **Subclasses must define this method**
         """
+        safe = string.ascii_letters + string.digits + "_-"
+        escaped_routespec = escapism.escape(routespec, safe=safe)
+
         async with self.mutex:
-            del self.routes_cache[routespec]
-            self._persist_routes()
+            for key, value in self.routes_cache["frontends"].items():
+                if escaped_routespec in key:
+                    del self.routes_cache["frontends"][key]
+                    break
+            for key, value in self.routes_cache["backends"].items():
+                if escaped_routespec in key:
+                    del self.routes_cache["backends"][key]
+                    break
+        traefik_utils.persist_routes(self.toml_dynamic_config_file, self.routes_cache)
 
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
@@ -213,12 +224,11 @@ class TraefikTomlProxy(TraefikProxy):
           }
         """
         all_routes = {}
-        await self.mutex.acquire()
-        try:
-            for key, value in self.routes_cache.items():
-                all_routes[key] = self._get_route_unsafe(key)
-        finally:
-            self.mutex.release()
+        async with self.mutex:
+            for key, value in self.routes_cache["frontends"].items():
+                escaped_routespec = "".join(key.split("_", 1)[1:])
+                routespec = escapism.unescape(escaped_routespec)
+                all_routes[routespec] = self._get_route_unsafe(routespec)
 
         return all_routes
 
@@ -242,9 +252,5 @@ class TraefikTomlProxy(TraefikProxy):
 
             None: if there are no routes matching the given routespec
         """
-        await self.mutex.acquire()
-        try:
-            result = self._get_route_unsafe(routespec)
-        finally:
-            self.mutex.release()
-        return result
+        async with self.mutex:
+            return self._get_route_unsafe(routespec)

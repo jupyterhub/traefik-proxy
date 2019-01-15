@@ -64,12 +64,12 @@ class TraefikProxy(Proxy):
         ht.set_password(self.traefik_api_username, self.traefik_api_password)
         self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
 
-    async def _wait_for_route(self, target, provider):
+    async def _wait_for_route(self, routespec, provider):
         async def _check_traefik_dynamic_conf_ready():
             """ Check if traefik loaded its dynamic configuration from the
                 etcd cluster """
-            expected_backend = traefik_utils.generate_alias(target, "backend")
-            expected_frontend = traefik_utils.generate_alias(target, "frontend")
+            expected_backend = traefik_utils.generate_alias(routespec, "backend")
+            expected_frontend = traefik_utils.generate_alias(routespec, "frontend")
             ready = False
             try:
                 resp_backends = await AsyncHTTPClient().fetch(
@@ -98,7 +98,7 @@ class TraefikProxy(Proxy):
 
         await exponential_backoff(
             _check_traefik_dynamic_conf_ready,
-            "Traefik route for %s configuration not available" % target,
+            "Traefik route for %s configuration not available" % routespec,
             timeout=20,
         )
 
