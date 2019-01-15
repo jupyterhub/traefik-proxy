@@ -16,9 +16,7 @@ pytestmark = pytest.mark.asyncio
 async def wait_for_services(urls):
     # Wait until traefik and the backend are ready
     await exponential_backoff(
-        utils.check_services_ready,
-        "Service not reacheable",
-        urls=urls,
+        utils.check_services_ready, "Service not reacheable", urls=urls
     )
 
 

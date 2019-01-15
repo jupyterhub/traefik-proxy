@@ -131,13 +131,16 @@ def atomic_writing(path):
     # Written successfully, now remove the backup copy
     os.remove(tmp_path)
 
+
 def persist_static_conf(file, static_conf_dict):
     with open(file, "w") as f:
         toml.dump(static_conf_dict, f)
 
+
 def persist_routes(file, routes_dict):
     with atomic_writing(file) as config_fd:
         toml.dump(routes_dict, config_fd)
+
 
 def load_routes(file, routes_dict):
     with open(file, "r") as config_fd:
