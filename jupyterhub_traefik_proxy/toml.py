@@ -62,8 +62,8 @@ class TraefikTomlProxy(TraefikProxy):
                 self.toml_static_config_file, self.static_config
             )
             try:
-                traefik_utils.load_routes(
-                    self.toml_dynamic_config_file, self.routes_cache
+                self.routes_cache = traefik_utils.load_routes(
+                    self.toml_dynamic_config_file,
                 )
             except FileNotFoundError:
                 # Make sure that the dynamic configuration file exists
@@ -166,18 +166,19 @@ class TraefikTomlProxy(TraefikProxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        route_keys = traefik_utils.generate_route_keys(self, routespec, separator=".")
+        backend_alias = traefik_utils.generate_alias(routespec, "backend")
+        frontend_alias = traefik_utils.generate_alias(routespec, "frontend")
         data = json.dumps(data)
         rule = traefik_utils.generate_rule(routespec)
 
         async with self.mutex:
-            self.routes_cache["frontends"][route_keys.frontend_alias] = {
-                "backend": route_keys.backend_alias,
+            self.routes_cache["frontends"][frontend_alias] = {
+                "backend": backend_alias,
                 "passHostHeader": True,
-                route_keys.frontend_rule_path: {"rule": rule, "data": data},
+                "routes": {"test": {"rule": rule, "data": data}},
             }
 
-            self.routes_cache["backends"][route_keys.backend_alias] = {
+            self.routes_cache["backends"][backend_alias] = {
                 "servers": {"server1": {"url": target, "weight": 1}}
             }
             traefik_utils.persist_routes(

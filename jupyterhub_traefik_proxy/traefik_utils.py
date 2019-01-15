@@ -142,6 +142,9 @@ def persist_routes(file, routes_dict):
         toml.dump(routes_dict, config_fd)
 
 
-def load_routes(file, routes_dict):
-    with open(file, "r") as config_fd:
-        toml.load(routes_dict, config_fd)
+def load_routes(file):
+    try:
+        with open(file, "r") as config_fd:
+            return toml.load(config_fd)
+    except:
+        raise
