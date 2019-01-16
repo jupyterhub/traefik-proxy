@@ -2,12 +2,12 @@
 
 import pytest
 import utils
+import json
 
 from urllib.parse import urlparse
 from jupyterhub.utils import exponential_backoff
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
-import json
-
+from urllib.parse import quote
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
@@ -21,46 +21,33 @@ async def wait_for_services(urls):
 
 
 @pytest.mark.parametrize(
-    "routespec, target, data, expected_output",
+    "routespec",
     [
-        (
-            "/user/username",
-            "http://127.0.0.1:9000",
-            {"test": "test1", "user": "username"},
-            {
-                "routespec": "/user/username",
-                "target": "http://127.0.0.1:9000",
-                "data": json.dumps({"test": "test1", "user": "username"}),
-            },
-        ),  # Path-based routing
-        (
-            "/user/user@email",
-            "http://127.0.0.1:9900",
-            {},
-            {
-                "routespec": "/user/user@email",
-                "target": "http://127.0.0.1:9900",
-                "data": "{}",
-            },
-        ),  # Path-based routing, no data dict
-        (
-            "host/proxy/path",
-            "http://127.0.0.1:9009",
-            {"test": "test2"},
-            {
-                "routespec": "host/proxy/path",
-                "target": "http://127.0.0.1:9009",
-                "data": json.dumps({"test": "test2"}),
-            },
-        ),  # Host-based routing
+        "/",
+        "/has%20space/foo/",
+        "/missing-trailing/slash",
+        "/has/@/",
+        "/has/" + quote("üñîçø∂é"),
+        "host.name/path/",
+        "other.host/path/no/slash",
     ],
 )
-async def test_add_get_delete(
-    proxy, launch_backend, routespec, target, data, expected_output
-):
+async def test_add_get_delete(proxy, launch_backend, routespec):
+    target = "http://127.0.0.1:9000"
+    data = {"test": "test1", "user": "username"}
+    expected_output = {
+        "routespec": routespec if routespec.endswith("/") else routespec + "/",
+        "target": target,
+        "data": json.dumps(data),
+    }
+
+    print(expected_output)
     backend_port = urlparse(target).port
     launch_backend(backend_port)
     await wait_for_services([proxy.public_url, target])
+
+    if not routespec.startswith("/"):
+        proxy.host_routing = True
 
     """ Test add and get """
     await proxy.add_route(routespec, target, data)
@@ -73,6 +60,7 @@ async def test_add_get_delete(
     else:
         req_url = proxy.public_url
     # Test the actual routing
+
     responding_backend1 = await utils.get_responding_backend_port(req_url, routespec)
     responding_backend2 = await utils.get_responding_backend_port(
         req_url, routespec + "/something"
@@ -99,7 +87,7 @@ async def test_add_get_delete(
 
 
 async def test_get_all_routes(proxy, launch_backend):
-    routespecs = ["/proxy/path1", "/proxy/path2", "host/proxy/path"]
+    routespecs = ["/proxy/path1", "/proxy/path2/", "host/proxy/path"]
     targets = [
         "http://127.0.0.1:9900",
         "http://127.0.0.1:9090",
@@ -108,8 +96,9 @@ async def test_get_all_routes(proxy, launch_backend):
     datas = [{"test": "test1"}, {}, {"test": "test2"}]
 
     expected_output = {
-        routespecs[0]: {
-            "routespec": routespecs[0],
+        routespecs[0]
+        + "/": {
+            "routespec": routespecs[0] + "/",
             "target": targets[0],
             "data": json.dumps(datas[0]),
         },
@@ -118,8 +107,9 @@ async def test_get_all_routes(proxy, launch_backend):
             "target": targets[1],
             "data": json.dumps(datas[1]),
         },
-        routespecs[2]: {
-            "routespec": routespecs[2],
+        routespecs[2]
+        + "/": {
+            "routespec": routespecs[2] + "/",
             "target": targets[2],
             "data": json.dumps(datas[2]),
         },
@@ -131,6 +121,8 @@ async def test_get_all_routes(proxy, launch_backend):
     await wait_for_services([proxy.public_url] + targets)
 
     for routespec, target, data in zip(routespecs, targets, datas):
+        if not routespec.startswith("/"):
+            proxy.host_routing = True
         await proxy.add_route(routespec, target, data)
 
     routes = await proxy.get_all_routes()
@@ -138,7 +130,7 @@ async def test_get_all_routes(proxy, launch_backend):
 
 
 async def test_host_origin_headers(proxy, launch_backend):
-    routespec = "/user/username"
+    routespec = "/user/username/"
     target = "http://127.0.0.1:9000"
     data = {}
 
@@ -178,3 +170,35 @@ async def test_host_origin_headers(proxy, launch_backend):
 
     assert resp.headers["Host"] == expected_host_header
     assert resp.headers["Origin"] == expected_origin_header
+
+
+from jupyterhub.tests.test_api import api_request, add_user
+
+
+@pytest.mark.parametrize("username", ["zoe", "50fia", "秀樹", "~TestJH", "has@"])
+async def test_check_routes(app, disable_check_routes, username):
+    proxy = app.proxy
+    test_user = add_user(app.db, app, name=username)
+    r = await api_request(app, "users/%s/server" % username, method="post")
+    r.raise_for_status()
+
+    # check a valid route exists for user
+    routes = await app.proxy.get_all_routes()
+    before = sorted(routes)
+    assert test_user.proxy_spec in before
+
+    # check if a route is removed when user deleted
+    await app.proxy.check_routes(app.users, app._service_map)
+    await proxy.delete_user(test_user)
+    routes = await app.proxy.get_all_routes()
+    during = sorted(routes)
+    assert test_user.proxy_spec not in during
+
+    # check if a route exists for user
+    await app.proxy.check_routes(app.users, app._service_map)
+    routes = await app.proxy.get_all_routes()
+    after = sorted(routes)
+    assert test_user.proxy_spec in after
+
+    # check that before and after state are the same
+    assert before == after

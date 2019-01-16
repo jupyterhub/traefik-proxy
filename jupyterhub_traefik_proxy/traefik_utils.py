@@ -9,11 +9,13 @@ import string
 import toml
 
 from urllib.parse import urlparse
+from urllib.parse import unquote
 from contextlib import contextmanager
 from collections import namedtuple
 
 
 def generate_rule(routespec):
+    routespec = unquote(routespec)
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
         rule = "PathPrefix:" + routespec
@@ -61,7 +63,7 @@ def generate_frontend_rule_entry(proxy, frontend_alias, separator="/"):
     return frontend_rule_entry
 
 
-def generate_route_keys(proxy, routespec, separator=""):
+def generate_route_keys(proxy, routespec, separator="/"):
     backend_alias = generate_alias(routespec, "backend")
     frontend_alias = generate_alias(routespec, "frontend")
 

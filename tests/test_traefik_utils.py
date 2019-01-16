@@ -9,14 +9,9 @@ def test_roundtrip_routes():
     routes = {
         "backends": {
             "backend1": {
-                "servers": {
-                    "server1": {
-                        "url": "http://127.0.0.1:9009",
-                        "weight": 1
-                        }
-                    }
-                }
-            },
+                "servers": {"server1": {"url": "http://127.0.0.1:9009", "weight": 1}}
+            }
+        },
         "frontends": {
             "frontend1": {
                 "backend": "backend1",
@@ -24,11 +19,11 @@ def test_roundtrip_routes():
                 "routes": {
                     "test": {
                         "rule": "Host:host;PathPrefix:/proxy/path",
-                        "data": json.dumps({"test": "test1"})
+                        "data": json.dumps({"test": "test1"}),
                     }
-                }
+                },
             }
-        }
+        },
     }
 
     file = "test_roudtrip.toml"
