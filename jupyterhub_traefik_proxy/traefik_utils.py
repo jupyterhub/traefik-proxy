@@ -1,107 +1,150 @@
 import sys
 import json
+import re
+import shutil
+import io
+import os
+import escapism
+import string
+import toml
 
-from os.path import abspath, dirname, join
-from subprocess import Popen
 from urllib.parse import urlparse
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+from contextlib import contextmanager
+from collections import namedtuple
 
 
-async def check_traefik_dynamic_conf_ready(username, password, api_url, target):
-    """ Check if traefik loaded its dynamic configuration from the
-        etcd cluster """
-    expected_backend = create_backend_alias_from_url(target)
-    expected_frontend = create_frontend_alias_from_url(target)
-    ready = False
-    try:
-        resp_backends = await AsyncHTTPClient().fetch(
-            api_url + "/api/providers/etcdv3/backends",
-            auth_username=username,
-            auth_password=password,
-        )
-        resp_frontends = await AsyncHTTPClient().fetch(
-            api_url + "/api/providers/etcdv3/frontends",
-            auth_username=username,
-            auth_password=password,
-        )
-        backends_data = json.loads(resp_backends.body)
-        frontends_data = json.loads(resp_frontends.body)
-
-        if resp_backends.code == 200 and resp_frontends.code == 200:
-            ready = (
-                expected_backend in backends_data
-                and expected_frontend in frontends_data
-            )
-    except Exception as e:
-        backends_rc, frontends_rc = e.response.code
-        ready = False
-    finally:
-        return ready
+def generate_rule(routespec):
+    if routespec.startswith("/"):
+        # Path-based route, e.g. /proxy/path/
+        rule = "PathPrefix:" + routespec
+    else:
+        # Host-based routing, e.g. host.tld/proxy/path/
+        host, path_prefix = routespec.split("/", 1)
+        path_prefix = "/" + path_prefix
+        rule = "Host:" + host + ";PathPrefix:" + path_prefix
+    return rule
 
 
-async def check_traefik_static_conf_ready(username, password, api_url):
-    """ Check if traefik loaded its static configuration from the
-    etcd cluster """
-    try:
-        resp = await AsyncHTTPClient().fetch(
-            api_url + "/api/providers/etcdv3",
-            auth_username=username,
-            auth_password=password,
-        )
-        rc = resp.code
-    except ConnectionRefusedError:
-        rc = None
-    except Exception as e:
-        rc = e.response.code
-    finally:
-        return rc == 200
+def generate_alias(routespec, server_type=""):
+    safe = string.ascii_letters + string.digits + "_-"
+    return server_type + "_" + escapism.escape(routespec, safe=safe)
 
 
-def launch_traefik_with_toml():
-    config_file_path = abspath(join(dirname(__file__), "traefik.toml"))
-    traefik = Popen(["traefik", "-c", config_file_path], stdout=None)
-    return traefik
+def generate_backend_entry(
+    proxy, backend_alias, separator="/", url=False, weight=False
+):
+    backend_entry = ""
+    if separator is "/":
+        backend_entry = proxy.etcd_traefik_prefix
+    backend_entry += separator.join(["backends", backend_alias, "servers", "server1"])
+    if url is True:
+        backend_entry += separator + "url"
+    elif weight is True:
+        backend_entry += separator + "weight"
+
+    return backend_entry
 
 
-def launch_traefik_with_etcd():
-    traefik = Popen(["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None)
-    return traefik
-
-
-def generate_traefik_toml():
-    pass  # Not implemented
-
-
-def create_backend_alias_from_url(url):
-    target = urlparse(url)
-    return "jupyterhub_backend_" + target.netloc
-
-
-def create_frontend_alias_from_url(url):
-    target = urlparse(url)
-    return "jupyterhub_frontend_" + target.netloc
-
-
-def create_backend_url_path(proxy, backend_alias):
-    return (
-        proxy.etcd_traefik_prefix + "backends/" + backend_alias + "/servers/server1/url"
-    )
-
-
-def create_backend_weight_path(proxy, backend_alias):
-    return (
-        proxy.etcd_traefik_prefix
-        + "backends/"
-        + backend_alias
-        + "/servers/server1/weight"
-    )
-
-
-def create_frontend_backend_path(proxy, frontend_alias):
+def generate_frontend_backend_entry(proxy, frontend_alias):
     return proxy.etcd_traefik_prefix + "frontends/" + frontend_alias + "/backend"
 
 
-def create_frontend_rule_path(proxy, frontend_alias):
-    return (
-        proxy.etcd_traefik_prefix + "frontends/" + frontend_alias + "/routes/test/rule"
+def generate_frontend_rule_entry(proxy, frontend_alias, separator="/"):
+    frontend_rule_entry = separator.join(
+        ["frontends", frontend_alias, "routes", "test"]
     )
+    if separator == "/":
+        frontend_rule_entry = (
+            proxy.etcd_traefik_prefix + frontend_rule_entry + separator + "rule"
+        )
+
+    return frontend_rule_entry
+
+
+def generate_route_keys(proxy, routespec, separator=""):
+    backend_alias = generate_alias(routespec, "backend")
+    frontend_alias = generate_alias(routespec, "frontend")
+
+    RouteKeys = namedtuple(
+        "RouteKeys",
+        [
+            "backend_alias",
+            "backend_url_path",
+            "backend_weight_path",
+            "frontend_alias",
+            "frontend_backend_path",
+            "frontend_rule_path",
+        ],
+    )
+
+    if separator != ".":
+        backend_url_path = generate_backend_entry(proxy, backend_alias, url=True)
+        frontend_rule_path = generate_frontend_rule_entry(proxy, frontend_alias)
+        backend_weight_path = generate_backend_entry(proxy, backend_alias, weight=True)
+        frontend_backend_path = generate_frontend_backend_entry(proxy, frontend_alias)
+    else:
+        backend_url_path = generate_backend_entry(
+            proxy, backend_alias, separator=separator
+        )
+        frontend_rule_path = generate_frontend_rule_entry(
+            proxy, frontend_alias, separator=separator
+        )
+        backend_weight_path = ""
+        frontend_backend_path = ""
+
+    return RouteKeys(
+        backend_alias,
+        backend_url_path,
+        backend_weight_path,
+        frontend_alias,
+        frontend_backend_path,
+        frontend_rule_path,
+    )
+
+
+def path_to_intermediate(path):
+    """Name of the intermediate file used in atomic writes.
+    The .~ prefix will make Dropbox ignore the temporary file."""
+    dirname, basename = os.path.split(path)
+    return os.path.join(dirname, ".~" + basename)
+
+
+@contextmanager
+def atomic_writing(path):
+    tmp_path = path_to_intermediate(path)
+    shutil.copy2(path, tmp_path)
+    fileobj = io.open(path, "w")
+
+    try:
+        yield fileobj
+    except:
+        # Failed! Move the backup file back to the real path to avoid corruption
+        fileobj.close()
+        os.replace(tmp_path, path)
+        raise
+
+    # Flush to disk
+    fileobj.flush()
+    os.fsync(fileobj.fileno())
+    fileobj.close()
+
+    # Written successfully, now remove the backup copy
+    os.remove(tmp_path)
+
+
+def persist_static_conf(file, static_conf_dict):
+    with open(file, "w") as f:
+        toml.dump(static_conf_dict, f)
+
+
+def persist_routes(file, routes_dict):
+    with atomic_writing(file) as config_fd:
+        toml.dump(routes_dict, config_fd)
+
+
+def load_routes(file):
+    try:
+        with open(file, "r") as config_fd:
+            return toml.load(config_fd)
+    except:
+        raise

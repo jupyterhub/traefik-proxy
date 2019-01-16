@@ -2,6 +2,7 @@
 
 from .proxy import TraefikProxy  # noqa
 from .etcd import TraefikEtcdProxy
+from .toml import TraefikTomlProxy
 
 from ._version import get_versions
 

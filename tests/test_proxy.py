@@ -5,42 +5,139 @@ import utils
 
 from urllib.parse import urlparse
 from jupyterhub.utils import exponential_backoff
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
+import json
+
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
 
 
-async def test_etcd_routing(etcd, clean_etcd, proxy, launch_backends):
-    routespec = ["/", "/user/first", "/user/second"]
-    target = ["http://127.0.0.1:9000", "http://127.0.0.1:9090", "http://127.0.0.1:9099"]
-    data = [{}, {}, {}]
-
-    routes_no = len(target)
-    traefik_port = urlparse(proxy.public_url).port
-
-    # Check if traefik process is reacheable
+async def wait_for_services(urls):
+    # Wait until traefik and the backend are ready
     await exponential_backoff(
-        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
+        utils.check_services_ready, "Service not reacheable", urls=urls
     )
 
-    # Check if backends are reacheable
-    await exponential_backoff(utils.check_backends_up, "Backends not reacheable")
 
-    # Add testing routes
-    await proxy.add_route(routespec[0], target[0], data[0])
-    await proxy.add_route(routespec[1], target[1], data[1])
-    await proxy.add_route(routespec[2], target[2], data[2])
+@pytest.mark.parametrize(
+    "routespec, target, data, expected_output",
+    [
+        (
+            "/user/username",
+            "http://127.0.0.1:9000",
+            {"test": "test1", "user": "username"},
+            {
+                "routespec": "/user/username",
+                "target": "http://127.0.0.1:9000",
+                "data": json.dumps({"test": "test1", "user": "username"}),
+            },
+        ),  # Path-based routing
+        (
+            "/user/user@email",
+            "http://127.0.0.1:9900",
+            {},
+            {
+                "routespec": "/user/user@email",
+                "target": "http://127.0.0.1:9900",
+                "data": "{}",
+            },
+        ),  # Path-based routing, no data dict
+        (
+            "host/proxy/path",
+            "http://127.0.0.1:9009",
+            {"test": "test2"},
+            {
+                "routespec": "host/proxy/path",
+                "target": "http://127.0.0.1:9009",
+                "data": json.dumps({"test": "test2"}),
+            },
+        ),  # Host-based routing
+    ],
+)
+async def test_add_get_delete(
+    proxy, launch_backend, routespec, target, data, expected_output
+):
+    backend_port = urlparse(target).port
+    launch_backend(backend_port)
+    await wait_for_services([proxy.public_url, target])
+
+    """ Test add and get """
+    await proxy.add_route(routespec, target, data)
+    # Make sure the route was added
+    route = await proxy.get_route(routespec)
+    assert route == expected_output
 
     if proxy.public_url.endswith("/"):
         req_url = proxy.public_url[:-1]
     else:
         req_url = proxy.public_url
+    # Test the actual routing
+    responding_backend1 = await utils.get_responding_backend_port(req_url, routespec)
+    responding_backend2 = await utils.get_responding_backend_port(
+        req_url, routespec + "/something"
+    )
+    assert responding_backend1 == backend_port and responding_backend2 == backend_port
 
-    await utils.check_routing(req_url)
+    """ Test delete + get """
+    await proxy.delete_route(routespec)
+    route = await proxy.get_route(routespec)
+    assert route == None
+
+    async def _wait_for_deletion():
+        deleted = False
+        try:
+            await utils.get_responding_backend_port(req_url, routespec)
+        except HTTPClientError:
+            deleted = True
+        finally:
+            return deleted
+
+    """ If this raises a TimeoutError, the route wasn't properly deleted,
+    thus the proxy still has a route for the given routespec"""
+    await exponential_backoff(_wait_for_deletion, "Route still exists")
 
 
-async def test_host_origin_headers(etcd, clean_etcd, proxy, default_backend):
+async def test_get_all_routes(proxy, launch_backend):
+    routespecs = ["/proxy/path1", "/proxy/path2", "host/proxy/path"]
+    targets = [
+        "http://127.0.0.1:9900",
+        "http://127.0.0.1:9090",
+        "http://127.0.0.1:9999",
+    ]
+    datas = [{"test": "test1"}, {}, {"test": "test2"}]
+
+    expected_output = {
+        routespecs[0]: {
+            "routespec": routespecs[0],
+            "target": targets[0],
+            "data": json.dumps(datas[0]),
+        },
+        routespecs[1]: {
+            "routespec": routespecs[1],
+            "target": targets[1],
+            "data": json.dumps(datas[1]),
+        },
+        routespecs[2]: {
+            "routespec": routespecs[2],
+            "target": targets[2],
+            "data": json.dumps(datas[2]),
+        },
+    }
+
+    for target in targets:
+        launch_backend(urlparse(target).port)
+
+    await wait_for_services([proxy.public_url] + targets)
+
+    for routespec, target, data in zip(routespecs, targets, datas):
+        await proxy.add_route(routespec, target, data)
+
+    routes = await proxy.get_all_routes()
+    assert routes == expected_output
+
+
+async def test_host_origin_headers(proxy, launch_backend):
     routespec = "/user/username"
     target = "http://127.0.0.1:9000"
     data = {}
@@ -48,6 +145,7 @@ async def test_host_origin_headers(etcd, clean_etcd, proxy, default_backend):
     traefik_port = urlparse(proxy.public_url).port
     traefik_host = urlparse(proxy.public_url).hostname
     default_backend_port = 9000
+    launch_backend(default_backend_port)
 
     await exponential_backoff(
         utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
@@ -80,44 +178,3 @@ async def test_host_origin_headers(etcd, clean_etcd, proxy, default_backend):
 
     assert resp.headers["Host"] == expected_host_header
     assert resp.headers["Origin"] == expected_origin_header
-
-
-async def test_traefik_api_without_auth(etcd, clean_etcd, proxy, default_backend):
-    traefik_port = urlparse(proxy.public_url).port
-
-    await exponential_backoff(
-        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
-    )
-
-    try:
-        resp = await AsyncHTTPClient().fetch(proxy.traefik_api_url + "/dashboard")
-        rc = resp.code
-    except ConnectionRefusedError:
-        rc = None
-    except Exception as e:
-        rc = e.response.code
-    finally:
-        return rc == 401 or rc == 403
-
-
-async def test_traefik_api_wit_auth(etcd, clean_etcd, proxy, default_backend):
-    traefik_port = urlparse(proxy.public_url).port
-
-    await exponential_backoff(
-        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
-    )
-
-    try:
-        resp = await AsyncHTTPClient().fetch(
-            proxy.traefik_api_url + "/dashboard",
-            auth_username=proxy.traefik_api_username,
-            auth_password=proxy.traefik_api_password,
-        )
-
-        rc = resp.code
-    except ConnectionRefusedError:
-        rc = None
-    except Exception as e:
-        rc = e.response.code
-    finally:
-        return rc == 200

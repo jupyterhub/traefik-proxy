@@ -16,7 +16,6 @@ class DummyServer(BaseHTTPRequestHandler):
 
 def run(port=80):
     dummy_server = HTTPServer(("localhost", port), DummyServer)
-    print("Starting dummy server...")
 
     try:
         dummy_server.serve_forever()
