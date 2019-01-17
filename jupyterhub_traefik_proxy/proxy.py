@@ -29,7 +29,6 @@ from os.path import abspath, dirname, join
 from urllib.parse import urlparse
 
 import json
-import hashlib
 
 
 class TraefikProxy(Proxy):
@@ -170,6 +169,7 @@ class TraefikProxy(Proxy):
         }
         self.static_config["entryPoints"] = entryPoints
         self.static_config["api"] = {"dashboard": True, "entrypoint": "auth_api"}
+        self.static_config["wss"] = {"protocol": "http"}
 
     async def start(self):
         """Start the proxy.

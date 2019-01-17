@@ -1,0 +1,26 @@
+defaultentrypoints = [ "http",]
+debug = true
+logLevel = "ERROR"
+
+[api]
+dashboard = true
+entrypoint = "auth_api"
+
+[wss]
+protocol = "http"
+
+[entryPoints.http]
+address = ":8000"
+
+[entryPoints.auth_api]
+address = ":8099"
+
+[entryPoints.auth_api.auth.basic]
+users = [ "api_admin:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
+
+[etcd]
+endpoint = "127.0.0.1:2379"
+prefix = "/traefik/"
+useapiv3 = true
+watch = true
+providersThrottleDuration = 1

@@ -3,11 +3,17 @@
 import pytest
 import utils
 import json
+import websockets
+import os
 
 from urllib.parse import urlparse
 from jupyterhub.utils import exponential_backoff
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
 from urllib.parse import quote
+from jupyterhub.tests.mocking import MockHub
+
+from jupyterhub_traefik_proxy import TraefikTomlProxy
+from os.path import abspath, dirname, join
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
@@ -23,7 +29,7 @@ async def wait_for_services(urls):
 @pytest.mark.parametrize(
     "routespec",
     [
-        "/",
+        "/",  # default route
         "/has%20space/foo/",
         "/missing-trailing/slash",
         "/has/@/",
@@ -41,7 +47,6 @@ async def test_add_get_delete(proxy, launch_backend, routespec):
         "data": json.dumps(data),
     }
 
-    print(expected_output)
     backend_port = urlparse(target).port
     launch_backend(backend_port)
     await wait_for_services([proxy.public_url, target])
@@ -202,3 +207,39 @@ async def test_check_routes(app, disable_check_routes, username):
 
     # check that before and after state are the same
     assert before == after
+
+
+async def test_websockets(proxy, launch_backend):
+    routespec = "/user/username/"
+    target = "http://127.0.0.1:9000"
+    data = {}
+
+    traefik_port = urlparse(proxy.public_url).port
+    traefik_host = urlparse(proxy.public_url).hostname
+    default_backend_port = 9000
+    launch_backend(default_backend_port, "ws")
+
+    await exponential_backoff(
+        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
+    )
+
+    # Check if default backend is reacheable
+    await exponential_backoff(
+        utils.check_host_up,
+        "Backend not reacheable",
+        ip="localhost",
+        port=default_backend_port,
+    )
+    # Add route to default_backend
+    await proxy.add_route(routespec, target, data)
+
+    public_url = proxy.public_url
+    if proxy.public_url.endswith("/"):
+        public_url = proxy.public_url[:-1]
+
+    req_url = "ws://" + urlparse(proxy.public_url).netloc + routespec
+
+    async with websockets.connect(req_url) as websocket:
+        port = await websocket.recv()
+
+    assert port == str(default_backend_port)
