@@ -8,8 +8,7 @@ import escapism
 import string
 import toml
 
-from urllib.parse import urlparse
-from urllib.parse import unquote
+from urllib.parse import urlparse, unquote
 from contextlib import contextmanager
 from collections import namedtuple
 

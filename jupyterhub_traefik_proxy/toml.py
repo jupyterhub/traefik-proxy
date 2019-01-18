@@ -236,11 +236,10 @@ class TraefikTomlProxy(TraefikProxy):
         """
         all_routes = {}
         async with self.mutex:
-            if self.routes_cache:
-                for key, value in self.routes_cache["frontends"].items():
-                    escaped_routespec = "".join(key.split("_", 1)[1:])
-                    routespec = escapism.unescape(escaped_routespec)
-                    all_routes[routespec] = self._get_route_unsafe(routespec)
+            for key, value in self.routes_cache["frontends"].items():
+                escaped_routespec = "".join(key.split("_", 1)[1:])
+                routespec = escapism.unescape(escaped_routespec)
+                all_routes[routespec] = self._get_route_unsafe(routespec)
 
         return all_routes
 

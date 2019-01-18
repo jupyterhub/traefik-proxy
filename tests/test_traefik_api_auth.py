@@ -10,19 +10,11 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.fixture(
-    params=["etcd_proxy", "toml_proxy", "external_etcd_proxy", "external_toml_proxy"]
-)
-def traefik_proxy(request):
-    return request.getfixturevalue(request.param)
-
-
 @pytest.mark.parametrize(
     "username, password, expected_rc",
     [("api_admin", "admin", 200), ("api_admin", "1234", 401), ("", "", 401)],
 )
-async def test_traefik_api_auth(traefik_proxy, username, password, expected_rc):
-    proxy = traefik_proxy
+async def test_traefik_api_auth(proxy, username, password, expected_rc):
     traefik_port = urlparse(proxy.public_url).port
 
     await exponential_backoff(
