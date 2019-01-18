@@ -35,7 +35,6 @@ async def check_host_up(ip, port):
 async def get_responding_backend_port(traefik_url, path):
     """ Check if traefik followed the configuration and routed the
     request to the right backend """
-    print(traefik_url + "".join("/" + path.split("/", 1)[1]))
     if not path.endswith("/"):
         path += "/"
 
@@ -47,7 +46,6 @@ async def get_responding_backend_port(traefik_url, path):
         )
     else:
         req = traefik_url + path
-        print("aicea" + req)
 
     try:
         resp = await AsyncHTTPClient().fetch(req)

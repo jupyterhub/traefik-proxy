@@ -121,6 +121,8 @@ class TraefikTomlProxy(TraefikProxy):
         if not result["data"] and not result["target"]:
             self.log.info("No route for {} found!".format(routespec))
             result = None
+        else:
+            result["data"] = json.loads(result["data"])
         return result
 
     async def start(self):

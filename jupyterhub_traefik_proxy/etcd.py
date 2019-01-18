@@ -264,12 +264,12 @@ class TraefikEtcdProxy(TraefikProxy):
             if value is None:
                 data = None
             else:
-                data = value.decode()
+                data = value
 
             all_routes[routespec] = {
                 "routespec": routespec,
                 "target": target,
-                "data": data,
+                "data": json.loads(data),
             }
 
         return all_routes
@@ -305,6 +305,6 @@ class TraefikEtcdProxy(TraefikProxy):
         if value is None:
             data = None
         else:
-            data = value.decode()
+            data = value
 
-        return {"routespec": routespec, "target": target, "data": data}
+        return {"routespec": routespec, "target": target, "data": json.loads(data)}

@@ -13,6 +13,8 @@ env:
 before_install:
   - pip install --upgrade setuptools pip
   - pip install --pre -r dev-requirements.txt --upgrade .
+  - npm install
+  - npm install -g configurable-http-proxy
 install:
   - python -m jupyterhub_traefik_proxy.install --output=./bin
   - export PATH=$PWD/bin:$PATH

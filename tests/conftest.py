@@ -2,7 +2,6 @@
 
 import pytest
 import sys
-import utils
 import subprocess
 import os
 import shutil
@@ -11,11 +10,7 @@ from jupyterhub_traefik_proxy import TraefikEtcdProxy
 from jupyterhub_traefik_proxy import TraefikTomlProxy
 from jupyterhub.proxy import ConfigurableHTTPProxy
 from jupyterhub.tests.mocking import MockHub
-
 from traitlets.config import Config
-from os.path import abspath, dirname, join
-from tornado import ioloop, gen
-from tornado.platform.asyncio import AsyncIOMainLoop
 
 
 @pytest.fixture()
@@ -27,6 +22,11 @@ async def etcd_proxy():
         traefik_api_username="api_admin",
         should_start=True,
     )
+    app = MockHub()
+    app.init_hub()
+    proxy.app = app
+    proxy.hub = app.hub
+
     await proxy.start()
     yield proxy
     await proxy.stop()
@@ -41,6 +41,11 @@ async def toml_proxy():
         traefik_api_username="api_admin",
         should_start=True,
     )
+    app = MockHub()
+    app.init_hub()
+    proxy.app = app
+    proxy.hub = app.hub
+
     await proxy.start()
     yield proxy
     await proxy.stop()
@@ -50,14 +55,20 @@ async def toml_proxy():
 async def configurable_http_proxy():
     """Fixture returning a configured ConfigurableHTTPProxy"""
     proxy = ConfigurableHTTPProxy(
-        public_url="http://127.0.0.1:8000",
-        # auth_token = "secret!",
-        api_url="http://127.0.0.1:8000",
+        auth_token="secret!",
+        api_url="http://127.0.0.1:54321",
         should_start=True,
+        public_url="http://127.0.0.1:8000",
     )
+
+    app = MockHub()
+    app.init_hub()
+    proxy.app = app
+    proxy.hub = app.hub
+
     await proxy.start()
     yield proxy
-    # await proxy.stop()
+    proxy.stop()
 
 
 @pytest.fixture()
@@ -113,7 +124,13 @@ def external_etcd_proxy():
 
 
 @pytest.fixture(
-    params=["etcd_proxy", "toml_proxy", "external_etcd_proxy", "external_toml_proxy"]
+    params=[
+        "etcd_proxy",
+        "toml_proxy",
+        "configurable_http_proxy",
+        "external_etcd_proxy",
+        "external_toml_proxy",
+    ]
 )
 def proxy(request):
     return request.getfixturevalue(request.param)
@@ -141,7 +158,9 @@ def restart_traefik_proc(proxy):
 
 @pytest.fixture()
 def launch_backend():
-    dummy_server_path = abspath(join(dirname(__file__), "dummy_http_server.py"))
+    dummy_server_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "dummy_http_server.py")
+    )
     running_backends = []
 
     def _launch_backend(port, proto="http"):

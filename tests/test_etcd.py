@@ -178,7 +178,7 @@ async def test_get_route(etcd_proxy, routespec):
     expected_output = {
         "routespec": routespec if routespec.endswith("/") else routespec + "/",
         "target": target,
-        "data": json.dumps(data),
+        "data": data,
     }
 
     add_route_with_etcdctl(proxy, routespec, target, data)
@@ -194,22 +194,10 @@ async def test_get_all_routes(etcd_proxy):
 
     expected_output = {
         routespec[0]
-        + "/": {
-            "routespec": routespec[0] + "/",
-            "target": target[0],
-            "data": json.dumps(data[0]),
-        },
-        routespec[1]: {
-            "routespec": routespec[1],
-            "target": target[1],
-            "data": json.dumps(data[1]),
-        },
+        + "/": {"routespec": routespec[0] + "/", "target": target[0], "data": data[0]},
+        routespec[1]: {"routespec": routespec[1], "target": target[1], "data": data[1]},
         routespec[2]
-        + "/": {
-            "routespec": routespec[2] + "/",
-            "target": target[2],
-            "data": json.dumps(data[2]),
-        },
+        + "/": {"routespec": routespec[2] + "/", "target": target[2], "data": data[2]},
     }
 
     add_route_with_etcdctl(proxy, routespec[0], target[0], data[0])
