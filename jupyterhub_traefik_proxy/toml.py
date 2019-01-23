@@ -63,7 +63,7 @@ class TraefikTomlProxy(TraefikProxy):
             )
             try:
                 self.routes_cache = traefik_utils.load_routes(
-                    self.toml_dynamic_config_file,
+                    self.toml_dynamic_config_file
                 )
             except FileNotFoundError:
                 # Make sure that the dynamic configuration file exists
@@ -121,6 +121,8 @@ class TraefikTomlProxy(TraefikProxy):
         if not result["data"] and not result["target"]:
             self.log.info("No route for {} found!".format(routespec))
             result = None
+        else:
+            result["data"] = json.loads(result["data"])
         return result
 
     async def start(self):
@@ -166,6 +168,7 @@ class TraefikTomlProxy(TraefikProxy):
 
         self.log.info("Adding route for %s to %s.", routespec, target)
 
+        routespec = self.validate_routespec(routespec)
         backend_alias = traefik_utils.generate_alias(routespec, "backend")
         frontend_alias = traefik_utils.generate_alias(routespec, "frontend")
         data = json.dumps(data)
@@ -185,7 +188,7 @@ class TraefikTomlProxy(TraefikProxy):
                 self.toml_dynamic_config_file, self.routes_cache
             )
 
-        if not self.should_start:
+        if self.should_start:
             try:
                 # Check if traefik was launched
                 pid = self.traefik_process.pid
@@ -201,6 +204,7 @@ class TraefikTomlProxy(TraefikProxy):
 
         **Subclasses must define this method**
         """
+        routespec = self.validate_routespec(routespec)
         safe = string.ascii_letters + string.digits + "_-"
         escaped_routespec = escapism.escape(routespec, safe=safe)
 
@@ -259,5 +263,6 @@ class TraefikTomlProxy(TraefikProxy):
 
             None: if there are no routes matching the given routespec
         """
+        routespec = self.validate_routespec(routespec)
         async with self.mutex:
             return self._get_route_unsafe(routespec)

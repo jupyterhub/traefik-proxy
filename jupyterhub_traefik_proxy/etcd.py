@@ -152,9 +152,9 @@ class TraefikEtcdProxy(TraefikProxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
-
         self.log.info("Adding route for %s to %s.", routespec, target)
 
+        routespec = self.validate_routespec(routespec)
         route_keys = traefik_utils.generate_route_keys(self, routespec)
 
         # Store the data dict passed in by JupyterHub
@@ -192,7 +192,7 @@ class TraefikEtcdProxy(TraefikProxy):
                 "Couldn't add route for %s. Response: %s", routespec, response
             )
 
-        if not self.should_start:
+        if self.should_start:
             try:
                 # Check if traefik was launched
                 pid = self.traefik_process.pid
@@ -208,6 +208,7 @@ class TraefikEtcdProxy(TraefikProxy):
 
         **Subclasses must define this method**
         """
+        routespec = self.validate_routespec(routespec)
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
         value, _ = await self.etcd_client.get(jupyterhub_routespec)
         if value is None:
@@ -263,12 +264,12 @@ class TraefikEtcdProxy(TraefikProxy):
             if value is None:
                 data = None
             else:
-                data = value.decode()
+                data = value
 
             all_routes[routespec] = {
                 "routespec": routespec,
                 "target": target,
-                "data": data,
+                "data": json.loads(data),
             }
 
         return all_routes
@@ -293,6 +294,7 @@ class TraefikEtcdProxy(TraefikProxy):
 
             None: if there are no routes matching the given routespec
         """
+        routespec = self.validate_routespec(routespec)
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
 
         value, _ = await self.etcd_client.get(jupyterhub_routespec)
@@ -303,6 +305,6 @@ class TraefikEtcdProxy(TraefikProxy):
         if value is None:
             data = None
         else:
-            data = value.decode()
+            data = value
 
-        return {"routespec": routespec, "target": target, "data": data}
+        return {"routespec": routespec, "target": target, "data": json.loads(data)}

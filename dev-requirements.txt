@@ -2,3 +2,5 @@ pytest
 pytest-asyncio
 codecov
 black
+notebook>=4.0
+websockets

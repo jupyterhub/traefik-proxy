@@ -5,6 +5,7 @@ import subprocess
 import sys
 import utils
 from jupyterhub_traefik_proxy import traefik_utils
+from urllib.parse import quote
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
@@ -41,8 +42,12 @@ def assert_etcdctl_del(key, expected_rv):
 
 def add_route_with_etcdctl(etcd_proxy, routespec, target, data):
     proxy = etcd_proxy
+
+    if not routespec.endswith("/"):
+        routespec = routespec + "/"
+
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
-    route_keys = traefik_utils.generate_route_keys(proxy, routespec, routespec)
+    route_keys = traefik_utils.generate_route_keys(proxy, routespec)
     rule = traefik_utils.generate_rule(routespec)
     expected_rv = "OK"
 
@@ -60,8 +65,12 @@ def add_route_with_etcdctl(etcd_proxy, routespec, target, data):
 
 def check_route_with_etcdctl(etcd_proxy, routespec, target, data, test_deletion=False):
     proxy = etcd_proxy
+
+    if not routespec.endswith("/"):
+        routespec = routespec + "/"
+
     jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
-    route_keys = traefik_utils.generate_route_keys(proxy, routespec, routespec)
+    route_keys = traefik_utils.generate_route_keys(proxy, routespec)
     rule = traefik_utils.generate_rule(routespec)
 
     if test_deletion:
@@ -98,20 +107,48 @@ def check_route_with_etcdctl(etcd_proxy, routespec, target, data, test_deletion=
     assert_etcdctl_get(route_keys.frontend_rule_path, expected_rv)
 
 
-@pytest.mark.parametrize("routespec", ["/proxy/path", "host/proxy/path"])
-@pytest.mark.parametrize("target", ["http://127.0.0.1:99"])
-@pytest.mark.parametrize("data", [{"test": "test1"}, {}])
-async def test_add_route_to_etcd(etcd_proxy, routespec, target, data):
+@pytest.mark.parametrize(
+    "routespec",
+    [
+        "/has%20space/foo/",
+        "/missing-trailing/slash",
+        "/has/@/",
+        "/has/" + quote("üñîçø∂é"),
+        "host.name/path/",
+        "other.host/path/no/slash",
+    ],
+)
+async def test_add_route_to_etcd(etcd_proxy, routespec):
     proxy = etcd_proxy
+    if not routespec.startswith("/"):
+        proxy.host_routing = True
+
+    target = "http://127.0.0.1:9000"
+    data = {"test": "test1", "user": "username"}
+
     await proxy.add_route(routespec, target, data)
     check_route_with_etcdctl(proxy, routespec, target, data)
 
 
-@pytest.mark.parametrize("routespec", ["/proxy/path", "host/proxy/path"])
-@pytest.mark.parametrize("target", ["http://127.0.0.1:99"])
-@pytest.mark.parametrize("data", [{"test": "test1"}, {}])
-async def test_delete_route_from_etcd(etcd_proxy, routespec, target, data):
+@pytest.mark.parametrize(
+    "routespec",
+    [
+        "/has%20space/foo/",
+        "/missing-trailing/slash",
+        "/has/@/",
+        "/has/" + quote("üñîçø∂é"),
+        "host.name/path/",
+        "other.host/path/no/slash",
+    ],
+)
+async def test_delete_route_from_etcd(etcd_proxy, routespec):
     proxy = etcd_proxy
+    if not routespec.startswith("/"):
+        proxy.host_routing = True
+
+    target = "http://127.0.0.1:9000"
+    data = {"test": "test1", "user": "username"}
+
     add_route_with_etcdctl(proxy, routespec, target, data)
     await proxy.delete_route(routespec)
 
@@ -120,38 +157,30 @@ async def test_delete_route_from_etcd(etcd_proxy, routespec, target, data):
 
 
 @pytest.mark.parametrize(
-    "routespec, target, data, expected_output",
+    "routespec",
     [
-        (
-            "/proxy/path",
-            "http://127.0.0.1:99",
-            {"test": "test1"},
-            {
-                "routespec": "/proxy/path",
-                "target": "http://127.0.0.1:99",
-                "data": json.dumps({"test": "test1"}),
-            },
-        ),  # Path-based routing
-        (
-            "/proxy/path",
-            "http://127.0.0.1:99",
-            {},
-            {"routespec": "/proxy/path", "target": "http://127.0.0.1:99", "data": "{}"},
-        ),  # Path-based routing, no data dict
-        (
-            "host/proxy/path",
-            "http://127.0.0.1:99",
-            {"test": "test2"},
-            {
-                "routespec": "host/proxy/path",
-                "target": "http://127.0.0.1:99",
-                "data": json.dumps({"test": "test2"}),
-            },
-        ),  # Host-based routing
+        "/has%20space/foo/",
+        "/missing-trailing/slash",
+        "/has/@/",
+        "/has/" + quote("üñîçø∂é"),
+        "host.name/path/",
+        "other.host/path/no/slash",
     ],
 )
-async def test_get_route(etcd_proxy, routespec, target, data, expected_output):
+async def test_get_route(etcd_proxy, routespec):
     proxy = etcd_proxy
+    if not routespec.startswith("/"):
+        proxy.host_routing = True
+
+    target = "http://127.0.0.1:9000"
+    data = {"test": "test1", "user": "username"}
+
+    expected_output = {
+        "routespec": routespec if routespec.endswith("/") else routespec + "/",
+        "target": target,
+        "data": data,
+    }
+
     add_route_with_etcdctl(proxy, routespec, target, data)
     route = await proxy.get_route(routespec)
     assert route == expected_output
@@ -159,26 +188,16 @@ async def test_get_route(etcd_proxy, routespec, target, data, expected_output):
 
 async def test_get_all_routes(etcd_proxy):
     proxy = etcd_proxy
-    routespec = ["/proxy/path1", "/proxy/path2", "host/proxy/path"]
+    routespec = ["/proxy/path1", "/proxy/path2/", "host/proxy/path"]
     target = ["http://127.0.0.1:990", "http://127.0.0.1:909", "http://127.0.0.1:999"]
     data = [{"test": "test1"}, {}, {"test": "test2"}]
 
     expected_output = {
-        routespec[0]: {
-            "routespec": routespec[0],
-            "target": target[0],
-            "data": json.dumps(data[0]),
-        },
-        routespec[1]: {
-            "routespec": routespec[1],
-            "target": target[1],
-            "data": json.dumps(data[1]),
-        },
-        routespec[2]: {
-            "routespec": routespec[2],
-            "target": target[2],
-            "data": json.dumps(data[2]),
-        },
+        routespec[0]
+        + "/": {"routespec": routespec[0] + "/", "target": target[0], "data": data[0]},
+        routespec[1]: {"routespec": routespec[1], "target": target[1], "data": data[1]},
+        routespec[2]
+        + "/": {"routespec": routespec[2] + "/", "target": target[2], "data": data[2]},
     }
 
     add_route_with_etcdctl(proxy, routespec[0], target[0], data[0])

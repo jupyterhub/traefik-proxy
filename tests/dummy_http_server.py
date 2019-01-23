@@ -1,4 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import asyncio
+import websockets
 
 
 class DummyServer(BaseHTTPRequestHandler):
@@ -12,6 +14,10 @@ class DummyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self._set_headers()
         self.wfile.write(bytes(str(self.server.server_port), "utf-8"))
+
+
+async def send_port(websocket, path):
+    await websocket.send(str(websocket.port))
 
 
 def run(port=80):
@@ -30,5 +36,14 @@ if __name__ == "__main__":
 
     if len(argv) == 2:
         run(port=int(argv[1]))
+    elif len(argv) == 3:
+        proto = str(argv[2])
+        if proto == "http":
+            run(port=int(argv[1]))
+        else:
+            asyncio.get_event_loop().run_until_complete(
+                websockets.serve(send_port, "localhost", int(argv[1]))
+            )
+            asyncio.get_event_loop().run_forever()
     else:
         run()
