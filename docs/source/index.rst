@@ -6,7 +6,15 @@
 JupyterHub Traefik Proxy
 ========================
 
-An implementation of the JupyterHub proxy api with `traefik <https://traefik.io>`__
+An implementation of the JupyterHub proxy api with `traefik <https://traefik.io>`__.
+
+Installation
+============
+
+There are two versions for the proxy, dependig on how traefik stores the routes:
+
+* TraefikTomlProxy
+* TraefikEtcdProxy
 
 Version: |version|
 

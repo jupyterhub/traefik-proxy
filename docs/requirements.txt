@@ -2,4 +2,3 @@ alabaster_jupyterhub
 recommonmark
 sphinx
 sphinx-copybutton
-versioneer
