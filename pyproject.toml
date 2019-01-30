@@ -1,3 +1,6 @@
+[build-system]
+requires = ["setuptools", "versioneer", "wheel"]
+
 [tool.black]
 exclude = '''
 /(
