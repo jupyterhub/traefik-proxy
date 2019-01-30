@@ -5,10 +5,17 @@ Usage:
     pip install [-e] .
 """
 
+import os
 import sys
 
 from setuptools import setup, find_packages
 from setuptools.command.bdist_egg import bdist_egg
+
+# ensure cwd is on sys.path
+# workaround bug in pip 19.0
+here = os.path.dirname(__file__)
+if here not in sys.path:
+    sys.path.insert(0, here)
 
 import versioneer
 

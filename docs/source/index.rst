@@ -10,9 +10,20 @@ An implementation of the JupyterHub proxy api with `traefik <https://traefik.io>
 
 Version: |version|
 
+TODO:
+
+- what is traefik
+- why use traefik instead of the default configurable-http-proxy (supports letsencrypt, works with etcd, can have multiple copies for scaling/stability)?
+- when to use etcd or toml
+
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+
+   install
+   toml
+   etcd
 
    api/index
    changelog
