@@ -45,7 +45,7 @@ setup(
     name="jupyterhub-traefik-proxy",
     version=versioneer.get_version(),
     install_requires=open("requirements.txt").read().splitlines(),
-    python_requires=">=3.5",
+    python_requires=">=3.6",
     author="Project Jupyter Contributors",
     author_email="jupyter@googlegroups.com",
     url="https://jupyterhub-traefik-proxy.readthedocs.io",
