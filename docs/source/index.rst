@@ -3,6 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+========================
 JupyterHub Traefik Proxy
 ========================
 
@@ -11,7 +12,7 @@ An implementation of the JupyterHub proxy api with `traefik <https://traefik.io>
 Version: |version|
 
 Why traefik?
-------------
+============
 
 Currently, the **default** proxy implementation for JupyterHub is `configurable-http-proxy <https://github.com/jupyterhub/configurable-http-proxy>`__, which stores the routing table in-memory. This might be the best approach in most of the cases, but because you can only run a single copy of the proxy at a time, it has its limitations when used in dynamic large scale systems.
 
@@ -23,18 +24,30 @@ There are two versions for the proxy, dependig on how traefik stores the routes:
 * TraefikTomlProxy - *for* **smaller**, *single-node deployments*
 * TraefikEtcdProxy - *for* **distributed** *setups*
 
+Contents
+========
+Installation Guide
+------------------
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
    install
+
+Getting Started
+---------------
+.. toctree::
+   :maxdepth: 1
+
    toml
    etcd
 
+API Reference
+-------------
+.. toctree::
+   :maxdepth: 3
+
    api/index
    changelog
-
-
 
 Indices and tables
 ==================

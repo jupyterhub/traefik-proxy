@@ -88,7 +88,7 @@
             ```
 
 
-## Enabling traefik-proxy in Jupyterhub:
+## Enabling traefik-proxy in Jupyterhub
 
 
 [TraefikEtcdProxy](https://github.com/jupyterhub/traefik-proxy/blob/master/jupyterhub_traefik_proxy/etcd.py) and [TraefikTomlProxy](https://github.com/jupyterhub/traefik-proxy/blob/master/jupyterhub_traefik_proxy/toml.py) are custom proxy implementations that subclass [Proxy](https://github.com/jupyterhub/jupyterhub/blob/master/jupyterhub/proxy.py) and can register in JupyterHub config using `c.JupyterHub.proxy_class` entrypoint.
