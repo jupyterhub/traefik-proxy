@@ -1,9 +1,119 @@
 # Installation
 
-## TODO:
 
-- Document traefik-proxy installation
-- enabling traefik in jupyterhub_config.py
-- what's needed (traefik binary, etcd binary)
-- cover how we talk to traefik (api endpoint, auth)
-- link to toml, etcd
+## Traefik-proxy installation
+
+1. Install **traefik-proxy** throught the project’s [Github repository](https://github.com/jupyterhub/traefik-proxy):
+
+    ```
+    $ git clone https://github.com/jupyterhub/traefik-proxy.git
+    $ cd traefik-proxy
+    $ pip install .
+    ```
+
+2. Install **Jupyterhub**:
+    ```
+    $ python -m pip install jupyterhub
+    ```
+
+3. In order to be able to launch JupyterHub with traefik-proxy or run the tests, **traefik** and **etcd** must first be installed and added to your `PATH`.
+   
+   There are two ways you can install traefik and etcd:
+   
+   1. Through traefik-proxy's **install utility**.
+
+      From `traefik-proxy` directory:
+
+      ```
+      $ python -m jupyterhub_traefik_proxy.install --output=/usr/local/bin
+      ```
+     
+      This will install the default versions of traefik and etcd, namely `traefik-1.7.5` and `etcd-3.3.10` to `/usr/local/bin` specified through the `--output` option.
+
+      If no directory is passed to the installer, a *dependencies* directory will be created in the `traefik-proxy` directory. In this case, you **must** add this directory to `PATH`, e.g.
+
+      ```
+      $ export PATH=$PATH:{$PWD}/dependencies
+      ```
+
+      If you want to install other versions of traefik and etcd in a directory of your choice, just specify it to the installer through the following arguments:
+        * `--traefik-version`
+        * `--etcd-version`
+        * `--output`
+
+      Example
+      ```
+      $ python -m jupyterhub_traefik_proxy.install --output=dep \
+               --traefik-version=1.6.6 --etcd-version=3.2.24
+      ```
+
+      If the desired install directory doesn't exist, it will be created by the installer.
+
+    2. From traefik and etcd **realease pages**:
+       * Install `traefik`
+
+            Grab the latest binary for your platform from [traefik realeases page](https://github.com/containous/traefik/releases), e.g.
+
+            ```
+            $ wget https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64
+            ```
+            Mark the binary as executable, e.g.
+
+            ```
+            $ chmod 755 traefik_linux-amd64
+            ```
+            Add the traefik binary as `traefik`, and make sure it is on your PATH, e.g.
+
+            ```
+            $ mv traefik_linux-amd64 /usr/local/bin/traefik
+            ```
+
+       * Install `etcd`
+
+            Download the latest archive for your platform from [etcd realeases page](https://github.com/etcd-io/etcd/releases), e.g.
+
+            ```
+            $ wget https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz
+            ```
+            Extract `etcd` and `etcdctl` executables from the archive, e.g.
+
+            ```
+            $ tar xzvf etcd-v3.3.10-linux-amd64.tar.gz
+            ```
+            Add `etcd` and `etcdl` to your `PATH`, e.g.
+
+            ```
+            $ mv etcd /usr/local/bin/etcd
+            $ mv etcdctl /usr/local/bin/etcdctl
+            ```
+
+
+## Enabling traefik-proxy in Jupyterhub:
+
+
+[TraefikEtcdProxy](https://github.com/jupyterhub/traefik-proxy/blob/master/jupyterhub_traefik_proxy/etcd.py) and [TraefikTomlProxy](https://github.com/jupyterhub/traefik-proxy/blob/master/jupyterhub_traefik_proxy/toml.py) are custom proxy implementations that subclass [Proxy](https://github.com/jupyterhub/jupyterhub/blob/master/jupyterhub/proxy.py) and can register in JupyterHub config using `c.JupyterHub.proxy_class` entrypoint.
+
+On startup, JupyterHub will look by default for a configuration file, *jupyterhub_config.py*, in the current working directory. If the configuration file is not in the current working directory,
+you can load a specific config file and start JupyterHub using:
+
+```
+$ jupyterhub -f /path/to/jupyterhub_config.py
+```
+
+There is an example configuration file [here](https://github.com/jupyterhub/traefik-proxy/blob/master/examples/jupyterhub_config.py) that configures Jupyterhub to run with *TraefikEtcdProxy* as the proxy and uses dummyauthenticator and simplespawner to enable testing without administrative privileges.
+
+In *jupyterhub_config.py*:
+
+```
+c.JupyterHub.proxy_class = "traefik_etcd"
+# will configure Jupyterhub to run with TraefikEtcdProxy
+
+```
+
+```
+c.JupyterHub.proxy_class = "traefik_toml"
+# will configure Jupyterhub to run with TraefikTomlProxy
+```
+
+## Implementation details
+ TODO: cover how we talk to traefik (api endpoint, auth)
