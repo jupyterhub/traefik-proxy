@@ -7,14 +7,14 @@
 JupyterHub Traefik Proxy
 ========================
 
-An implementation of the JupyterHub proxy api with `traefik <https://traefik.io>`__ - an extremely lightweight, portable reverse proxy implementation, that supports load balancing and can configure itself automatically and dynamically. 
+An implementation of the JupyterHub proxy api with `traefik <https://traefik.io>`__ : an extremely lightweight, portable reverse proxy implementation, that supports load balancing and can configure itself automatically and dynamically. 
 
 Version: |version|
 
 Why traefik?
 ============
 
-Currently, the **default** proxy implementation for JupyterHub is `configurable-http-proxy <https://github.com/jupyterhub/configurable-http-proxy>`__, which stores the routing table in-memory. This might be the best approach in most of the cases, but because you can only run a single copy of the proxy at a time, it has its limitations when used in dynamic large scale systems.
+Currently, the **default** proxy implementation for JupyterHub is `configurable-http-proxy <https://github.com/jupyterhub/configurable-http-proxy>`__(CHP), which stores the routing table in-memory. This might be the best approach in most of the cases, but because you can only run a single copy of the proxy at a time, it has its limitations when used in dynamic large scale systems.
 
 When using a proxy implementation based on traefik, you can run multiple instances of traefik by using a distributed key value store like `etcd <https://coreos.com/etcd>`__ to store the routing table. This makes the proxy **highly available** and improves the scalability and stability of the system.
 Moreover it offers *HTTPS* support through a straigt-forward `ACME (Let's Encrypt) <https://docs.traefik.io/configuration/acme>`__ configuration.
@@ -36,7 +36,7 @@ Installation Guide
 Getting Started
 ---------------
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    toml
    etcd

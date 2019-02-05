@@ -116,4 +116,18 @@ c.JupyterHub.proxy_class = "traefik_toml"
 ```
 
 ## Implementation details
- TODO: cover how we talk to traefik (api endpoint, auth)
+
+
+Traefik provides a Web UI **dashboard** where you can see the frontends and backends registered, the routing rules, some metrics, but also other configuration elements. Find out more about traefik api's, [here](https://docs.traefik.io/configuration/api/#security).
+
+Because of **security** concerns, in traefik-proxy implementation, traefik api endpoint isn't exposed on the public http endpoint. Instead, it runs on a dedicated **authenticated endpoint** that's on localhost by default.
+
+The port on which traefik-proxy's api will run, as well as the username and password used for authenticating, can be passed to the proxy through `jupyterhub_config.py`, e.g.:
+
+```
+c.TraefikTomlProxy.traefik_api_url = "http://127.0.0.1:8099"
+c.TraefikTomlProxy.traefik_api_password = "admin"
+c.TraefikTomlProxy.traefik_api_username = "admin"
+```
+
+Check out TraefikProxy's **API Reference** for more configuration options.
