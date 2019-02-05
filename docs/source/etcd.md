@@ -4,7 +4,7 @@
 is a distributed key-value store.
 This is the choice to use when using jupyterhub-traefik-proxy
 in a distributed setup, such as a Kubernetes cluster,
-e.g. with multiple traefik proxy instances.
+e.g. with multiple traefik-proxy instances.
 
 ## How-To install TraefikEtcdProxy
 
