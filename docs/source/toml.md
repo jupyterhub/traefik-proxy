@@ -4,11 +4,12 @@
 [The Littlest JupyterHub](https://tljh.jupyter.org).
 
 ## How-To install TraefikTomlProxy
-1. Install **traefik-proxy** throught the project’s [Github repository](https://github.com/jupyterhub/traefik-proxy)
+
+1. Install **traefik-proxy** through the project’s [Github repository](https://github.com/jupyterhub/traefik-proxy)
 2. Install **Jupyterhub**
 3. Install **traefik**
 
-* You can find the full installation guide and examples in the [Introduction section](install.md)
+* You can find the full installation guide and examples in the [Introduction section](install.html#traefik-proxy-installation)
 
 ## How-To enable TraefikTomlProxy
 
@@ -22,7 +23,7 @@ You can choose to:
     c.JupyterHub.proxy_class = "traefik_toml"
     ```
 
-* use the class name, in which case, you have to import it, e.g.:
+* use the TraefikTomlProxy object, in which case, you have to import the module, e.g.:
 
     ```
     from jupyterhub_traefik_proxy import TraefikTomlProxy
@@ -30,7 +31,7 @@ You can choose to:
     ```
 
 
-## The toml configuration files
+## Traefik configuration
 
 Traefik's configuration is divided into two parts:
 
@@ -39,11 +40,10 @@ Traefik's configuration is divided into two parts:
 
 Traefik allows us to have one file for the static configuration (the `traefik.toml`) and one or several files for the routes, that traefik would watch.
 
-
 ---
-*   **Note**
+<span style="color:green">**Note !**</span>
 
-    **TraefikTomlProxy**, uses two configuration files: one file for the routes (**rules.toml**), and one for the static configuration (**traefik.toml**).
+**TraefikTomlProxy**, uses two configuration files: one file for the routes (**rules.toml**), and one for the static configuration (**traefik.toml**).
 
 ---
 
@@ -59,108 +59,110 @@ You can override this in TraefikTomlProxy, by modifying the **toml_static_config
 c.TraefikTomlProxy.toml_static_config_file="/path/to/static_config_filename.toml"
 ```
 
-Similary, you can override the dynamic configuration file by modifying the **toml_dynamic_config_file** argument:
+Similarly, you can override the dynamic configuration file by modifying the **toml_dynamic_config_file** argument:
 
 ```
 c.TraefikTomlProxy.toml_dynamic_config_file="/path/to/dynamic_config_filename.toml"
 ```
 
 ---
-*   **Note**
+<span style="color:green">**Note !**</span>
 
-    **When JupyterHub starts the proxy**, it writes the static config once, then only edits the routes config file. 
+**When JupyterHub starts the proxy**, it writes the static config once, then only edits the routes config file. 
 
-    **When JupyterHub does not start the proxy**, the user is totally responsible for the static config and 
-    JupyterHub is responsible exclusively for the routes.
-
+**When JupyterHub does not start the proxy**, the user is totally responsible for the static config and 
+JupyterHub is responsible exclusively for the routes.
 ---
 
 ## Externally managed TraefikTomlProxy
+
 When TraefikTomlProxy is externally managed, service managers like [systemd](https://www.freedesktop.org/wiki/Software/systemd/) 
 or [docker](https://www.docker.com/) will be responsible for starting and stopping the proxy.
 
-In order to let JupyterHub know that the proxy will be managed externally, use the `should_start` configuration option:
+If TraefikTomlProxy is used as an externally managed service, then make sure you follow the steps enumerated below:
 
-```
-c.TraefikTomlProxy.should_start = False
-```
+1. Let JupyterHub know that the proxy being used is TraefikTomlProxy, using the *proxy_class* configuration option:
+    ```
+    c.TraefikTomlProxy.proxy_class = traefik_toml
+    ```
 
-## Step-by-step example setup for [the-littlest-jupyterhub](https://github.com/jupyterhub/the-littlest-jupyterhub)
-
-The Littlest JupyterHub (TLJH) is a simple JupyterHub distribution for a small (0-100) number of users on a single server.
-
-In order to enable TraefikTomlProxy on TLJH, a minimal configuration is required.
-
-1. Ensure **jupyterhub_config.py**
+2. Ensure **jupyterhub_config.py**
 
    JupyterHub configuration file, *jupyterhub_config.py* must specify at least:
-   * that the proxy is externally managed
-   * the traefik's api credentials
-   * the dynamic configuration file, if different from *rules.toml* or if this file is located 
-     in another place than traefik's default search directories (etc/traefik/, * $HOME/.traefik/, the working directory)
+   * That the proxy is externally managed
+   * The traefik api credentials
+   * The dynamic configuration file, 
+     if different from *rules.toml* or if this file is located 
+     in another place than traefik's default search directories (etc/traefik/, $HOME/.traefik/, the working directory)
 
-   Example configuration:
+3. Ensure **traefik.toml**
+
+   The static configuration file, *traefik.toml* must configure at least:
+   * The default entrypoint
+   * The api entrypoint (*and authenticate it*)
+   * The websockets protocol
+   * The dynamic configuration file to watch
+    (*make sure this configuration file exists, even if empty before the proxy is launched*)
+
+## Example setup
+   
+This is an example setup for using JupyterHub and TraefikTomlProxy managed by another service than Jupyterhub.
+
+1. Configure the proxy through the JupyterHub configuration file, *jupyterhub_config.py*, e.g.:
+
    ```
    from jupyterhub_traefik_proxy import TraefikTomlProxy
 
    # mark the proxy as externally managed
    c.TraefikTomlProxy.should_start = False
+
    # traefik api endpoint login password
    c.TraefikTomlProxy.traefik_api_password = "admin"
+
    # traefik api endpoint login username
    c.TraefikTomlProxy.traefik_api_username = "api_admin"
+
    # traefik's dynamic configuration file
-   c.TraefikTomlProxy.toml_dynamic_config_file = "TLJH_INSTALL_DIR/rules.toml"
+   c.TraefikTomlProxy.toml_dynamic_config_file = "path/to/rules.toml"
+
    # configure JupyterHub to use TraefikTomlProxy
    c.JupyterHub.proxy_class = TraefikTomlProxy
     ```
 
-2. Ensure **traefik.toml**
-   The static configuration file must configure at least:
-   * the api entrypoint (and authenticate it)
-   * websockets
-   * the dynamic configuration file to watch
+2. Create a traefik static configuration file, *traefik.toml*, e.g.:
 
-   Example configuration:
-   ```
-   [api]
-   dashboard = true
-   entrypoint = "auth_api"
+    ```
+    # the default entrypoint
+    defaultentrypoints = ["http"]
 
-   # TODO
-   [entryPoints.auth_api]
-   address = ":8099"
+    # the api entrypoint
+    [api]
+    dashboard = true
+    entrypoint = "auth_api"
 
-   [entryPoints.auth_api.auth.basic]
-   users = [ "api_admin:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
+    # websockets protocol
+    [wss]
+    protocol = "http"
 
-   [wss]
-   protocol = "http"
+    # the port on localhost where traefik accepts http requests
+    [entryPoints.http]
+    address = ":8000"
 
-   [file]
-   filename = "./tests/rules.toml"
-   watch = true
-   ```
+    # the port on localhost where the traefik api and dashboard can be found
+    [entryPoints.auth_api]
+    address = ":8099"
 
-3. JupyterHub and the proxy are managed by *systemd* in TLJH. Make sure there is a a **unit configuration** file (*proxy*.service) 
-for the proxy process to be supervised by systemd. 
+    # authenticate the traefik api entrypoint
+    [entryPoints.auth_api.auth.basic]
+    users = [ "api_admin:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
 
-   TLJH already uses traefik in order to enable HTTPS, so we can use the *traefik.service* unit configuration.
-   Make sure you give traefik `rw` access to the dynamic configuration file and that this configuration file exists before the proxy is launched (it can be empty).
-
-   * In *traefik.py*:
-
-   ```
-   # create an empty config file
-   with open(os.path.join(state_dir, "rules.toml"), "w") as f:
-           os.fchmod(f.fileno(), 0o600)
+    # the dynamic configuration file
+    [file]
+    filename = "rules.toml"
+    watch = true
    ```
 
-   * In *traefik.service*:
-
-   ```
-   # give rw access to the config file
-   ReadWritePaths={install_prefix}/state/rules.toml
-   ```
-
-
+3. Start traefik with the configuration specified above, e.g.:
+    ```
+    $ traefik -c traefik.toml
+    ```

@@ -74,7 +74,12 @@ class TraefikEtcdProxy(TraefikProxy):
         get_etcd_kvs(self.static_config, self.etcd_traefik_prefix)
 
         success = [
-            KV.put.txn(self.etcd_traefik_prefix + "etcd/endpoint", "127.0.0.1:2379"),
+            KV.put.txn(
+                self.etcd_traefik_prefix + "etcd/endpoint",
+                str(urlparse(self.etcd_url).hostname)
+                + ":"
+                + str(urlparse(self.etcd_url).port),
+            ),
             KV.put.txn(
                 self.etcd_traefik_prefix + "etcd/prefix", self.etcd_traefik_prefix
             ),

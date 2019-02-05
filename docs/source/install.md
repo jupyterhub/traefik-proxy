@@ -3,7 +3,7 @@
 
 ## Traefik-proxy installation
 
-1. Install **traefik-proxy** throught the project’s [Github repository](https://github.com/jupyterhub/traefik-proxy):
+1. Install **traefik-proxy** through the project’s [Github repository](https://github.com/jupyterhub/traefik-proxy):
 
     ```
     $ git clone https://github.com/jupyterhub/traefik-proxy.git
@@ -49,10 +49,10 @@
 
       If the desired install directory doesn't exist, it will be created by the installer.
 
-    2. From traefik and etcd **realease pages**:
+    2. From traefik and etcd **release pages**:
        * Install `traefik`
 
-            Grab the latest binary for your platform from [traefik realeases page](https://github.com/containous/traefik/releases), e.g.
+            Grab the latest binary for your platform from [traefik releases page](https://github.com/containous/traefik/releases), e.g.
 
             ```
             $ wget https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64
@@ -117,7 +117,6 @@ c.JupyterHub.proxy_class = "traefik_toml"
 
 ## Implementation details
 
-
 Traefik provides a Web UI **dashboard** where you can see the frontends and backends registered, the routing rules, some metrics, but also other configuration elements. Find out more about traefik api's, [here](https://docs.traefik.io/configuration/api/#security).
 
 Because of **security** concerns, in traefik-proxy implementation, traefik api endpoint isn't exposed on the public http endpoint. Instead, it runs on a dedicated **authenticated endpoint** that's on localhost by default.
@@ -131,3 +130,17 @@ c.TraefikTomlProxy.traefik_api_username = "admin"
 ```
 
 Check out TraefikProxy's **API Reference** for more configuration options.
+
+## Testing jupyterhub-traefik-proxy
+
+You can then run the all the test suite from the *traefik-proxy* directory with:
+
+```
+$ pytest -v ./tests
+```
+
+Or you can run a specific test with:
+
+```
+$ pytest -v ./tests/<test-file-name>
+```
