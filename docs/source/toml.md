@@ -5,7 +5,7 @@
 
 ## How-To install TraefikTomlProxy
 
-1. Install **traefik-proxy** through the project’s [Github repository](https://github.com/jupyterhub/traefik-proxy)
+1. Install **traefik-proxy** through the project’s [GitHub repository](https://github.com/jupyterhub/traefik-proxy)
 2. Install **Jupyterhub**
 3. Install **traefik**
 
@@ -17,7 +17,7 @@ You can enable JupyterHub to work with `TraefikTomlProxy` in jupyterhub_config.p
 
 You can choose to:
 
-* use the `traefik_toml` entrypoint, e.g.:
+* use the `traefik_toml` entrypoint, new in JupyterHub 1.0, e.g.:
 
     ```
     c.JupyterHub.proxy_class = "traefik_toml"
@@ -36,7 +36,8 @@ You can choose to:
 Traefik's configuration is divided into two parts:
 
 * The **static** configuration (loaded only at the beginning)
-* The **dynamic** configuration (can be hot-reloaded, without restarting the process).
+* The **dynamic** configuration (can be hot-reloaded, without restarting the proxy), 
+where the routing table will be updated continuously.
 
 Traefik allows us to have one file for the static configuration (the `traefik.toml`) and one or several files for the routes, that traefik would watch.
 
@@ -83,10 +84,10 @@ If TraefikTomlProxy is used as an externally managed service, then make sure you
 
 1. Let JupyterHub know that the proxy being used is TraefikTomlProxy, using the *proxy_class* configuration option:
     ```
-    c.TraefikTomlProxy.proxy_class = traefik_toml
+    c.TraefikTomlProxy.proxy_class = "traefik_toml"
     ```
 
-2. Ensure **jupyterhub_config.py**
+2. Configure `TraeficTomlProxy` in **jupyterhub_config.py**
 
    JupyterHub configuration file, *jupyterhub_config.py* must specify at least:
    * That the proxy is externally managed
@@ -94,6 +95,19 @@ If TraefikTomlProxy is used as an externally managed service, then make sure you
    * The dynamic configuration file, 
      if different from *rules.toml* or if this file is located 
      in another place than traefik's default search directories (etc/traefik/, $HOME/.traefik/, the working directory)
+
+    Example configuration:
+    ```
+    # JupyterHub shouldn't start the proxy, it's already running
+    c.TraefikTomlProxy.should_start = False
+
+    # if not the default:
+    c.TraefikTomlProxy.toml_dynamic_config_file = "somefile.toml"
+
+    # traefik api credentials
+    c.TraefikTomlProxy.traefik_api_username = "abc"
+    c.TraefikTomlProxy.traefik_api_password = "xxx"
+    ```
 
 3. Ensure **traefik.toml**
 

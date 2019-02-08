@@ -22,7 +22,7 @@ using the `proxy_class` configuration option.
 
 You can choose to:
 
-* use the `traefik_etcd` entrypoint, e.g.:
+* use the `traefik_etcd` entrypoint, new in JupyterHub 1.0, e.g.:
 
     ```
     c.JupyterHub.proxy_class = "traefik_etcd"
@@ -93,14 +93,27 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
 
 1. Let JupyterHub know that the proxy being used is TraefikEtcdProxy, using the *proxy_class* configuration option:
     ```
-    c.TraefikEtcdProxy.proxy_class = traefik_etcd
+    c.TraefikEtcdProxy.proxy_class = "traefik_etcd"
     ```
 
-2. Ensure **jupyterhub_config.py**
+2. Configure `TraeficEtcdProxy` in **jupyterhub_config.py**
 
    JupyterHub configuration file, *jupyterhub_config.py* must specify at least:
    * That the proxy is externally managed
    * The traefik api credentials
+
+   Example configuration:
+   ```
+   # JupyterHub shouldn't start the proxy, it's already running
+   c.TraefikEtcdProxy.should_start = False
+
+   # if not the default:
+   c.TraefikEtcdProxy.etcd_url = "http://etcd-host:2379"
+
+   # traefik api credentials
+   c.TraefikEtcdProxy.traefik_api_username = "abc"
+   c.TraefikEtcdProxy.traefik_api_password = "xxx"
+   ```
 
 3. Ensure etcd contains the traefik static configuration
 

@@ -11,6 +11,8 @@
     $ pip install .
     ```
 
+    TODO: replace this with `pip install jupyterhub-traefik-proxy` when we've made a release
+
 2. Install **Jupyterhub**:
     ```
     $ python -m pip install jupyterhub
@@ -50,43 +52,9 @@
       If the desired install directory doesn't exist, it will be created by the installer.
 
     2. From traefik and etcd **release pages**:
-       * Install `traefik`
+       * Install [`traefik`](https://traefik.io/#easy-to-install)
 
-            Grab the latest binary for your platform from [traefik releases page](https://github.com/containous/traefik/releases), e.g.
-
-            ```
-            $ wget https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64
-            ```
-            Mark the binary as executable, e.g.
-
-            ```
-            $ chmod 755 traefik_linux-amd64
-            ```
-            Add the traefik binary as `traefik`, and make sure it is on your PATH, e.g.
-
-            ```
-            $ mv traefik_linux-amd64 /usr/local/bin/traefik
-            ```
-
-       * Install `etcd`
-
-            Download the latest archive for your platform from [etcd realeases page](https://github.com/etcd-io/etcd/releases), e.g.
-
-            ```
-            $ wget https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz
-            ```
-            Extract `etcd` and `etcdctl` executables from the archive, e.g.
-
-            ```
-            $ tar xzvf etcd-v3.3.10-linux-amd64.tar.gz
-            ```
-            Add `etcd` and `etcdl` to your `PATH`, e.g.
-
-            ```
-            $ mv etcd /usr/local/bin/etcd
-            $ mv etcdctl /usr/local/bin/etcdctl
-            ```
-
+       * Install [`etcd`](https://traefik.io/#easy-to-install)
 
 ## Enabling traefik-proxy in Jupyterhub
 
