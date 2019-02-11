@@ -8,8 +8,8 @@ e.g. with multiple traefik-proxy instances.
 
 ## How-To install TraefikEtcdProxy
 
-1. Install **traefik-proxy** through the project’s [Github repository](https://github.com/jupyterhub/traefik-proxy)
-2. Install **Jupyterhub**
+3. Install **jupyterhub**
+2. Install **jupyterhub-traefik-proxy**
 3. Install **traefik**
 4. Install **etcd**
 
@@ -17,7 +17,7 @@ e.g. with multiple traefik-proxy instances.
 
 ## How-To enable TraefikEtcdProxy
 
-You can enable JupyterHub to work with `TraefikEtcdProxy` in jupyterhub_config.py, 
+You can enable JupyterHub to work with `TraefikEtcdProxy` in jupyterhub_config.py,
 using the `proxy_class` configuration option.
 
 You can choose to:
@@ -155,8 +155,8 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
        * The etcd endpoint
 
 ## Example setup
-   
-This is an example setup for using JupyterHub and TraefikEtcdProxy managed by another service than Jupyterhub.
+
+This is an example setup for using JupyterHub and TraefikEtcdProxy managed by another service than JupyterHub.
 
 1. Configure the proxy through the JupyterHub configuration file, *jupyterhub_config.py*, e.g.:
 
