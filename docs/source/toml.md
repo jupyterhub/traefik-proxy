@@ -1,12 +1,12 @@
 # Using traefik-proxy with TOML configuration files
 
-**jupyterhub-traefik-proxy** can be used with simple toml configuration files, for smaller, single-node deployments such as 
+**jupyterhub-traefik-proxy** can be used with simple toml configuration files, for smaller, single-node deployments such as
 [The Littlest JupyterHub](https://tljh.jupyter.org).
 
 ## How-To install TraefikTomlProxy
 
-1. Install **traefik-proxy** through the project’s [GitHub repository](https://github.com/jupyterhub/traefik-proxy)
-2. Install **Jupyterhub**
+1. Install **jupyterhub**
+2. Install **jupyterhub-traefik-proxy**
 3. Install **traefik**
 
 * You can find the full installation guide and examples in the [Introduction section](install.html#traefik-proxy-installation)
@@ -120,7 +120,7 @@ If TraefikTomlProxy is used as an externally managed service, then make sure you
 
 ## Example setup
    
-This is an example setup for using JupyterHub and TraefikTomlProxy managed by another service than Jupyterhub.
+This is an example setup for using JupyterHub and TraefikTomlProxy managed by another service than JupyterHub.
 
 1. Configure the proxy through the JupyterHub configuration file, *jupyterhub_config.py*, e.g.:
 
