@@ -13,34 +13,45 @@ pytestmark = pytest.mark.asyncio
 default_backend_weight = "1"
 
 
-def assert_etcdctl_get(key, expected_rv):
-    assert (
-        subprocess.check_output(["etcdctl", "get", key])
-        .decode(sys.stdout.encoding)
-        .strip()
-        == expected_rv
-    )
+def assert_etcdctl_get(key, expected_rv, user, password):
+    if user and password:
+        assert (
+            subprocess.check_output(
+                ["etcdctl", "--user", user + ":" + password, "get", key]
+            )
+            .decode(sys.stdout.encoding)
+            .strip()
+            == expected_rv
+        )
+    else:
+        assert (
+            subprocess.check_output(["etcdctl", "get", key])
+            .decode(sys.stdout.encoding)
+            .strip()
+            == expected_rv
+        )
 
 
-def assert_etcdctl_put(key, value, expected_rv):
-    assert (
-        subprocess.check_output(["etcdctl", "put", key, value])
-        .decode(sys.stdout.encoding)
-        .strip()
-        == expected_rv
-    )
+def assert_etcdctl_put(key, value, expected_rv, user, password):
+    if user and password:
+        assert (
+            subprocess.check_output(
+                ["etcdctl", "--user", user + ":" + password, "put", key, value]
+            )
+            .decode(sys.stdout.encoding)
+            .strip()
+            == expected_rv
+        )
+    else:
+        assert (
+            subprocess.check_output(["etcdctl", "put", key, value])
+            .decode(sys.stdout.encoding)
+            .strip()
+            == expected_rv
+        )
 
 
-def assert_etcdctl_del(key, expected_rv):
-    assert (
-        subprocess.check_output(["etcdctl", "del", key])
-        .decode(sys.stdout.encoding)
-        .strip()
-        == expected_rv
-    )
-
-
-def add_route_with_etcdctl(etcd_proxy, routespec, target, data):
+def add_route_with_etcdctl(etcd_proxy, routespec, target, data, user="", password=""):
     proxy = etcd_proxy
 
     if not routespec.endswith("/"):
@@ -51,19 +62,29 @@ def add_route_with_etcdctl(etcd_proxy, routespec, target, data):
     rule = traefik_utils.generate_rule(routespec)
     expected_rv = "OK"
 
-    assert_etcdctl_put(jupyterhub_routespec, target, expected_rv)
-    assert_etcdctl_put(target, json.dumps(data), expected_rv)
-    assert_etcdctl_put(route_keys.backend_url_path, target, expected_rv)
+    assert_etcdctl_put(jupyterhub_routespec, target, expected_rv, user, password)
+    assert_etcdctl_put(target, json.dumps(data), expected_rv, user, password)
+    assert_etcdctl_put(route_keys.backend_url_path, target, expected_rv, user, password)
     assert_etcdctl_put(
-        route_keys.backend_weight_path, default_backend_weight, expected_rv
+        route_keys.backend_weight_path,
+        default_backend_weight,
+        expected_rv,
+        user,
+        password,
     )
     assert_etcdctl_put(
-        route_keys.frontend_backend_path, route_keys.backend_alias, expected_rv
+        route_keys.frontend_backend_path,
+        route_keys.backend_alias,
+        expected_rv,
+        user,
+        password,
     )
-    assert_etcdctl_put(route_keys.frontend_rule_path, rule, expected_rv)
+    assert_etcdctl_put(route_keys.frontend_rule_path, rule, expected_rv, user, password)
 
 
-def check_route_with_etcdctl(etcd_proxy, routespec, target, data, test_deletion=False):
+def check_route_with_etcdctl(
+    etcd_proxy, routespec, target, data, user="", password="", test_deletion=False
+):
     proxy = etcd_proxy
 
     if not routespec.endswith("/"):
@@ -79,32 +100,32 @@ def check_route_with_etcdctl(etcd_proxy, routespec, target, data, test_deletion=
         expected_rv = jupyterhub_routespec + "\n" + target
 
     # Test that (routespec, target) pair has been added to etcd
-    assert_etcdctl_get(jupyterhub_routespec, expected_rv)
+    assert_etcdctl_get(jupyterhub_routespec, expected_rv, user, password)
 
     # Test that (target, data) pair has been added to etcd
     if not test_deletion:
         expected_rv = target + "\n" + json.dumps(data)
-    assert_etcdctl_get(target, expected_rv)
+    assert_etcdctl_get(target, expected_rv, user, password)
 
     # Test that a backend has been added to etcd for this target
     if not test_deletion:
         expected_rv = route_keys.backend_url_path + "\n" + target
-    assert_etcdctl_get(route_keys.backend_url_path, expected_rv)
+    assert_etcdctl_get(route_keys.backend_url_path, expected_rv, user, password)
 
     # Test that a backend weight has been added to etcd for this target
     if not test_deletion:
         expected_rv = route_keys.backend_weight_path + "\n" + default_backend_weight
-    assert_etcdctl_get(route_keys.backend_weight_path, expected_rv)
+    assert_etcdctl_get(route_keys.backend_weight_path, expected_rv, user, password)
 
     # Test that a frontend has been added for the prev backend
     if not test_deletion:
         expected_rv = route_keys.frontend_backend_path + "\n" + route_keys.backend_alias
-    assert_etcdctl_get(route_keys.frontend_backend_path, expected_rv)
+    assert_etcdctl_get(route_keys.frontend_backend_path, expected_rv, user, password)
 
     # Test that a path-routing rule has been added for this frontend
     if not test_deletion:
         expected_rv = route_keys.frontend_rule_path + "\n" + rule
-    assert_etcdctl_get(route_keys.frontend_rule_path, expected_rv)
+    assert_etcdctl_get(route_keys.frontend_rule_path, expected_rv, user, password)
 
 
 @pytest.mark.parametrize(
@@ -127,7 +148,13 @@ async def test_add_route_to_etcd(etcd_proxy, routespec):
     data = {"test": "test1", "user": "username"}
 
     await proxy.add_route(routespec, target, data)
-    check_route_with_etcdctl(proxy, routespec, target, data)
+
+    if proxy.etcd_root_password:
+        check_route_with_etcdctl(
+            proxy, routespec, target, data, "root", proxy.etcd_root_password
+        )
+    else:
+        check_route_with_etcdctl(proxy, routespec, target, data)
 
 
 @pytest.mark.parametrize(
@@ -149,11 +176,28 @@ async def test_delete_route_from_etcd(etcd_proxy, routespec):
     target = "http://127.0.0.1:9000"
     data = {"test": "test1", "user": "username"}
 
-    add_route_with_etcdctl(proxy, routespec, target, data)
+    if proxy.etcd_root_password:
+        add_route_with_etcdctl(
+            proxy, routespec, target, data, "root", proxy.etcd_root_password
+        )
+    else:
+        add_route_with_etcdctl(proxy, routespec, target, data)
+
     await proxy.delete_route(routespec)
 
     # Test that (routespec, target) pair has been deleted from etcd
-    check_route_with_etcdctl(proxy, routespec, target, data, test_deletion=True)
+    if proxy.etcd_root_password:
+        check_route_with_etcdctl(
+            proxy,
+            routespec,
+            target,
+            data,
+            "root",
+            proxy.etcd_root_password,
+            test_deletion=True,
+        )
+    else:
+        check_route_with_etcdctl(proxy, routespec, target, data, test_deletion=True)
 
 
 @pytest.mark.parametrize(
@@ -181,7 +225,13 @@ async def test_get_route(etcd_proxy, routespec):
         "data": data,
     }
 
-    add_route_with_etcdctl(proxy, routespec, target, data)
+    if proxy.etcd_root_password:
+        add_route_with_etcdctl(
+            proxy, routespec, target, data, "root", proxy.etcd_root_password
+        )
+    else:
+        add_route_with_etcdctl(proxy, routespec, target, data)
+
     route = await proxy.get_route(routespec)
     assert route == expected_output
 
@@ -200,8 +250,15 @@ async def test_get_all_routes(etcd_proxy):
         + "/": {"routespec": routespec[2] + "/", "target": target[2], "data": data[2]},
     }
 
-    add_route_with_etcdctl(proxy, routespec[0], target[0], data[0])
-    add_route_with_etcdctl(proxy, routespec[1], target[1], data[1])
-    add_route_with_etcdctl(proxy, routespec[2], target[2], data[2])
+    user = ""
+    password = ""
+
+    if proxy.etcd_root_password:
+        user = "root"
+        password = proxy.etcd_root_password
+
+    add_route_with_etcdctl(proxy, routespec[0], target[0], data[0], user, password)
+    add_route_with_etcdctl(proxy, routespec[1], target[1], data[1], user, password)
+    add_route_with_etcdctl(proxy, routespec[2], target[2], data[2], user, password)
     routes = await proxy.get_all_routes()
     assert routes == expected_output

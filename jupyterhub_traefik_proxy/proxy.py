@@ -137,9 +137,21 @@ class TraefikProxy(Proxy):
                 ["traefik", "-c", config_file_path], stdout=None
             )
         elif config_type == "etcd":
-            self.traefik_process = Popen(
-                ["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None
-            )
+            if self.etcd_root_password:
+                self.traefik_process = Popen(
+                    [
+                        "traefik",
+                        "--etcd",
+                        "--etcd.useapiv3=true",
+                        "--etcd.username=root",
+                        "--etcd.password=" + self.etcd_root_password,
+                    ],
+                    stdout=None,
+                )
+            else:
+                self.traefik_process = Popen(
+                    ["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None
+                )
         else:
             raise ValueError(
                 "Configuration mode not supported \n.\

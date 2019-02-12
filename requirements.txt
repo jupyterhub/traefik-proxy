@@ -1,5 +1,5 @@
 jupyterhub>=0.9
-aioetcd3
+etcd3
 passlib
 toml
 escapism
