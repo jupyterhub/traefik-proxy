@@ -32,3 +32,43 @@ def test_roundtrip_routes():
     reloaded = traefik_utils.load_routes(file)
     os.remove(file)
     assert reloaded == routes
+
+
+def test_atomic_writing(tmpdir):
+    testfile = tmpdir.join("testfile")
+    with testfile.open("w") as f:
+        f.write("before")
+
+    with traefik_utils.atomic_writing(str(testfile)) as f:
+        f.write("after")
+
+    # tempfile got cleaned up
+    assert not os.path.exists(f.name)
+
+    # file was updated
+    with testfile.open("r") as f:
+        assert f.read() == "after"
+
+    # didn't leave any residue
+    assert tmpdir.listdir() == [testfile]
+
+
+def test_atomic_writing_recovery(tmpdir):
+    testfile = tmpdir.join("testfile")
+    with testfile.open("w") as f:
+        f.write("before")
+
+    with pytest.raises(TypeError):
+        with traefik_utils.atomic_writing(str(testfile)) as f:
+            f.write("after")
+            f.write(b"invalid")
+
+    # tempfile got cleaned up
+    assert not os.path.exists(f.name)
+
+    # file didn't get overwritten
+    with testfile.open("r") as f:
+        assert f.read() == "before"
+
+    # didn't leave any residue
+    assert tmpdir.listdir() == [testfile]

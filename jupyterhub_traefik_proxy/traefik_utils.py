@@ -1,14 +1,11 @@
-import sys
-import json
-import re
-import shutil
-import io
 import os
-import escapism
 import string
+from tempfile import NamedTemporaryFile
+from urllib.parse import unquote
+
+import escapism
 import toml
 
-from urllib.parse import urlparse, unquote
 from contextlib import contextmanager
 from collections import namedtuple
 
@@ -103,34 +100,34 @@ def generate_route_keys(proxy, routespec, separator="/"):
     )
 
 
-def path_to_intermediate(path):
-    """Name of the intermediate file used in atomic writes.
-    The .~ prefix will make Dropbox ignore the temporary file."""
-    dirname, basename = os.path.split(path)
-    return os.path.join(dirname, ".~" + basename)
+# atomic writing adapted from jupyter/notebook 5.7
+# unlike atomic writing there, which writes the canonical path
+# and only use the temp file for recovery,
+# we write the temp file and then replace the canonical path
+# to ensure that traefik never reads a partial file
 
 
 @contextmanager
 def atomic_writing(path):
-    tmp_path = path_to_intermediate(path)
-    shutil.copy2(path, tmp_path)
-    fileobj = io.open(path, "w")
+    """Write temp file before copying it into place
 
+    Avoids a partial file ever being present in `path`,
+    which could cause traefik to load a partial routing table.
+    """
+    fileobj = NamedTemporaryFile(prefix=os.path.abspath(path) + "-tmp-", mode="w")
     try:
         yield fileobj
-    except:
-        # Failed! Move the backup file back to the real path to avoid corruption
-        fileobj.close()
-        os.replace(tmp_path, path)
-        raise
-
-    # Flush to disk
-    fileobj.flush()
-    os.fsync(fileobj.fileno())
-    fileobj.close()
-
-    # Written successfully, now remove the backup copy
-    os.remove(tmp_path)
+        os.fsync(fileobj)
+        os.replace(fileobj.name, path)
+        # unset delete flag because we just cleaned up
+        fileobj.delete = False
+    finally:
+        # close deletes the file
+        try:
+            fileobj.close()
+        except FileNotFoundError:
+            # already deleted by os.replace above
+            pass
 
 
 def persist_static_conf(file, static_conf_dict):
