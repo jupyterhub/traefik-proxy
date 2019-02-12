@@ -158,12 +158,19 @@ def proxy(request):
 def enable_auth_in_etcd(password):
     subprocess.call(["etcdctl", "user", "add", "root:" + password])
     subprocess.call(["etcdctl", "user", "grant-role", "root", "root"])
-    assert subprocess.check_output(["etcdctl", "auth", "enable"]).decode(sys.stdout.encoding).strip() == "Authentication Enabled"
+    assert (
+        subprocess.check_output(["etcdctl", "auth", "enable"])
+        .decode(sys.stdout.encoding)
+        .strip()
+        == "Authentication Enabled"
+    )
 
 
 def disable_auth_in_etcd(password):
     subprocess.call(["etcdctl", "user", "remove", "root"])
-    subprocess.check_output(["etcdctl", "--user", "root:" + password, "auth", "disable"]).decode(sys.stdout.encoding).strip() == "Authentication Disabled"
+    subprocess.check_output(
+        ["etcdctl", "--user", "root:" + password, "auth", "disable"]
+    ).decode(sys.stdout.encoding).strip() == "Authentication Disabled"
 
 
 @pytest.fixture(scope="session", autouse=True)
