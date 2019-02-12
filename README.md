@@ -1,14 +1,16 @@
-# traefik-proxy
+# jupyterhub-traefik-proxy
+
 JupyterHub proxy implementation with traefik
 
-### How to start Jupyterhub with traefik-proxy using `jupyterhub_config.py`:
+### How to start JupyterHub with traefik-proxy using `jupyterhub_config.py`:
 
-# 1. Install Jupyterhub:
+# 1. Install JupyterHub:
 
 ```
 python3 -m pip install jupyterhub
 ```
-Please visit [Jupyterhub installation guide](https://jupyterhub.readthedocs.io/en/latest/installation-guide.html) for a complete installation guide
+
+Please visit [JupyterHub installation guide](https://jupyterhub.readthedocs.io/en/latest/installation-guide.html) for a complete installation guide.
 
 # 2. Install traefik
 
@@ -52,7 +54,7 @@ mv etcdctl /usr/local/bin/etcdctl
 etcd &> /dev/null &
 ```
 
-# 5. Start Jupyterhub:
+# 5. Start JupyterHub:
 
 ```
 jupyterhub --ip 127.0.0.1 --port=8000 -f ./examples/jupyterhub_config.py
