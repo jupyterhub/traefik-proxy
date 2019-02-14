@@ -42,6 +42,12 @@ class TraefikEtcdProxy(TraefikProxy):
 
     etcd_client = Any()
 
+    etcd_username = Unicode(
+        "root",
+        config=True,
+        help="""The username for etcd login"""
+    )
+
     etcd_password = Unicode(config=True, help="""The password for etcd login""")
 
     @default("etcd_client")
@@ -51,7 +57,7 @@ class TraefikEtcdProxy(TraefikProxy):
             return etcd3.client(
                 host=str(etcd_service.hostname),
                 port=etcd_service.port,
-                user="root",
+                user=self.etcd_username,
                 password=self.etcd_password,
             )
         else:

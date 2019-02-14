@@ -143,7 +143,7 @@ class TraefikProxy(Proxy):
                         "traefik",
                         "--etcd",
                         "--etcd.useapiv3=true",
-                        "--etcd.username=root",
+                        "--etcd.username=" + self.etcd_username,
                         "--etcd.password=" + self.etcd_password,
                     ],
                     stdout=None,
