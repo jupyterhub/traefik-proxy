@@ -18,17 +18,17 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-from jupyterhub.proxy import Proxy
-from jupyterhub.utils import exponential_backoff
-from . import traefik_utils
+import json
+from os.path import abspath, dirname, join
+from subprocess import Popen
+from urllib.parse import urlparse
 
 from traitlets import Any, Unicode
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
-from subprocess import Popen
-from os.path import abspath, dirname, join
-from urllib.parse import urlparse
 
-import json
+from jupyterhub.utils import exponential_backoff
+from jupyterhub.proxy import Proxy
+from . import traefik_utils
 
 
 class TraefikProxy(Proxy):
@@ -137,14 +137,14 @@ class TraefikProxy(Proxy):
                 ["traefik", "-c", config_file_path], stdout=None
             )
         elif config_type == "etcd":
-            if self.etcd_root_password:
+            if self.etcd_password:
                 self.traefik_process = Popen(
                     [
                         "traefik",
                         "--etcd",
                         "--etcd.useapiv3=true",
                         "--etcd.username=root",
-                        "--etcd.password=" + self.etcd_root_password,
+                        "--etcd.password=" + self.etcd_password,
                     ],
                     stdout=None,
                 )

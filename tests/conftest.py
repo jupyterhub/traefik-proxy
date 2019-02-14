@@ -13,7 +13,10 @@ from jupyterhub.tests.mocking import MockHub
 
 @pytest.fixture
 async def no_auth_etcd_proxy():
-    """Fixture returning a configured TraefikEtcdProxy"""
+    """
+    Fixture returning a configured TraefikEtcdProxy.
+    No etcd authentication.
+    """
     proxy = TraefikEtcdProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
@@ -27,14 +30,16 @@ async def no_auth_etcd_proxy():
 
 @pytest.fixture
 async def auth_etcd_proxy(etcd):
-    """Fixture returning a configured TraefikEtcdProxy
-    for etcd with credentials"""
+    """
+    Fixture returning a configured TraefikEtcdProxy
+    Etcd has credentials set up
+    """
     enable_auth_in_etcd("secret")
     proxy = TraefikEtcdProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
-        etcd_root_password="secret",
+        etcd_password="secret",
         should_start=True,
     )
     await proxy.start()
@@ -130,7 +135,7 @@ def auth_external_etcd_proxy():
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
-        etcd_root_password="secret",
+        etcd_password="secret",
         should_start=False,
     )
     traefik_process = configure_and_launch_traefik("secret")
@@ -175,7 +180,7 @@ def disable_auth_in_etcd(password):
 
 @pytest.fixture(scope="session", autouse=True)
 def etcd():
-    etcd_proc = subprocess.Popen(["etcd", "--debug"], stdout=None, stderr=None)
+    etcd_proc = subprocess.Popen("etcd", stdout=None, stderr=None)
     yield etcd_proc
 
     etcd_proc.kill()

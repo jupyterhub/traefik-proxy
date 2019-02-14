@@ -18,18 +18,15 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 from urllib.parse import urlparse
-from traitlets import Any, default, Unicode
 
 import etcd3
-from etcd3.client import EtcdTokenCallCredentials
+from tornado.concurrent import run_on_executor
+from traitlets import Any, default, Unicode
 
-# from aioetcd3.client import client
-# from aioetcd3 import transaction
-# from aioetcd3.kv import KV
-# from aioetcd3.help import range_prefix
-
+from jupyterhub.utils import maybe_future
 from . import traefik_utils
 from jupyterhub_traefik_proxy import TraefikProxy
 
@@ -37,21 +34,25 @@ from jupyterhub_traefik_proxy import TraefikProxy
 class TraefikEtcdProxy(TraefikProxy):
     """JupyterHub Proxy implementation using traefik and etcd"""
 
+    executor = Any()
+
+    @default("executor")
+    def _default_executor(self):
+        return ThreadPoolExecutor(1)
+
     etcd_client = Any()
 
-    etcd_root_password = Unicode(
-        config=True, help="""The password for traefik api login"""
-    )
+    etcd_password = Unicode(config=True, help="""The password for etcd login""")
 
     @default("etcd_client")
     def _default_client(self):
         etcd_service = urlparse(self.etcd_url)
-        if self.etcd_root_password:
+        if self.etcd_password:
             return etcd3.client(
                 host=str(etcd_service.hostname),
                 port=etcd_service.port,
                 user="root",
-                password=self.etcd_root_password,
+                password=self.etcd_password,
             )
         else:
             return etcd3.client(host=str(etcd_service.hostname), port=etcd_service.port)
@@ -72,9 +73,22 @@ class TraefikEtcdProxy(TraefikProxy):
         help="""The etcd key prefix for traefik dynamic configuration""",
     )
 
-    etcd_username = Unicode(config=True, help="""The username for traefik api login""")
+    @run_on_executor
+    def _etcd_transaction(self, success_actions):
+        status, response = self.etcd_client.transaction(
+            compare=[], success=success_actions, failure=[]
+        )
+        return status, response
 
-    etcd_password = Unicode(config=True, help="""The username for traefik api login""")
+    @run_on_executor
+    def _etcd_get(self, key):
+        value, _ = self.etcd_client.get(key)
+        return value
+
+    @run_on_executor
+    def _etcd_get_prefix(self, prefix):
+        routes = self.etcd_client.get_prefix(prefix)
+        return routes
 
     async def _setup_traefik_static_config(self):
         await super()._setup_traefik_static_config()
@@ -120,13 +134,11 @@ class TraefikEtcdProxy(TraefikProxy):
                     value = value[i]
             success.append(self.etcd_client.transactions.put(key.lower(), value))
 
-        if self.etcd_root_password:
+        if self.etcd_password:
             assert self.etcd_client.call_credentials is not None
             assert self.etcd_client.metadata is not None
 
-        status, response = self.etcd_client.transaction(
-            compare=[], success=success, failure=[]
-        )
+        status, response = await maybe_future(self._etcd_transaction(success))
 
         if status:
             self.log.error(
@@ -196,20 +208,18 @@ class TraefikEtcdProxy(TraefikProxy):
         # To be able to delete the route when routespec is provided
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
 
-        status, response = self.etcd_client.transaction(
-            compare=[],
-            success=[
-                self.etcd_client.transactions.put(jupyterhub_routespec, target),
-                self.etcd_client.transactions.put(target, data),
-                self.etcd_client.transactions.put(route_keys.backend_url_path, target),
-                self.etcd_client.transactions.put(route_keys.backend_weight_path, "1"),
-                self.etcd_client.transactions.put(
-                    route_keys.frontend_backend_path, route_keys.backend_alias
-                ),
-                self.etcd_client.transactions.put(route_keys.frontend_rule_path, rule),
-            ],
-            failure=[],
-        )
+        success = [
+            self.etcd_client.transactions.put(jupyterhub_routespec, target),
+            self.etcd_client.transactions.put(target, data),
+            self.etcd_client.transactions.put(route_keys.backend_url_path, target),
+            self.etcd_client.transactions.put(route_keys.backend_weight_path, "1"),
+            self.etcd_client.transactions.put(
+                route_keys.frontend_backend_path, route_keys.backend_alias
+            ),
+            self.etcd_client.transactions.put(route_keys.frontend_rule_path, rule),
+        ]
+
+        status, response = await maybe_future(self._etcd_transaction(success))
 
         if status:
             self.log.info(
@@ -244,7 +254,7 @@ class TraefikEtcdProxy(TraefikProxy):
         """
         routespec = self.validate_routespec(routespec)
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
-        value, _ = self.etcd_client.get(jupyterhub_routespec)
+        value = await maybe_future(self._etcd_get(jupyterhub_routespec))
         if value is None:
             self.log.warning("Route %s doesn't exist. Nothing to delete", routespec)
             return
@@ -252,18 +262,16 @@ class TraefikEtcdProxy(TraefikProxy):
         target = value.decode()
         route_keys = traefik_utils.generate_route_keys(self, routespec)
 
-        status, response = self.etcd_client.transaction(
-            compare=[],
-            success=[
-                self.etcd_client.transactions.delete(jupyterhub_routespec),
-                self.etcd_client.transactions.delete(target),
-                self.etcd_client.transactions.delete(route_keys.backend_url_path),
-                self.etcd_client.transactions.delete(route_keys.backend_weight_path),
-                self.etcd_client.transactions.delete(route_keys.frontend_backend_path),
-                self.etcd_client.transactions.delete(route_keys.frontend_rule_path),
-            ],
-            failure=[],
-        )
+        success = [
+            self.etcd_client.transactions.delete(jupyterhub_routespec),
+            self.etcd_client.transactions.delete(target),
+            self.etcd_client.transactions.delete(route_keys.backend_url_path),
+            self.etcd_client.transactions.delete(route_keys.backend_weight_path),
+            self.etcd_client.transactions.delete(route_keys.frontend_backend_path),
+            self.etcd_client.transactions.delete(route_keys.frontend_rule_path),
+        ]
+        status, response = await maybe_future(self._etcd_transaction(success))
+
         if status:
             self.log.info("Routespec %s was deleted.", routespec)
         else:
@@ -287,14 +295,14 @@ class TraefikEtcdProxy(TraefikProxy):
           }
         """
         all_routes = {}
-        routes = self.etcd_client.get_prefix(self.etcd_jupyterhub_prefix)
+        routes = await maybe_future(self._etcd_get_prefix(self.etcd_jupyterhub_prefix))
 
         for value, metadata in routes:
             # Strip the "/jupyterhub" prefix from the routespec
             routespec = metadata.key.decode().replace(self.etcd_jupyterhub_prefix, "")
             target = value.decode()
 
-            value, _ = self.etcd_client.get(target)
+            value = await maybe_future(self._etcd_get(target))
             if value is None:
                 data = None
             else:
@@ -331,11 +339,11 @@ class TraefikEtcdProxy(TraefikProxy):
         routespec = self.validate_routespec(routespec)
         jupyterhub_routespec = self.etcd_jupyterhub_prefix + routespec
 
-        value, _ = self.etcd_client.get(jupyterhub_routespec)
+        value = await maybe_future(self._etcd_get(jupyterhub_routespec))
         if value == None:
             return None
         target = value.decode()
-        value, _ = self.etcd_client.get(target)
+        value = await maybe_future(self._etcd_get(target))
         if value is None:
             data = None
         else:
