@@ -42,11 +42,7 @@ class TraefikEtcdProxy(TraefikProxy):
 
     etcd_client = Any()
 
-    etcd_username = Unicode(
-        "root",
-        config=True,
-        help="""The username for etcd login"""
-    )
+    etcd_username = Unicode("root", config=True, help="""The username for etcd login""")
 
     etcd_password = Unicode(config=True, help="""The password for etcd login""")
 
@@ -98,58 +94,28 @@ class TraefikEtcdProxy(TraefikProxy):
 
     async def _setup_traefik_static_config(self):
         await super()._setup_traefik_static_config()
-        kv = {}
 
-        def get_etcd_kvs(d, etcd_key):
-            for k, v in d.items():
-                if isinstance(v, dict):
-                    new_key = etcd_key + k + "/"
-                    get_etcd_kvs(v, new_key)
-                else:
-                    kv[etcd_key + k] = v
+        self.static_config["etcd"] = {
+            "username": self.etcd_username,
+            "password": self.etcd_password,
+            "endpoint": str(urlparse(self.etcd_url).hostname)
+            + ":"
+            + str(urlparse(self.etcd_url).port),
+            "prefix": self.etcd_traefik_prefix,
+            "useapiv3": True,
+            "watch": True,
+            "providersThrottleDuration": 1,
+        }
 
-        get_etcd_kvs(self.static_config, self.etcd_traefik_prefix)
-
-        success = [
-            self.etcd_client.transactions.put(
-                self.etcd_traefik_prefix + "etcd/endpoint",
-                str(urlparse(self.etcd_url).hostname)
-                + ":"
-                + str(urlparse(self.etcd_url).port),
-            ),
-            self.etcd_client.transactions.put(
-                self.etcd_traefik_prefix + "etcd/prefix", self.etcd_traefik_prefix
-            ),
-            self.etcd_client.transactions.put(
-                self.etcd_traefik_prefix + "etcd/useapiv3", "true"
-            ),
-            self.etcd_client.transactions.put(
-                self.etcd_traefik_prefix + "etcd/watch", "true"
-            ),
-            self.etcd_client.transactions.put(
-                self.etcd_traefik_prefix + "providersThrottleDuration", "1"
-            ),
-        ]
-
-        for key, value in kv.items():
-            if isinstance(value, bool):
-                value = str(value).lower()
-            if isinstance(value, list):
-                for i in range(len(value)):
-                    key += "/" + str(i)
-                    value = value[i]
-            success.append(self.etcd_client.transactions.put(key.lower(), value))
-
-        if self.etcd_password:
-            assert self.etcd_client.call_credentials is not None
-            assert self.etcd_client.metadata is not None
-
-        status, response = await maybe_future(self._etcd_transaction(success))
-
-        if status:
-            self.log.error(
-                "Couldn't set up traefik's static config. Response: %s", response
+        try:
+            traefik_utils.persist_static_conf(
+                self.toml_static_config_file, self.static_config
             )
+        except IOError:
+            self.log.exception("Couldn't set up traefik's static config.")
+        except:
+            self.log.error("Couldn't set up traefik's static config. Unexpected error:")
+            raise
 
     def _start_traefik(self):
         self.log.info("Starting traefik...")

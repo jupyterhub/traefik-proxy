@@ -40,10 +40,6 @@ class TraefikTomlProxy(TraefikProxy):
     def _default_mutex(self):
         return asyncio.Lock()
 
-    toml_static_config_file = Unicode(
-        "traefik.toml", config=True, help="""traefik's static configuration file"""
-    )
-
     toml_dynamic_config_file = Unicode(
         "rules.toml", config=True, help="""traefik's dynamic configuration file"""
     )

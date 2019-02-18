@@ -36,6 +36,10 @@ class TraefikProxy(Proxy):
 
     traefik_process = Any()
 
+    toml_static_config_file = Unicode(
+        "traefik.toml", config=True, help="""traefik's static configuration file"""
+    )
+
     traefik_api_url = Unicode(
         "http://127.0.0.1:8099",
         config=True,
@@ -131,27 +135,15 @@ class TraefikProxy(Proxy):
         self.traefik_process.wait()
 
     def _launch_traefik(self, config_type):
-        if config_type == "toml":
+        if config_type == "etcd" and not self.etcd_password:
+            self.traefik_process = Popen(
+                ["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None
+            )
+        elif config_type == "toml" or config_type == "etcd":
             config_file_path = abspath(join(dirname(__file__), "traefik.toml"))
             self.traefik_process = Popen(
                 ["traefik", "-c", config_file_path], stdout=None
             )
-        elif config_type == "etcd":
-            if self.etcd_password:
-                self.traefik_process = Popen(
-                    [
-                        "traefik",
-                        "--etcd",
-                        "--etcd.useapiv3=true",
-                        "--etcd.username=" + self.etcd_username,
-                        "--etcd.password=" + self.etcd_password,
-                    ],
-                    stdout=None,
-                )
-            else:
-                self.traefik_process = Popen(
-                    ["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None
-                )
         else:
             raise ValueError(
                 "Configuration mode not supported \n.\
