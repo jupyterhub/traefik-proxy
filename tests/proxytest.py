@@ -2,7 +2,11 @@
 
 import copy
 import utils
+import subprocess
+import sys
+
 from contextlib import contextmanager
+from os.path import dirname, join, abspath
 from random import randint
 from unittest.mock import Mock
 from urllib.parse import quote
@@ -67,6 +71,25 @@ class MockUser(User):
 
     def _new_spawner(self, spawner_name, **kwargs):
         return MockSpawner(spawner_name, user=self, **kwargs)
+
+
+@pytest.fixture
+def launch_backend():
+    dummy_server_path = abspath(join(dirname(__file__), "dummy_http_server.py"))
+    running_backends = []
+
+    def _launch_backend(port, proto="http"):
+        backend = subprocess.Popen(
+            [sys.executable, dummy_server_path, str(port), proto], stdout=None
+        )
+        running_backends.append(backend)
+
+    yield _launch_backend
+
+    for proc in running_backends:
+        proc.kill()
+    for proc in running_backends:
+        proc.wait()
 
 
 async def wait_for_services(urls):
