@@ -1,14 +1,14 @@
 """General pytest fixtures"""
 
-import pytest
-import subprocess
 import os
 import shutil
+import subprocess
 import sys
+
+import pytest
 
 from jupyterhub_traefik_proxy import TraefikEtcdProxy
 from jupyterhub_traefik_proxy import TraefikTomlProxy
-from jupyterhub.tests.mocking import MockHub
 
 
 @pytest.fixture
