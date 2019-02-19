@@ -113,6 +113,7 @@ class TraefikEtcdProxy(TraefikProxy):
             )
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
+            raise
         except:
             self.log.error("Couldn't set up traefik's static config. Unexpected error:")
             raise
