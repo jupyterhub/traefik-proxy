@@ -1,15 +1,72 @@
 """Tests for the base traefik proxy"""
 
-import pytest
-import utils
-import websockets
 import copy
-
-from jupyterhub.utils import exponential_backoff
+import utils
 from contextlib import contextmanager
-from urllib.parse import urlparse
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
+from random import randint
+from unittest.mock import Mock
 from urllib.parse import quote
+from urllib.parse import urlparse
+
+import pytest
+from jupyterhub.objects import Hub, Server
+from jupyterhub.user import User
+from jupyterhub.utils import exponential_backoff, url_path_join
+from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
+import websockets
+
+
+class MockApp:
+    def __init__(self):
+        self.hub = Hub(routespec="/")
+
+
+class MockSpawner:
+
+    name = ""
+    server = None
+    pending = None
+
+    def __init__(self, name="", *, user, **kwargs):
+        self.name = name
+        self.user = user
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        self.proxy_spec = url_path_join(self.user.proxy_spec, name, "/")
+
+    def start(self):
+        self.server = Server.from_url("http://127.0.0.1:%i" % randint(1025, 65535))
+
+    def stop(self):
+        self.server = None
+
+    @property
+    def ready(self):
+        """Is this server ready to use?
+
+        A server is not ready if an event is pending.
+        """
+        return self.server is not None
+
+    @property
+    def active(self):
+        """Return True if the server is active.
+
+        This includes fully running and ready or any pending start/stop event.
+        """
+        return self.ready
+
+
+class MockUser(User):
+    """Mock User for use in proxytest"""
+
+    def __init__(self, name):
+        orm_user = Mock()
+        orm_user.name = name
+        super().__init__(orm_user=orm_user, db=Mock())
+
+    def _new_spawner(self, spawner_name, **kwargs):
+        return MockSpawner(spawner_name, user=self, **kwargs)
 
 
 async def wait_for_services(urls):
@@ -199,31 +256,41 @@ async def test_host_origin_headers(proxy, launch_backend):
     assert resp.headers["Origin"] == expected_origin_header
 
 
-from jupyterhub.tests.test_api import api_request, add_user
-
-
 @pytest.mark.parametrize("username", ["zoe", "50fia", "秀樹", "~TestJH", "has@"])
-async def test_check_routes(app, disable_check_routes, username):
-    proxy = app.proxy
-    test_user = add_user(app.db, app, name=username)
-    r = await api_request(app, "users/%s/server" % username, method="post")
-    r.raise_for_status()
+async def test_check_routes(proxy, username):
+    # fill out necessary attributes for check_routes
+    proxy.app = MockApp()
+    proxy.hub = proxy.app.hub
+
+    users = {}
+    services = {}
+    # run initial check first, to ensure that `/` is in the routes
+    await proxy.check_routes(users, services)
+    routes = await proxy.get_all_routes()
+    assert sorted(routes) == ["/"]
+
+    users[username] = test_user = MockUser(username)
+    spawner = test_user.spawners[""]
+    spawner.start()
+    assert spawner.ready
+    assert spawner.active
+    await proxy.add_user(test_user, "")
 
     # check a valid route exists for user
-    routes = await app.proxy.get_all_routes()
+    routes = await proxy.get_all_routes()
     before = sorted(routes)
     assert test_user.proxy_spec in before
 
     # check if a route is removed when user deleted
-    await app.proxy.check_routes(app.users, app._service_map)
+    await proxy.check_routes(users, services)
     await proxy.delete_user(test_user)
-    routes = await app.proxy.get_all_routes()
+    routes = await proxy.get_all_routes()
     during = sorted(routes)
     assert test_user.proxy_spec not in during
 
     # check if a route exists for user
-    await app.proxy.check_routes(app.users, app._service_map)
-    routes = await app.proxy.get_all_routes()
+    await proxy.check_routes(users, services)
+    routes = await proxy.get_all_routes()
     after = sorted(routes)
     assert test_user.proxy_spec in after
 
