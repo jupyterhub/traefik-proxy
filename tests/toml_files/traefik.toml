@@ -10,7 +10,7 @@ entrypoint = "auth_api"
 protocol = "http"
 
 [file]
-filename = "./tests/rules.toml"
+filename = "./tests/toml_files/rules.toml"
 watch = true
 
 [entryPoints.http]

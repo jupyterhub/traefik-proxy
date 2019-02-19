@@ -76,13 +76,13 @@ def external_toml_proxy():
         traefik_api_username="api_admin",
     )
     proxy.should_start = False
-    proxy.toml_dynamic_config_file = "./tests/rules.toml"
+    proxy.toml_dynamic_config_file = "./tests/toml_files/rules.toml"
     # Start traefik manually
     traefik_process = subprocess.Popen(
-        ["traefik", "-c", "./tests/traefik.toml"], stdout=None
+        ["traefik", "-c", "./tests/toml_files/traefik.toml"], stdout=None
     )
     yield proxy
-    open("./tests/rules.toml", "w").close()
+    open("./tests/toml_files/rules.toml", "w").close()
     traefik_process.kill()
     traefik_process.wait()
 
@@ -92,7 +92,7 @@ def configure_and_launch_traefik(password=""):
         "traefik",
         "storeconfig",
         "-c",
-        "./tests/traefik_etcd_config.toml",
+        "./tests/toml_files/traefik_etcd_config.toml",
         "--etcd",
         "--etcd.endpoint=127.0.0.1:2379",
         "--etcd.useapiv3=true",
