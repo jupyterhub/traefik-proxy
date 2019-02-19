@@ -18,23 +18,27 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-from jupyterhub.proxy import Proxy
-from jupyterhub.utils import exponential_backoff
-from . import traefik_utils
+import json
+from os.path import abspath, dirname, join
+from subprocess import Popen
+from urllib.parse import urlparse
 
 from traitlets import Any, Unicode
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
-from subprocess import Popen
-from os.path import abspath, dirname, join
-from urllib.parse import urlparse
 
-import json
+from jupyterhub.utils import exponential_backoff
+from jupyterhub.proxy import Proxy
+from . import traefik_utils
 
 
 class TraefikProxy(Proxy):
     """JupyterHub Proxy implementation using traefik"""
 
     traefik_process = Any()
+
+    toml_static_config_file = Unicode(
+        "traefik.toml", config=True, help="""traefik's static configuration file"""
+    )
 
     traefik_api_url = Unicode(
         "http://127.0.0.1:8099",
@@ -131,14 +135,14 @@ class TraefikProxy(Proxy):
         self.traefik_process.wait()
 
     def _launch_traefik(self, config_type):
-        if config_type == "toml":
+        if config_type == "etcd" and not self.etcd_password:
+            self.traefik_process = Popen(
+                ["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None
+            )
+        elif config_type == "toml" or config_type == "etcd":
             config_file_path = abspath(join(dirname(__file__), "traefik.toml"))
             self.traefik_process = Popen(
                 ["traefik", "-c", config_file_path], stdout=None
-            )
-        elif config_type == "etcd":
-            self.traefik_process = Popen(
-                ["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None
             )
         else:
             raise ValueError(

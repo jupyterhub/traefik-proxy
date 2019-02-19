@@ -40,10 +40,6 @@ class TraefikTomlProxy(TraefikProxy):
     def _default_mutex(self):
         return asyncio.Lock()
 
-    toml_static_config_file = Unicode(
-        "traefik.toml", config=True, help="""traefik's static configuration file"""
-    )
-
     toml_dynamic_config_file = Unicode(
         "rules.toml", config=True, help="""traefik's dynamic configuration file"""
     )
@@ -70,6 +66,7 @@ class TraefikTomlProxy(TraefikProxy):
                 open(self.toml_dynamic_config_file, "a").close()
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
+            raise
         except:
             self.log.error("Couldn't set up traefik's static config. Unexpected error:")
             raise
