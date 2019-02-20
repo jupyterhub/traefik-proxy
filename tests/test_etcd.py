@@ -133,7 +133,7 @@ async def test_add_route_to_etcd(etcd_proxy, routespec):
 
     if proxy.etcd_password:
         check_route_with_etcdctl(
-            proxy, routespec, target, data, "root", proxy.etcd_password
+            proxy, routespec, target, data, proxy.etcd_username, proxy.etcd_password
         )
     else:
         check_route_with_etcdctl(proxy, routespec, target, data)
@@ -160,7 +160,7 @@ async def test_delete_route_from_etcd(etcd_proxy, routespec):
 
     if proxy.etcd_password:
         add_route_with_etcdctl(
-            proxy, routespec, target, data, "root", proxy.etcd_password
+            proxy, routespec, target, data, proxy.etcd_username, proxy.etcd_password
         )
     else:
         add_route_with_etcdctl(proxy, routespec, target, data)
@@ -174,7 +174,7 @@ async def test_delete_route_from_etcd(etcd_proxy, routespec):
             routespec,
             target,
             data,
-            "root",
+            proxy.etcd_username,
             proxy.etcd_password,
             test_deletion=True,
         )
@@ -209,7 +209,7 @@ async def test_get_route(etcd_proxy, routespec):
 
     if proxy.etcd_password:
         add_route_with_etcdctl(
-            proxy, routespec, target, data, "root", proxy.etcd_password
+            proxy, routespec, target, data, proxy.etcd_username, proxy.etcd_password
         )
     else:
         add_route_with_etcdctl(proxy, routespec, target, data)
@@ -236,7 +236,7 @@ async def test_get_all_routes(etcd_proxy):
     password = ""
 
     if proxy.etcd_password:
-        user = "root"
+        user = proxy.etcd_username
         password = proxy.etcd_password
 
     add_route_with_etcdctl(proxy, routespec[0], target[0], data[0], user, password)

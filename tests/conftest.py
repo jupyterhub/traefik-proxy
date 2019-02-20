@@ -40,6 +40,7 @@ async def auth_etcd_proxy(etcd):
         traefik_api_password="admin",
         traefik_api_username="api_admin",
         etcd_password="secret",
+        etcd_username="root",
         should_start=True,
     )
     await proxy.start()
@@ -136,6 +137,7 @@ def auth_external_etcd_proxy():
         traefik_api_password="admin",
         traefik_api_username="api_admin",
         etcd_password="secret",
+        etcd_username="root",
         should_start=False,
     )
     traefik_process = configure_and_launch_traefik("secret")

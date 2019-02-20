@@ -9,8 +9,8 @@ portable reverse proxy implementation, that supports load balancing and can conf
 
 There are two versions for the proxy, depending on how traefik stores the routes:
 
-* TraefikTomlProxy - *for* **smaller**, *single-node deployments*
-* TraefikEtcdProxy - *for* **distributed** *setups*
+* TraefikTomlProxy - for **smaller**, single-node deployments
+* TraefikEtcdProxy - for **distributed** setups
 
 ## Instalation
 You can find a complete installation guide [here](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/install.html).
