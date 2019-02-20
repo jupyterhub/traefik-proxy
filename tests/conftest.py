@@ -146,20 +146,6 @@ def auth_external_etcd_proxy():
     disable_auth_in_etcd("secret")
 
 
-@pytest.fixture(
-    params=[
-        "no_auth_etcd_proxy",
-        "auth_etcd_proxy",
-        "toml_proxy",
-        "external_etcd_proxy",
-        "auth_external_etcd_proxy",
-        "external_toml_proxy",
-    ]
-)
-def proxy(request):
-    return request.getfixturevalue(request.param)
-
-
 def enable_auth_in_etcd(password):
     subprocess.call(["etcdctl", "user", "add", "root:" + password])
     subprocess.call(["etcdctl", "user", "grant-role", "root", "root"])
