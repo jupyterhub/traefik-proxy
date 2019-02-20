@@ -2,10 +2,27 @@
 
 Steps to follow when using a configuration example:
 
-1. install jupyterhub master
+1. install jupyterhub master, e.g.:
 
-2. get the traefik binary onto PATH
+```
+$ python3 -m pip install jupyterhub
+```
 
-3. install and start etcd
+2. install traefik and etcd, e.g.:
 
-4. start jupyterhub using a configuration example
+```
+$ python3 -m jupyterhub_traefik_proxy.install --output=/usr/local/bin
+```
+
+3. start etcd, e.g.:
+
+```
+$ etcd
+```
+
+4. start jupyterhub using a configuration example, e.g.:
+
+```
+jupyterhub --ip 127.0.0.1 --port=8000 -f ./examples/jupyterhub_config.py
+```
+Visit http://localhost:8000 in your browser, and sign in using any username and password.
