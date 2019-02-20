@@ -102,7 +102,7 @@ class TraefikProxy(Proxy):
         await exponential_backoff(
             _check_traefik_dynamic_conf_ready,
             "Traefik route for %s configuration not available" % routespec,
-            timeout=20,
+            timeout=30,
         )
 
     async def _wait_for_static_config(self, provider):
@@ -126,7 +126,7 @@ class TraefikProxy(Proxy):
         await exponential_backoff(
             _check_traefik_static_conf_ready,
             "Traefik static configuration not available",
-            timeout=20,
+            timeout=30,
         )
 
     def _stop_traefik(self):
