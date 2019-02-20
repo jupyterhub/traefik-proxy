@@ -1,6 +1,11 @@
-========================
-JupyterHub Traefik Proxy
-========================
+
+#### JupyterHub Traefik Proxy
+
+.. image:: https://readthedocs.org/projects/jupyterhub-traefik-proxy/badge/?version=latest
+   :target: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/?badge=latest
+   :alt: Documentation Status
+.. image:: https://travis-ci.org/jupyterhub/traefik-proxy.svg?branch=master
+   :target: https://travis-ci.org/jupyterhub/traefik-proxy
 
 An implementation of the JupyterHub proxy api with [traefik](https://traefik.io): an extremely lightweight,
 portable reverse proxy implementation, that supports load balancing and can configure itself automatically and dynamically.
