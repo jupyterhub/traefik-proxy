@@ -41,3 +41,5 @@ $ pytest -v ./tests/<test-file-name>
 * For TraefikEtcdProxy: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup
 * For TraefikTomlProxy: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/toml.html#example-setup
 
+## JupyterHub configuration examples
+You can use the configuration examples in the ```examples``` directory in order to configure JupyterHub to run with TraefikProxy.
