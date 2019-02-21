@@ -11,7 +11,7 @@
 2. Install **jupyterhub-traefik-proxy**, which is available now as pre-release:
 
     ```
-    python3 -m pip install --pre jupyterhub-traefik-proxy
+    python3 -m pip install jupyterhub-traefik-proxy
     ```
 
 3. In order to be able to launch JupyterHub with traefik-proxy or run the tests, **traefik** and **etcd** must first be installed and added to your `PATH`.
@@ -96,6 +96,13 @@ c.TraefikTomlProxy.traefik_api_username = "admin"
 Check out TraefikProxy's **API Reference** for more configuration options.
 
 ## Testing jupyterhub-traefik-proxy
+
+There are some tests that use *etcdctl* command line client for etcd.
+Make sure to set environment variable ETCDCTL_API=3 before running the tests, so that the v3 API to be used, e.g.:
+
+```
+$ export ETCDCTL_API=3
+```
 
 You can then run the all the test suite from the *traefik-proxy* directory with:
 

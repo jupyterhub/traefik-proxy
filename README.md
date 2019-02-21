@@ -1,62 +1,45 @@
-# jupyterhub-traefik-proxy
 
-JupyterHub proxy implementation with traefik
+# JupyterHub Traefik Proxy
 
-### How to start JupyterHub with traefik-proxy using `jupyterhub_config.py`:
+[![Build Status](https://travis-ci.org/jupyterhub/traefik-proxy.svg?branch=master)](https://travis-ci.org/jupyterhub/traefik-proxy)
+[![Documentation Status](https://readthedocs.org/projects/jupyterhub-traefik-proxy/badge/?version=latest)](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/?badge=latest)
 
-# 1. Install JupyterHub:
+An implementation of the JupyterHub proxy api with [traefik](https://traefik.io): an extremely lightweight,
+portable reverse proxy implementation, that supports load balancing and can configure itself automatically and dynamically.
 
-```
-python3 -m pip install jupyterhub
-```
+There are two versions for the proxy, depending on how traefik stores the routes:
 
-Please visit [JupyterHub installation guide](https://jupyterhub.readthedocs.io/en/latest/installation-guide.html) for a complete installation guide.
+* TraefikTomlProxy - for **smaller**, single-node deployments
+* TraefikEtcdProxy - for **distributed** setups
 
-# 2. Install traefik
+## Instalation
+You can find a complete installation guide [here](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/install.html).
 
-Grab the latest binary for your platform from [traefik realeases page](https://github.com/containous/traefik/releases), e.g.
 
-```
-wget https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64
-```
-Mark the binary as executable, e.g.
+## Documentation
+The latest documentation is available at: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/.
 
-```
-chmod 755 traefik_linux-amd64
-```
-Add the traefik binary as `traefik`, and make sure it is on your PATH, e.g.
+## Running the tests
+There are some tests that use *etcdctl* command line client for etcd.
+Make sure to set environment variable ETCDCTL_API=3 before running the tests, so that the v3 API to be used, e.g.:
 
 ```
-mv traefik_linux-amd64 /usr/local/bin/traefik
+$ export ETCDCTL_API=3
 ```
-
-# 3. Install etcd
-
-Download the latest archive for your platform from [etcd realeases page](https://github.com/etcd-io/etcd/releases), e.g.
+You can then run the all the test suite from the *traefik-proxy* directory with:
 
 ```
-wget https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz
+$ pytest -v ./tests
 ```
-Extract etcd and etcdctl executables from the archive, e.g.
+Or you can run a specific test with:
 
 ```
-tar xzvf etcd-v3.3.10-linux-amd64.tar.gz
-```
-Add etcd and etcdl to your PATH, e.g.
-
-```
-mv etcd /usr/local/bin/etcd
-mv etcdctl /usr/local/bin/etcdctl
+$ pytest -v ./tests/<test-file-name>
 ```
 
-# 4. Start the etcd cluster, e.g.
-```
-etcd &> /dev/null &
-```
+## Example setups:
+* For TraefikEtcdProxy: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup
+* For TraefikTomlProxy: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/toml.html#example-setup
 
-# 5. Start JupyterHub:
-
-```
-jupyterhub --ip 127.0.0.1 --port=8000 -f ./examples/jupyterhub_config.py
-```
-Visit http://localhost:8000 in your browser, and sign in using any username and password.
+## JupyterHub configuration examples
+You can use the configuration examples in the ```examples``` directory in order to configure JupyterHub to run with TraefikProxy.

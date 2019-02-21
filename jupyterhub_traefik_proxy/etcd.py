@@ -42,7 +42,7 @@ class TraefikEtcdProxy(TraefikProxy):
 
     etcd_client = Any()
 
-    etcd_username = Unicode("root", config=True, help="""The username for etcd login""")
+    etcd_username = Unicode(config=True, help="""The username for etcd login""")
 
     etcd_password = Unicode(config=True, help="""The password for etcd login""")
 

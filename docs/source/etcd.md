@@ -37,10 +37,20 @@ You can choose to:
 
 ## Etcd configuration
 
-1. In order to use the TraefikEtcdProxy, prior to starting the traefik process, **etcd must** at least **contain traefik's static configuration**.
+1. Depending on the value of the ```should_start``` proxy flag, you can choose whether or not TraefikEtcdProxy willl be externally managed.
 
-2. TraefikEtcdProxy searches the etcd key-value store after the **etcd_traefik_prefix** prefix for its static configuration. 
-    Similarly, the dynamic configuration is searched after the **etcd_jupyterhub_prefix**.
+   * When **should_start** is set to **True**, TraefikEtcdProxy will auto-generate its static configuration
+     (using the override values or the defaults) and store it in ```traefik.toml``` file.
+     The traefik process will then be launched using this file.
+   * When **should_start** is set to **False**, prior to starting the traefik process, you must create a *toml* file with the desired
+     traefik static configuration and pass it to traefik. Keep in mind that in order for the routes to be stored in **etcd**,
+     this *toml* file **must** specify etcd as the provider.
+
+2. TraefikEtcdProxy searches the etcd key-value store after the **etcd_traefik_prefix** prefix for its static configuration.
+
+   Similarly, the dynamic configuration is searched after the **etcd_jupyterhub_prefix**.
+
+   **Note**: If you want to change or add traefik's static configuration options, you can add them to etcd under this prefix and traefik will pick them up.
 
     * The **default** values of this configurations options are:
         ```
@@ -75,7 +85,14 @@ You can choose to:
    However, based on how etcd is configured and started, TraefikEtcdProxy needs to be told about 
    some etcd configuration details, such as:
    * etcd **address** where it accepts client requests
-   * etcd **credentials** (TODO)
+     ```
+     c.TraefikEtcdProxy.etcd_url="scheme://hostname:port"
+     ```
+   * etcd **credentials** (if etcd has authentication enabled)
+     ```
+     c.TraefikEtcdProxy.etcd_username="abc"
+     c.TraefikEtcdProxy.etcd_password="123"
+     ```
 
 <span style="color:green">**Note 2**</span>
 
@@ -93,7 +110,7 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
 
 1. Let JupyterHub know that the proxy being used is TraefikEtcdProxy, using the *proxy_class* configuration option:
     ```
-    c.TraefikEtcdProxy.proxy_class = "traefik_etcd"
+    c.JupyterHub.proxy_class = "traefik_etcd"
     ```
 
 2. Configure `TraeficEtcdProxy` in **jupyterhub_config.py**
@@ -101,6 +118,7 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
    JupyterHub configuration file, *jupyterhub_config.py* must specify at least:
    * That the proxy is externally managed
    * The traefik api credentials
+   * The etcd credentials (if etcd authentication is enabled)
 
    Example configuration:
    ```
@@ -112,47 +130,66 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
 
    # traefik api credentials
    c.TraefikEtcdProxy.traefik_api_username = "abc"
-   c.TraefikEtcdProxy.traefik_api_password = "xxx"
+   c.TraefikEtcdProxy.traefik_api_password = "123"
+
+   # etcd credentials
+   c.TraefikEtcdProxy.etcd_username = "def"
+   c.TraefikEtcdProxy.etcd_password = "456"
    ```
 
-3. Ensure etcd contains the traefik static configuration
+3. Create a *toml* file with traefik's desired static configuration
 
-   There are two ways to **add the static configuration to etcd**:
-   * **Using [etcdctl](https://coreos.com/etcd/docs/latest/dev-guide/interacting_v3.html)**, a command line tool for interacting with etcd server.
-      Because traefik suggests using the API V3 version of etcd, the API version must be set to version 3 via the ETCDCTL_API environment variable 
-      before interacting with etcd, e.g.: 
-      ```
-      $ export ETCDCTL_API=3
-      ```
-
-      You must add the static configuration to etcd using key-value pairs, e.g.:
-      ```
-      $ etcdctl put key value
-      ```
-
-      ***Note**: The keys of the static configuration can be prefixed 
-      with the value of the **etcd_traefik_prefix** if there is a need to retrieve them from the etcd store 
-      by searching after this prefix, but it's not a must.*
-
-   * **Using traefik [storeconfig](https://docs.traefik.io/user-guide/kv-config/#store-configuration-in-key-value-store) subcommand**
-      This subcommand automates the process of uploading a toml configuration into the Key-value store without starting the traefik process.
-
-      **Example:**
-
-      Create a traefik.toml file with the desired static configuration, then use *storeconfig* to upload it to etcd.
-
-      ```
-      $ traefik storeconfig -c traefik.toml \
-            --etcd \
-            --etcd.endpoint=127.0.0.1:2379 \
-            --etcd.useapiv3=true
-     ```
+   Before starting the traefik process, you must create a *toml* file with the desired
+   traefik static configuration and pass it to traefik when you launch the process.
+   Keep in mind that in order for the routes to be stored in **etcd**,
+   this *toml* file **must** specify etcd as the provider/
 
    * **Keep in mind that the static configuration must configure at least:**
        * The default entrypoint
        * The api entrypoint (*and authenticate it*)
        * The websockets protocol
        * The etcd endpoint
+
+    Example:
+
+     ```
+      defaultentrypoints = ["http"]
+      debug = true
+      logLevel = "ERROR"
+
+      [api]
+      dashboard = true
+      entrypoint = "auth_api"
+
+      [wss]
+      protocol = "http"
+
+      [entryPoints.http]
+      address = "127.0.0.1:8000"
+
+      [entryPoints.auth_api]
+      address = "127.0.0.1:8099"
+
+      [entryPoints.auth_api.auth.basic]
+      users = [ "abc:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
+
+      [etcd]
+      endpoint = "127.0.0.1:2379"
+      prefix = "/jupyterhub"
+      useapiv3 = true
+      watch = true
+      providersThrottleDuration = 1
+     ```
+
+     **Note**: **If you choose to enable the authentication on etcd**, you can use this *toml* file to pass the credentials to traefik, e.g.:
+
+      ```
+      [etcd]
+      username = "root"
+      password = "admin"
+      endpoint = "127.0.0.1:2379"
+      ...
+     ```
 
 ## Example setup
 
@@ -167,10 +204,10 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
    c.TraefikEtcdProxy.should_start = False
 
    # traefik api endpoint login password
-   c.TraefikEtcdProxy.traefik_api_password = "admin"
+   c.TraefikEtcdProxy.traefik_api_password = "abc"
 
    # traefik api endpoint login username
-   c.TraefikEtcdProxy.traefik_api_username = "api_admin"
+   c.TraefikEtcdProxy.traefik_api_username = "123"
 
    # etcd url where it accepts client requests
    c.TraefikEtcdProxy.etcd_url = "path/to/rules.toml"
@@ -179,12 +216,24 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
    c.JupyterHub.proxy_class = TraefikEtcdProxy
     ```
 
+    **Note:** If you intend to enable authentication on etcd, add the etcd credentials to *jupyterhub_config.py*:
+
+    ```
+    # etcd username
+    c.TraefikEtcdProxy.etcd_username = "def"
+
+    # etcd password
+    c.TraefikEtcdProxy.etcd_password = "456"
+    ```
+
 2. Start a single-note etcd cluster on the default port on localhost. e.g.:
    ```
    $ etcd
    ```
+   **Note:** If you intend to enable authentication on etcd checkout
+   [this guide](https://coreos.com/etcd/docs/latest/op-guide/authentication.html):
 
-3. Create a traefik static configuration file, *traefik.toml* and use *storeconfig* to add it to etcd.
+3. Create a traefik static configuration file, *traefik.toml*, e.g:.
 
     ```
     # the default entrypoint
@@ -209,9 +258,13 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
     
     # authenticate the traefik api entrypoint
     [entryPoints.auth_api.auth.basic]
-    users = [ "api_admin:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
+    users = [ "abc:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
 
     [etcd]
+    # the etcd username (if auth is enabled)
+    username = "def"
+    # the etcd password (if auth is enabled)
+    password = "456"
     # the etcd address
     endpoint = "127.0.0.1:2379"
     # the prefix to use for the static configuration
@@ -224,5 +277,5 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
 
 4. Start traefik with the configuration specified above, e.g.:
     ```
-    $ traefik --etcd --etcd.useapiv3=true
+    $ traefik -c traefik.toml
     ```

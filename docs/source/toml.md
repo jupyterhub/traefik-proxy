@@ -84,7 +84,7 @@ If TraefikTomlProxy is used as an externally managed service, then make sure you
 
 1. Let JupyterHub know that the proxy being used is TraefikTomlProxy, using the *proxy_class* configuration option:
     ```
-    c.TraefikTomlProxy.proxy_class = "traefik_toml"
+    c.JupyterHub.proxy_class = "traefik_toml"
     ```
 
 2. Configure `TraeficTomlProxy` in **jupyterhub_config.py**
