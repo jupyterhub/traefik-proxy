@@ -23,8 +23,8 @@ from os.path import abspath, dirname, join
 from subprocess import Popen
 from urllib.parse import urlparse
 
-from traitlets import Any, Unicode
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+from traitlets import Any, Integer, Unicode
+from tornado.httpclient import AsyncHTTPClient
 
 from jupyterhub.utils import exponential_backoff
 from jupyterhub.proxy import Proxy
@@ -55,6 +55,12 @@ class TraefikProxy(Proxy):
     )
 
     traefik_api_hashed_password = Unicode()
+
+    check_route_timeout = Integer(
+        30,
+        config=True,
+        help="""Timeout (in seconds) when waiting for traefik to register an updated route.""",
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -102,7 +108,7 @@ class TraefikProxy(Proxy):
         await exponential_backoff(
             _check_traefik_dynamic_conf_ready,
             "Traefik route for %s configuration not available" % routespec,
-            timeout=40,
+            timeout=self.check_route_timeout,
         )
 
     async def _wait_for_static_config(self, provider):
@@ -126,7 +132,7 @@ class TraefikProxy(Proxy):
         await exponential_backoff(
             _check_traefik_static_conf_ready,
             "Traefik static configuration not available",
-            timeout=40,
+            timeout=self.check_route_timeout,
         )
 
     def _stop_traefik(self):
