@@ -114,17 +114,16 @@ def atomic_writing(path):
     Avoids a partial file ever being present in `path`,
     which could cause traefik to load a partial routing table.
     """
-    fileobj = NamedTemporaryFile(prefix=os.path.abspath(path) + "-tmp-", mode="w")
+    fileobj = NamedTemporaryFile(
+        prefix=os.path.abspath(path) + "-tmp-", mode="w", delete=False
+    )
     try:
-        yield fileobj
-        os.fsync(fileobj)
+        with fileobj as f:
+            yield f
         os.replace(fileobj.name, path)
-        # unset delete flag because we just cleaned up
-        fileobj.delete = False
     finally:
-        # close deletes the file
         try:
-            fileobj.close()
+            os.unlink(fileobj.name)
         except FileNotFoundError:
             # already deleted by os.replace above
             pass
