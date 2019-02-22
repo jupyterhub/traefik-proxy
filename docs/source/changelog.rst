@@ -6,6 +6,10 @@ Changes in jupyterhub-traefik-proxy
 Unreleased
 ----------
 
+0.1.2
+-----
+
+- Fix possible race in atomic_writing with TraefikTomlProxy
 
 0.1.1
 -----
