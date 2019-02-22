@@ -23,10 +23,10 @@ from os.path import abspath, dirname, join
 from subprocess import Popen
 from urllib.parse import urlparse
 
-from traitlets import Any, Integer, Unicode
+from traitlets import Any, Dict, Integer, Unicode, default
 from tornado.httpclient import AsyncHTTPClient
 
-from jupyterhub.utils import exponential_backoff
+from jupyterhub.utils import exponential_backoff, url_path_join
 from jupyterhub.proxy import Proxy
 from . import traefik_utils
 
@@ -50,9 +50,25 @@ class TraefikProxy(Proxy):
         config=True, help="""The password for traefik api login"""
     )
 
+    @default("traefik_api_password")
+    def _warn_empty_password(self):
+        self.log.warning(
+            "Traefik API password not set."
+            " Set c.TraefikProxy.traefik_api_password to authenticate with traefik."
+        )
+        return ""
+
     traefik_api_username = Unicode(
         config=True, help="""The username for traefik api login"""
     )
+
+    @default("traefik_api_username")
+    def _warn_empty_username(self):
+        self.log.warning(
+            "Traefik API username not set."
+            " Set c.TraefikProxy.traefik_api_username to authenticate with traefik."
+        )
+        return ""
 
     traefik_api_hashed_password = Unicode()
 
@@ -62,9 +78,7 @@ class TraefikProxy(Proxy):
         help="""Timeout (in seconds) when waiting for traefik to register an updated route.""",
     )
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.static_config = {}
+    static_config = Dict()
 
     def _generate_htpassword(self):
         from passlib.apache import HtpasswdFile
@@ -73,37 +87,44 @@ class TraefikProxy(Proxy):
         ht.set_password(self.traefik_api_username, self.traefik_api_password)
         self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
 
-    async def _wait_for_route(self, routespec, provider):
-        async def _check_traefik_dynamic_conf_ready():
-            """ Check if traefik loaded its dynamic configuration from the
-                etcd cluster """
-            expected_backend = traefik_utils.generate_alias(routespec, "backend")
-            expected_frontend = traefik_utils.generate_alias(routespec, "frontend")
-            ready = False
-            try:
-                resp_backends = await AsyncHTTPClient().fetch(
-                    self.traefik_api_url + "/api/providers/" + provider + "/backends",
-                    auth_username=self.traefik_api_username,
-                    auth_password=self.traefik_api_password,
-                )
-                resp_frontends = await AsyncHTTPClient().fetch(
-                    self.traefik_api_url + "/api/providers/" + provider + "/frontends",
-                    auth_username=self.traefik_api_username,
-                    auth_password=self.traefik_api_password,
-                )
-                backends_data = json.loads(resp_backends.body)
-                frontends_data = json.loads(resp_frontends.body)
+    async def _check_for_traefik_endpoint(self, routespec, kind, provider):
+        """Check for an expected frontend or backend
 
-                if resp_backends.code == 200 and resp_frontends.code == 200:
-                    ready = (
-                        expected_backend in backends_data
-                        and expected_frontend in frontends_data
-                    )
-            except Exception as e:
-                backends_rc, frontends_rc = e.response.code
-                ready = False
-            finally:
-                return ready
+        This is used to wait for traefik to load configuration
+        from a provider
+        """
+        expected = traefik_utils.generate_alias(routespec, kind)
+        path = "/api/providers/{}/{}s".format(provider, kind)
+        try:
+            resp = await self._traefik_api_request(path)
+            data = json.loads(resp.body)
+        except Exception:
+            self.log.exception("Error checking traefik api for %s %s", kind, routespec)
+            return False
+
+        if expected not in data:
+            self.log.debug("traefik %s not yet in %ss", expected, kind)
+            self.log.debug("Current traefik %ss: %s", kind, data)
+            return False
+
+        # found the expected endpoint
+        return True
+
+    async def _wait_for_route(self, routespec, provider):
+        self.log.info("Waiting for %s to register with traefik", routespec)
+
+        async def _check_traefik_dynamic_conf_ready():
+            """Check if traefik loaded its dynamic configuration yet"""
+            if not await self._check_for_traefik_endpoint(
+                routespec, "backend", provider
+            ):
+                return False
+            if not await self._check_for_traefik_endpoint(
+                routespec, "frontend", provider
+            ):
+                return False
+
+            return True
 
         await exponential_backoff(
             _check_traefik_dynamic_conf_ready,
@@ -111,23 +132,39 @@ class TraefikProxy(Proxy):
             timeout=self.check_route_timeout,
         )
 
+    async def _traefik_api_request(self, path):
+        """Make an API request to traefik"""
+        url = url_path_join(self.traefik_api_url, path)
+        self.log.debug("Fetching traefik api %s", url)
+        resp = await AsyncHTTPClient().fetch(
+            url,
+            auth_username=self.traefik_api_username,
+            auth_password=self.traefik_api_password,
+        )
+        if resp.code >= 300:
+            self.log.warning("%s GET %s", resp.code, url)
+        else:
+            self.log.debug("%s GET %s", resp.code, url)
+        return resp
+
     async def _wait_for_static_config(self, provider):
         async def _check_traefik_static_conf_ready():
             """ Check if traefik loaded its static configuration from the
             etcd cluster """
             try:
-                resp = await AsyncHTTPClient().fetch(
-                    self.traefik_api_url + "/api/providers/" + provider,
-                    auth_username=self.traefik_api_username,
-                    auth_password=self.traefik_api_password,
+                resp = await self._traefik_api_request("/api/providers/" + provider)
+            except Exception:
+                self.log.exception("Error checking for traefik static configuration")
+                return False
+
+            if resp.code != 200:
+                self.log.error(
+                    "Unexpected response code %s checking for traefik static configuration",
+                    resp.code,
                 )
-                rc = resp.code
-            except ConnectionRefusedError:
-                rc = None
-            except Exception as e:
-                rc = e.response.code
-            finally:
-                return rc == 200
+                return False
+
+            return True
 
         await exponential_backoff(
             _check_traefik_static_conf_ready,
