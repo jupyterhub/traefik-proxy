@@ -88,7 +88,7 @@ class TraefikTomlProxy(TraefikProxy):
                 os.remove(self.toml_static_config_file)
             os.remove(self.toml_dynamic_config_file)
         except:
-            self.log.error("Failed to remove traefik's configuration files \n")
+            self.log.error("Failed to remove traefik's configuration files")
             raise
 
     def _get_route_unsafe(self, routespec):
