@@ -91,6 +91,24 @@ class TraefikTomlProxy(TraefikProxy):
             self.log.error("Failed to remove traefik's configuration files")
             raise
 
+    def _sync_cache_if_empty(self):
+        if not self.routes_cache["frontends"] and not self.routes_cache["backends"]:
+            try:
+                """
+                Check if there are any routes in the dynamic configuration file
+                and load them.
+                """
+                routes = traefik_utils.load_routes(
+                    self.toml_dynamic_config_file
+                )
+                if routes:
+                    self.routes_cache = routes
+                return True
+            except FileNotFoundError:
+                return False
+
+        return True
+
     def _get_route_unsafe(self, routespec):
         safe = string.ascii_letters + string.digits + "_-"
         escaped_routespec = escapism.escape(routespec, safe=safe)
@@ -162,10 +180,10 @@ class TraefikTomlProxy(TraefikProxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
-
-        self.log.info("Adding route for %s to %s.", routespec, target)
-
         routespec = self.validate_routespec(routespec)
+
+        self._sync_cache_if_empty()
+
         backend_alias = traefik_utils.generate_alias(routespec, "backend")
         frontend_alias = traefik_utils.generate_alias(routespec, "frontend")
         data = json.dumps(data)
@@ -202,6 +220,11 @@ class TraefikTomlProxy(TraefikProxy):
         **Subclasses must define this method**
         """
         routespec = self.validate_routespec(routespec)
+
+        synced = self._sync_cache_if_empty()
+        if not synced:
+            return
+
         safe = string.ascii_letters + string.digits + "_-"
         escaped_routespec = escapism.escape(routespec, safe=safe)
 
@@ -231,7 +254,13 @@ class TraefikTomlProxy(TraefikProxy):
             'data': the attached data dict for this route (as specified in add_route)
           }
         """
+
+        synced = self._sync_cache_if_empty()
+        if not synced:
+            return {}
+
         all_routes = {}
+
         async with self.mutex:
             for key, value in self.routes_cache["frontends"].items():
                 escaped_routespec = "".join(key.split("_", 1)[1:])
@@ -261,5 +290,10 @@ class TraefikTomlProxy(TraefikProxy):
             None: if there are no routes matching the given routespec
         """
         routespec = self.validate_routespec(routespec)
+
+        synced = self._sync_cache_if_empty()
+        if not synced:
+            return None
+
         async with self.mutex:
             return self._get_route_unsafe(routespec)
