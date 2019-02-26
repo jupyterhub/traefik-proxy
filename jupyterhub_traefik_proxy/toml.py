@@ -46,7 +46,14 @@ class TraefikTomlProxy(TraefikProxy):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.routes_cache = {"backends": {}, "frontends": {}}
+        try:
+            # Load initial routing table from disk
+            self.routes_cache = traefik_utils.load_routes(self.toml_dynamic_config_file)
+        except FileNotFoundError:
+            self.routes_cache = {}
+        finally:
+            if not self.routes_cache:
+                self.routes_cache = {"backends": {}, "frontends": {}}
 
     async def _setup_traefik_static_config(self):
         await super()._setup_traefik_static_config()
@@ -58,9 +65,7 @@ class TraefikTomlProxy(TraefikProxy):
                 self.toml_static_config_file, self.static_config
             )
             try:
-                self.routes_cache = traefik_utils.load_routes(
-                    self.toml_dynamic_config_file
-                )
+                os.stat(self.toml_dynamic_config_file)
             except FileNotFoundError:
                 # Make sure that the dynamic configuration file exists
                 open(self.toml_dynamic_config_file, "a").close()
@@ -162,9 +167,6 @@ class TraefikTomlProxy(TraefikProxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
-
-        self.log.info("Adding route for %s to %s.", routespec, target)
-
         routespec = self.validate_routespec(routespec)
         backend_alias = traefik_utils.generate_alias(routespec, "backend")
         frontend_alias = traefik_utils.generate_alias(routespec, "frontend")
@@ -232,6 +234,7 @@ class TraefikTomlProxy(TraefikProxy):
           }
         """
         all_routes = {}
+
         async with self.mutex:
             for key, value in self.routes_cache["frontends"].items():
                 escaped_routespec = "".join(key.split("_", 1)[1:])

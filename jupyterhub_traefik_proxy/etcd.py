@@ -20,6 +20,7 @@ Route Specification:
 
 from concurrent.futures import ThreadPoolExecutor
 import json
+import os
 from urllib.parse import urlparse
 
 import etcd3
@@ -129,6 +130,14 @@ class TraefikEtcdProxy(TraefikProxy):
             )
             raise
 
+    def _clean_resources(self):
+        try:
+            if self.should_start:
+                os.remove(self.toml_static_config_file)
+        except:
+            self.log.error("Failed to remove traefik's configuration files")
+            raise
+
     async def start(self):
         """Start the proxy.
 
@@ -150,6 +159,7 @@ class TraefikEtcdProxy(TraefikProxy):
         if the proxy is to be started by the Hub
         """
         await super().stop()
+        self._clean_resources()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
