@@ -6,6 +6,12 @@ Changes in jupyterhub-traefik-proxy
 Unreleased
 ----------
 
+0.1.3
+-----
+
+- Load initial routing table from disk in TraefikTomlProxy
+  when resuming from a previous session.
+
 0.1.2
 -----
 
