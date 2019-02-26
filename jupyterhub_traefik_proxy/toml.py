@@ -48,9 +48,7 @@ class TraefikTomlProxy(TraefikProxy):
         super().__init__(**kwargs)
         try:
             # Load initial routing table from disk
-            self.routes_cache = traefik_utils.load_routes(
-                self.toml_dynamic_config_file
-            )
+            self.routes_cache = traefik_utils.load_routes(self.toml_dynamic_config_file)
         except FileNotFoundError:
             self.routes_cache = {}
         finally:
@@ -67,9 +65,7 @@ class TraefikTomlProxy(TraefikProxy):
                 self.toml_static_config_file, self.static_config
             )
             try:
-                self.routes_cache = traefik_utils.load_routes(
-                    self.toml_dynamic_config_file
-                )
+                os.stat(self.toml_dynamic_config_file)
             except FileNotFoundError:
                 # Make sure that the dynamic configuration file exists
                 open(self.toml_dynamic_config_file, "a").close()
@@ -99,7 +95,6 @@ class TraefikTomlProxy(TraefikProxy):
         except:
             self.log.error("Failed to remove traefik's configuration files")
             raise
-
 
     def _get_route_unsafe(self, routespec):
         safe = string.ascii_letters + string.digits + "_-"
