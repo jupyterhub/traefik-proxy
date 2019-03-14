@@ -2,9 +2,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import asyncio
 import websockets
 
+
 def health_check(path, request_headers):
-    if path == '/some_routespec/':
+    if path == "/some_routespec/":
         print(request_headers)
+
 
 async def send_port(websocket, path):
     print("sending hello")
