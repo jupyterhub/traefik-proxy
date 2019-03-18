@@ -1,17 +1,10 @@
 import asyncio
-import concurrent.futures
-from numpy import mean
 import time
-import subprocess
-import sys
-import websockets
 
-import urllib.request
+from numpy import mean
 from urllib.parse import urlparse
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
-from os.path import dirname, join, abspath
-from tornado.concurrent import run_on_executor
-from concurrent.futures import ThreadPoolExecutor
+import websockets
 
 
 async def measure_add_route(proxy, routespec, target, data):
@@ -33,6 +26,20 @@ async def measure_get_all_routes(proxy):
 
 
 async def add_route_perf(proxy, routes_no):
+    """
+    Computes time taken(ns) to add routes_no routes
+    to the routing table and the mean
+    time taken.
+
+    Returns a list:
+    [
+        time_taken to add 1st route
+        time_taken to add 2nd route
+        ...
+        time_taken to add routes_no'th route
+        mean time
+    ]
+    """
     target = "http://127.0.0.1:9000"
     data = {"test": "test1", "user": "username"}
 
@@ -41,24 +48,57 @@ async def add_route_perf(proxy, routes_no):
         routespec = "/route/" + str(i) + "/"
         result = await measure_add_route(proxy, routespec, target, data)
         times.append(result)
-    return mean(times)
+    times.append(mean(times))
+    return times
 
 
 async def delete_route_perf(proxy, routes_no):
+    """
+    Computes time taken (ns) to delete routes_no routes
+    from the routing table and the mean
+    time taken.
+    It assumes the routes to be deleted already exist.
+
+    Returns a list:
+    [
+        time_taken to delete 1st route
+        time_taken to delete 2nd route
+        ...
+        time_taken to delete routes_no'th route
+        mean time
+    ]
+    """
     times = []
     for i in range(routes_no):
         routespec = "/route/" + str(i) + "/"
         result = await measure_delete_route(proxy, routespec)
         times.append(result)
-    return mean(times)
+    times.append(mean(times))
+    return times
 
 
 async def get_all_routes_perf(proxy, routes_no):
+    """
+    Computes time taken (ns) to get all routes for routes_no times
+    and the mean time taken.
+
+    It assumes the routing table already contains routes_no routes.
+
+    Returns a list:
+    [
+        time_taken to get_all_routes (1st time)
+        time_taken to get_all_routes (2nd time)
+        ...
+        time_taken to get_all_routes (routes_no'th time)
+        mean time
+    ]
+    """
     times = []
     for i in range(routes_no):
         result = await measure_get_all_routes(proxy)
         times.append(result)
-    return mean(times)
+    times.append(mean(times))
+    return times
 
 
 def create_request_url(proxy, routespec, proto):
@@ -84,15 +124,26 @@ async def make_ws_small_req(proxy, routespec):
 
 
 async def measure_methods_perf(proxy, routes_no):
+    """
+    Computes the time taken to add/delete/get_all_routes (ns)
+    routes_no routes to/from the routing table.
+
+    Returns:
+        result (dict):
+            dict with the following keys::
+            'add': List return by add_route_perf
+            'delete': List return by delete_route_perf
+            'get_all': List return by get_all_routes_perf
+    """
     result = {}
 
-    mean_add = await add_route_perf(proxy, routes_no)
-    mean_get_all = await get_all_routes_perf(proxy, routes_no)
-    mean_delete = await delete_route_perf(proxy, routes_no)
+    add = await add_route_perf(proxy, routes_no)
+    get_all = await get_all_routes_perf(proxy, routes_no)
+    delete = await delete_route_perf(proxy, routes_no)
 
-    result["add"] = mean_add
-    result["get_all"] = mean_get_all
-    result["delete"] = mean_delete
+    result["add"] = add
+    result["get_all"] = get_all
+    result["delete"] = delete
 
     return result
 
@@ -100,6 +151,12 @@ async def measure_methods_perf(proxy, routes_no):
 async def measure_throughput(
     proxy, requests_no, concurrent_no, routespec, proto, request_size
 ):
+    """
+    Makes 'requests_no' GET http/websocket requests
+    to the proxy with max 'concurrent_no' concurrent.
+
+    Returns the throughput(number of requests/milisec)
+    """
     loop = asyncio.get_event_loop()
     running_tasks = set()
 

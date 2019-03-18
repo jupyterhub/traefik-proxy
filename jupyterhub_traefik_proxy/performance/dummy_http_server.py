@@ -19,14 +19,10 @@ class DummyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self._set_headers()
         data = None
-        # print(self.headers["RequestSize"] + " @@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         if self.headers["RequestSize"] == "large":
-            # print("serving large data")
-            data = self.generate(50000000)  # 10MB
+            data = self.generate(10000000)  # 10MB
         else:
-            # print("serving small data")
             data = self.generate(1)  # 1B
-        # print(sys.getsizeof(data))
         self.wfile.write(data)
 
 
