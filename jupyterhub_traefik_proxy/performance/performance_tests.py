@@ -7,98 +7,69 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 import websockets
 
 
-async def measure_add_route(proxy, routespec, target, data):
-    tic = time.perf_counter_ns()
-    await proxy.add_route(routespec, target, data)
-    return time.perf_counter_ns() - tic
-
-
-async def measure_delete_route(proxy, routespec):
-    tic = time.perf_counter_ns()
-    await proxy.delete_route(routespec)
-    return time.perf_counter_ns() - tic
-
-
-async def measure_get_all_routes(proxy):
-    tic = time.perf_counter_ns()
-    await proxy.get_all_routes()
-    return time.perf_counter_ns() - tic
-
-
-async def add_route_perf(proxy, routes_no):
+async def add_route_perf(proxy, route_idx):
     """
-    Computes time taken(ns) to add routes_no routes
-    to the routing table and the mean
-    time taken.
+    Computes time taken (ns) to add the "route_idx"
+    route to the proxy's routing table ( which
+    contains route_idx - 1 routes).
 
-    Returns a list:
+    Returns a tuple:
     [
-        time_taken to add 1st route
-        time_taken to add 2nd route
-        ...
-        time_taken to add routes_no'th route
-        mean time
+        route_idx: the index of the route added
+        time_taken: the time it took to add the route with number 
+                  "route_idx" to the proxy's routing table
     ]
     """
     target = "http://127.0.0.1:9000"
-    data = {"test": "test1", "user": "username"}
+    data = {"test": "test_" + str(route_idx), "user": "user_" + str(route_idx)}
+    routespec = "/route/" + str(route_idx) + "/"
 
-    times = []
-    for i in range(routes_no):
-        routespec = "/route/" + str(i) + "/"
-        result = await measure_add_route(proxy, routespec, target, data)
-        times.append(result)
-    times.append(mean(times))
-    return times
+    tic = time.perf_counter_ns()
+    await proxy.add_route(routespec, target, data)
+    time_taken = time.perf_counter_ns() - tic
+
+    return route_idx, time_taken
 
 
-async def delete_route_perf(proxy, routes_no):
+async def delete_route_perf(proxy, route_idx):
     """
-    Computes time taken (ns) to delete routes_no routes
-    from the routing table and the mean
-    time taken.
-    It assumes the routes to be deleted already exist.
+    Computes time taken (ns) to delete the "route_idx"
+    route from the proxy's routing table (which 
+    contains route_idx + 1 routes).
+    
+    It assumes the route to be deleted already exists.
 
-    Returns a list:
+    Returns a tuple:
     [
-        time_taken to delete 1st route
-        time_taken to delete 2nd route
-        ...
-        time_taken to delete routes_no'th route
-        mean time
+        route_idx: the index of the route deleted
+        time_taken: the time it took to delete the route with number 
+                  "route_idx" from the proxy's routing table
     ]
     """
-    times = []
-    for i in range(routes_no):
-        routespec = "/route/" + str(i) + "/"
-        result = await measure_delete_route(proxy, routespec)
-        times.append(result)
-    times.append(mean(times))
-    return times
+    routespec = "/route/" + str(route_idx) + "/"
+
+    tic = time.perf_counter_ns()
+    await proxy.delete_route(routespec)
+    time_taken = time.perf_counter_ns() - tic
+
+    return route_idx, time_taken
 
 
-async def get_all_routes_perf(proxy, routes_no):
+async def get_all_routes_perf(proxy, iteration):
     """
-    Computes time taken (ns) to get all routes for routes_no times
-    and the mean time taken.
+    Computes time taken (ns) to retrieve all the
+    routes from the proxy's routing table.
 
-    It assumes the routing table already contains routes_no routes.
-
-    Returns a list:
+    Returns a tuple:
     [
-        time_taken to get_all_routes (1st time)
-        time_taken to get_all_routes (2nd time)
-        ...
-        time_taken to get_all_routes (routes_no'th time)
-        mean time
+        iteration: the iteration index
+        time_taken: the time it took to get all the routes
     ]
     """
-    times = []
-    for i in range(routes_no):
-        result = await measure_get_all_routes(proxy)
-        times.append(result)
-    times.append(mean(times))
-    return times
+    tic = time.perf_counter_ns()
+    await proxy.get_all_routes()
+    time_taken = time.perf_counter_ns() - tic
+    return iteration, time_taken
 
 
 def create_request_url(proxy, routespec, proto):
@@ -121,31 +92,6 @@ async def make_ws_small_req(proxy, routespec):
         resp = await websocket.recv()
 
     return resp
-
-
-async def measure_methods_perf(proxy, routes_no):
-    """
-    Computes the time taken to add/delete/get_all_routes (ns)
-    routes_no routes to/from the routing table.
-
-    Returns:
-        result (dict):
-            dict with the following keys::
-            'add': List return by add_route_perf
-            'delete': List return by delete_route_perf
-            'get_all': List return by get_all_routes_perf
-    """
-    result = {}
-
-    add = await add_route_perf(proxy, routes_no)
-    get_all = await get_all_routes_perf(proxy, routes_no)
-    delete = await delete_route_perf(proxy, routes_no)
-
-    result["add"] = add
-    result["get_all"] = get_all
-    result["delete"] = delete
-
-    return result
 
 
 async def measure_throughput(

@@ -6,7 +6,9 @@ import textwrap
 
 import csv
 import matplotlib.pyplot as plt
+import numpy as np
 from threading import Thread
+from statistics import mean
 
 from jupyterhub.tests.mocking import MockHub
 from jupyterhub.proxy import ConfigurableHTTPProxy
@@ -23,10 +25,11 @@ async def no_auth_etcd_proxy():
     proxy = TraefikEtcdProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
-        traefik_api_username="api_admin",
+        traefik_api_username="admin",
         should_start=True,
     )
     await proxy.start()
+    time.sleep(5)
     return proxy
 
 
@@ -35,11 +38,12 @@ async def toml_proxy():
     proxy = TraefikTomlProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
-        traefik_api_username="api_admin",
+        traefik_api_username="admin",
         should_start=True,
     )
 
     await proxy.start()
+    time.sleep(5)
     return proxy
 
 
@@ -82,16 +86,76 @@ async def stop_proxy(proxy_class, proxy):
         await proxy.stop()
 
 
+def get_tasks_list_results(tasks):
+    results = [-1] * len(tasks)
+    for task in tasks:
+        route_idx, time_taken = task.result()
+        results[route_idx] = time_taken
+
+    return results
+
+
+def ns_to_s(t):
+    return t / 1000000000
+
+
+async def measure_methods_performance_concurrent(proxy_class, iterations):
+    proxy = await get_proxy(proxy_class)
+
+    # Get "add_route" performance
+    tasks = [
+        performance_tests.add_route_perf(proxy, route_idx)
+        for route_idx in range(iterations)
+    ]
+    
+    _done, _running = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+    add = get_tasks_list_results(_done)
+    mean_add = ns_to_s(mean(add))
+    print(f"Add {mean_add}")
+
+    # Get "get_all_routes" performance
+    tasks = [
+        performance_tests.get_all_routes_perf(proxy, route_idx)
+        for route_idx in range(iterations)
+    ]
+    _done, _running = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+    get_all = get_tasks_list_results(_done)
+    mean_get_all = ns_to_s(mean(get_all))
+    print(f"Get all {mean_get_all}")
+
+    # Get "delete_route" performance
+    tasks = [
+        performance_tests.delete_route_perf(proxy, route_idx)
+        for route_idx in range(iterations)
+    ]
+    _done, _running = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+    delete = get_tasks_list_results(_done)
+    mean_delete = ns_to_s(mean(delete))
+    print(f"Delete {mean_delete}")
+
+    await stop_proxy(proxy_class, proxy)
+    result = {}
+    result["add"] = add
+    result["delete"] = delete
+    result["get_all"] = get_all
+
+    return result
+
+
 async def measure_methods_performance(proxy_class, iterations):
     proxy = await get_proxy(proxy_class)
 
-    result = await performance_tests.measure_methods_perf(proxy, iterations)
-
-    print("add_route took: " + str(result["add"][-1]))
-    print("delete_route took: " + str(result["delete"][-1]))
-    print("get_all_routes took: " + str(result["get_all"][-1]))
+    for route_idx in range(iterations):
+        time.sleep(2)
+        _done, _running = await asyncio.wait(
+            [performance_tests.add_route_perf(proxy, route_idx)],
+            return_when=asyncio.ALL_COMPLETED,
+        )
+        add = get_tasks_list_results(_done)
 
     await stop_proxy(proxy_class, proxy)
+    result = {}
+    result["add"] = add
     return result
 
 
@@ -226,32 +290,50 @@ def main():
     backend_port = args.backend_port
 
     requests_no = 1000
+    test_iterations = 5
 
     loop = asyncio.get_event_loop()
     if metric == "methods":
-        result = loop.run_until_complete(
-            measure_methods_performance(proxy_class, routes_number)
-        )
+        tic = time.perf_counter_ns()
+        results = {}
+        for i in range(test_iterations):
+            results[i] = loop.run_until_complete(
+                measure_methods_performance_concurrent(proxy_class, routes_number)
+            )
+        print(ns_to_s(time.perf_counter_ns() - tic))
+
         if csv_filename:
             with open(csv_filename, mode="w+") as csv_file:
-                fieldnames = [("T_" + str(i)) for i in range(routes_number)]
-                fieldnames.insert(0, "Method")
-                fieldnames.append("Mean")
+                sample_no = 3
+                if routes_number > 40:
+                    sample_no = routes_number / 10
+
+                samples = np.unique(
+                    np.logspace(
+                        0, np.log10(routes_number), sample_no, endpoint=False, dtype=int
+                    )
+                )
+                print(samples)
+                fieldnames = ["proxy", "test_id", "method", "route_idx", "time"]
                 writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-
-                result_add_dict = dict(zip(fieldnames[1:], result["add"]))
-                result_add_dict["Method"] = "add_route"
-
-                result_delete_dict = dict(zip(fieldnames[1:], result["delete"]))
-                result_delete_dict["Method"] = "delete_route"
-
-                result_get_all_dict = dict(zip(fieldnames[1:], result["get_all"]))
-                result_get_all_dict["Method"] = "get_all_routes"
-
                 writer.writeheader()
-                writer.writerow(result_add_dict)
-                writer.writerow(result_delete_dict)
-                writer.writerow(result_get_all_dict)
+
+                for test_id in range(test_iterations):
+                    for sample in samples:
+                        constants = [proxy_class, test_id, "add_route", sample]
+                        result_add_dict = dict(zip(fieldnames[:-1], constants))
+                        constants[2] = "delete_route"
+                        result_delete_dict = dict(zip(fieldnames[:-1], constants))
+                        constants[2] = "get_all_routes"
+                        result_get_all_dict = dict(zip(fieldnames[:-1], constants))
+
+                        result_add_dict["time"] = results[test_id]["add"][sample]
+                        result_delete_dict["time"] = results[test_id]["delete"][sample]
+                        result_get_all_dict["time"] = results[test_id]["get_all"][sample]
+
+                        writer.writerow(result_add_dict)
+                        writer.writerow(result_delete_dict)
+                        writer.writerow(result_get_all_dict)
     else:
         if metric == "http_throughput_small":
             result = {}
