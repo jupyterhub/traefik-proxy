@@ -16,6 +16,7 @@ pytestmark = pytest.mark.asyncio
         "external_etcd_proxy",
         "auth_external_etcd_proxy",
         "external_toml_proxy",
+        "consul_proxy",
     ]
 )
 def proxy(request):

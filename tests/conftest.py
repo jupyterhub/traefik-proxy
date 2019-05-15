@@ -8,7 +8,25 @@ import sys
 import pytest
 
 from jupyterhub_traefik_proxy import TraefikEtcdProxy
+from jupyterhub_traefik_proxy import TraefikConsulProxy
 from jupyterhub_traefik_proxy import TraefikTomlProxy
+
+
+@pytest.fixture
+async def consul_proxy():
+    """
+    Fixture returning a configured TraefikEtcdProxy.
+    No etcd authentication.
+    """
+    proxy = TraefikConsulProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="admin",
+        should_start=True,
+    )
+    await proxy.start()
+    yield proxy
+    await proxy.stop()
 
 
 @pytest.fixture
@@ -39,8 +57,8 @@ async def auth_etcd_proxy(etcd):
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
-        etcd_password="secret",
-        etcd_username="root",
+        kv_password="secret",
+        kv_username="root",
         should_start=True,
     )
     await proxy.start()
@@ -136,8 +154,8 @@ def auth_external_etcd_proxy():
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
-        etcd_password="secret",
-        etcd_username="root",
+        kv_password="secret",
+        kv_username="root",
         should_start=False,
     )
     traefik_process = configure_and_launch_traefik("secret")
@@ -164,6 +182,15 @@ def disable_auth_in_etcd(password):
     subprocess.check_output(
         ["etcdctl", "--user", "root:" + password, "auth", "disable"]
     ).decode(sys.stdout.encoding).strip() == "Authentication Disabled"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def consul():
+    etcd_proc = subprocess.Popen(["consul", "agent", "-dev"], stdout=None, stderr=None)
+    yield etcd_proc
+
+    etcd_proc.kill()
+    etcd_proc.wait()
 
 
 @pytest.fixture(scope="session", autouse=True)

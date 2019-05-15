@@ -131,9 +131,9 @@ async def test_add_route_to_etcd(etcd_proxy, routespec):
 
     await proxy.add_route(routespec, target, data)
 
-    if proxy.etcd_password:
+    if proxy.kv_password:
         check_route_with_etcdctl(
-            proxy, routespec, target, data, proxy.etcd_username, proxy.etcd_password
+            proxy, routespec, target, data, proxy.kv_username, proxy.kv_password
         )
     else:
         check_route_with_etcdctl(proxy, routespec, target, data)
@@ -158,9 +158,9 @@ async def test_delete_route_from_etcd(etcd_proxy, routespec):
     target = "http://127.0.0.1:9000"
     data = {"test": "test1", "user": "username"}
 
-    if proxy.etcd_password:
+    if proxy.kv_password:
         add_route_with_etcdctl(
-            proxy, routespec, target, data, proxy.etcd_username, proxy.etcd_password
+            proxy, routespec, target, data, proxy.kv_username, proxy.kv_password
         )
     else:
         add_route_with_etcdctl(proxy, routespec, target, data)
@@ -168,14 +168,14 @@ async def test_delete_route_from_etcd(etcd_proxy, routespec):
     await proxy.delete_route(routespec)
 
     # Test that (routespec, target) pair has been deleted from etcd
-    if proxy.etcd_password:
+    if proxy.kv_password:
         check_route_with_etcdctl(
             proxy,
             routespec,
             target,
             data,
-            proxy.etcd_username,
-            proxy.etcd_password,
+            proxy.kv_username,
+            proxy.kv_password,
             test_deletion=True,
         )
     else:
@@ -207,9 +207,9 @@ async def test_get_route(etcd_proxy, routespec):
         "data": data,
     }
 
-    if proxy.etcd_password:
+    if proxy.kv_password:
         add_route_with_etcdctl(
-            proxy, routespec, target, data, proxy.etcd_username, proxy.etcd_password
+            proxy, routespec, target, data, proxy.kv_username, proxy.kv_password
         )
     else:
         add_route_with_etcdctl(proxy, routespec, target, data)
@@ -235,9 +235,9 @@ async def test_get_all_routes(etcd_proxy):
     user = ""
     password = ""
 
-    if proxy.etcd_password:
-        user = proxy.etcd_username
-        password = proxy.etcd_password
+    if proxy.kv_password:
+        user = proxy.kv_username
+        password = proxy.kv_password
 
     add_route_with_etcdctl(proxy, routespec[0], target[0], data[0], user, password)
     add_route_with_etcdctl(proxy, routespec[1], target[1], data[1], user, password)
