@@ -39,7 +39,7 @@ def add_route_with_etcdctl(etcd_proxy, routespec, target, data, user="", passwor
     if not routespec.endswith("/"):
         routespec = routespec + "/"
 
-    jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
+    jupyterhub_routespec = proxy.kv_jupyterhub_prefix + routespec
     route_keys = traefik_utils.generate_route_keys(proxy, routespec)
     rule = traefik_utils.generate_rule(routespec)
     expected_rv = "OK"
@@ -72,7 +72,7 @@ def check_route_with_etcdctl(
     if not routespec.endswith("/"):
         routespec = routespec + "/"
 
-    jupyterhub_routespec = proxy.etcd_jupyterhub_prefix + routespec
+    jupyterhub_routespec = proxy.kv_jupyterhub_prefix + routespec
     route_keys = traefik_utils.generate_route_keys(proxy, routespec)
     rule = traefik_utils.generate_rule(routespec)
 

@@ -21,7 +21,7 @@ async def consul_proxy():
     proxy = TraefikConsulProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
-        traefik_api_username="admin",
+        traefik_api_username="api_admin",
         should_start=True,
     )
     await proxy.start()
