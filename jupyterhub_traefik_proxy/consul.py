@@ -50,6 +50,16 @@ class TraefikConsulProxy(TKvProxy):
     @default("kv_client")
     def _default_client(self):
         consul_service = urlparse(self.kv_url)
+        if self.kv_password:
+            client = consul.aio.Consul(
+                host=str(consul_service.hostname),
+                port=consul_service.port,
+                token=self.kv_password,
+            )
+            client.http._session._default_headers.update(
+                {"X-Consul-Token": self.kv_password}
+            )
+            return client
         return consul.aio.Consul(
             host=str(consul_service.hostname), port=consul_service.port
         )
@@ -70,6 +80,10 @@ class TraefikConsulProxy(TKvProxy):
             "prefix": self.kv_traefik_prefix,
             "watch": True,
         }
+
+    def _launch_traefik(self, config_type):
+        os.environ["CONSUL_HTTP_TOKEN"] = self.kv_password
+        super()._launch_traefik(config_type)
 
     async def _kv_atomic_add_route_parts(
         self, jupyterhub_routespec, target, data, route_keys, rule

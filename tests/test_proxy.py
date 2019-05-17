@@ -10,13 +10,14 @@ pytestmark = pytest.mark.asyncio
 
 @pytest.fixture(
     params=[
+        "no_auth_consul_proxy",
+        "auth_consul_proxy",
         "no_auth_etcd_proxy",
         "auth_etcd_proxy",
         "toml_proxy",
         "external_etcd_proxy",
         "auth_external_etcd_proxy",
         "external_toml_proxy",
-        "consul_proxy",
     ]
 )
 def proxy(request):

@@ -13,15 +13,33 @@ from jupyterhub_traefik_proxy import TraefikTomlProxy
 
 
 @pytest.fixture
-async def consul_proxy():
+async def no_auth_consul_proxy(consul_no_acl):
     """
-    Fixture returning a configured TraefikEtcdProxy.
-    No etcd authentication.
+     Fixture returning a configured TraefikConsulProxy.
+    Consul acl disabled.
     """
     proxy = TraefikConsulProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
+        should_start=True,
+    )
+    await proxy.start()
+    yield proxy
+    await proxy.stop()
+
+
+@pytest.fixture
+async def auth_consul_proxy(consul_acl):
+    """
+    Fixture returning a configured TraefikConsulProxy.
+    Consul acl enabled.
+    """
+    proxy = TraefikConsulProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
+        kv_password="secret",
         should_start=True,
     )
     await proxy.start()
@@ -95,13 +113,13 @@ def external_toml_proxy():
         traefik_api_username="api_admin",
     )
     proxy.should_start = False
-    proxy.toml_dynamic_config_file = "./tests/toml_files/rules.toml"
+    proxy.toml_dynamic_config_file = "./tests/config_files/rules.toml"
     # Start traefik manually
     traefik_process = subprocess.Popen(
-        ["traefik", "-c", "./tests/toml_files/traefik.toml"], stdout=None
+        ["traefik", "-c", "./tests/config_files/traefik.toml"], stdout=None
     )
     yield proxy
-    open("./tests/toml_files/rules.toml", "w").close()
+    open("./tests/config_files/rules.toml", "w").close()
     traefik_process.kill()
     traefik_process.wait()
 
@@ -111,7 +129,7 @@ def configure_and_launch_traefik(password=""):
         "traefik",
         "storeconfig",
         "-c",
-        "./tests/toml_files/traefik_etcd_config.toml",
+        "./tests/config_files/traefik_etcd_config.toml",
         "--etcd",
         "--etcd.endpoint=127.0.0.1:2379",
         "--etcd.useapiv3=true",
@@ -185,15 +203,6 @@ def disable_auth_in_etcd(password):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def consul():
-    etcd_proc = subprocess.Popen(["consul", "agent", "-dev"], stdout=None, stderr=None)
-    yield etcd_proc
-
-    etcd_proc.kill()
-    etcd_proc.wait()
-
-
-@pytest.fixture(scope="session", autouse=True)
 def etcd():
     etcd_proc = subprocess.Popen("etcd", stdout=None, stderr=None)
     yield etcd_proc
@@ -206,3 +215,34 @@ def etcd():
 @pytest.fixture(scope="function", autouse=True)
 def clean_etcd():
     subprocess.run(["etcdctl", "del", '""', "--from-key=true"])
+
+
+@pytest.fixture()
+def consul_no_acl():
+    consul_proc = subprocess.Popen(
+        ["consul", "agent", "-dev"], stdout=None, stderr=None
+    )
+    yield consul_proc
+
+    consul_proc.kill()
+    consul_proc.wait()
+
+
+@pytest.fixture()
+def consul_acl():
+    etcd_proc = subprocess.Popen(
+        [
+            "consul",
+            "agent",
+            "-advertise=127.0.0.1",
+            "-config-file=./tests/config_files/consul_config.json",
+            "-bootstrap-expect=1",
+        ],
+        stdout=None,
+        stderr=None,
+    )
+    yield etcd_proc
+
+    etcd_proc.kill()
+    etcd_proc.wait()
+    shutil.rmtree(os.getcwd() + "/consul.data")

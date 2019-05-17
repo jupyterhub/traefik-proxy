@@ -10,7 +10,15 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.fixture(params=["no_auth_etcd_proxy", "auth_etcd_proxy", "toml_proxy", "consul_proxy"])
+@pytest.fixture(
+    params=[
+        "auth_consul_proxy",
+        "toml_proxy",
+        "no_auth_etcd_proxy",
+        "auth_etcd_proxy",
+        "no_auth_consul_proxy",
+    ]
+)
 def proxy(request):
     return request.getfixturevalue(request.param)
 

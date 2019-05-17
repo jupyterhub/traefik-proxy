@@ -57,8 +57,7 @@ class TraefikEtcdProxy(TKvProxy):
                 user=self.kv_username,
                 password=self.kv_password,
             )
-        else:
-            return etcd3.client(host=str(etcd_service.hostname), port=etcd_service.port)
+        return etcd3.client(host=str(etcd_service.hostname), port=etcd_service.port)
 
     @default("kv_traefik_prefix")
     def _default_kv_traefik_prefix(self):
