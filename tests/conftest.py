@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 import pytest
 
@@ -15,7 +16,7 @@ from jupyterhub_traefik_proxy import TraefikTomlProxy
 @pytest.fixture
 async def no_auth_consul_proxy(consul_no_acl):
     """
-     Fixture returning a configured TraefikConsulProxy.
+    Fixture returning a configured TraefikConsulProxy.
     Consul acl disabled.
     """
     proxy = TraefikConsulProxy(
@@ -106,48 +107,34 @@ async def toml_proxy():
 
 
 @pytest.fixture
-def external_toml_proxy():
-    proxy = TraefikTomlProxy(
+def external_consul_proxy(consul_no_acl):
+    proxy = TraefikConsulProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
+        should_start=False,
     )
-    proxy.should_start = False
-    proxy.toml_dynamic_config_file = "./tests/config_files/rules.toml"
-    # Start traefik manually
-    traefik_process = subprocess.Popen(
-        ["traefik", "-c", "./tests/config_files/traefik.toml"], stdout=None
-    )
+    traefik_process = configure_and_launch_traefik(kv_store="consul")
     yield proxy
-    open("./tests/config_files/rules.toml", "w").close()
+
     traefik_process.kill()
     traefik_process.wait()
 
 
-def configure_and_launch_traefik(password=""):
-    storeconfig_command = [
-        "traefik",
-        "storeconfig",
-        "-c",
-        "./tests/config_files/traefik_etcd_config.toml",
-        "--etcd",
-        "--etcd.endpoint=127.0.0.1:2379",
-        "--etcd.useapiv3=true",
-    ]
+@pytest.fixture
+def auth_external_consul_proxy(consul_acl):
+    proxy = TraefikConsulProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
+        kv_password="secret",
+        should_start=False,
+    )
+    traefik_process = configure_and_launch_traefik(kv_store="consul", password="secret")
+    yield proxy
 
-    traefik_launch_command = ["traefik", "--etcd", "--etcd.useapiv3=true"]
-
-    if password:
-        credentials = ["--etcd.username=root", "--etcd.password=" + password]
-        storeconfig_command += credentials
-        traefik_launch_command += credentials
-
-    # Get the static config from file
-    subprocess.run(storeconfig_command)
-    # Start traefik manually
-    traefik_process = subprocess.Popen(traefik_launch_command, stdout=None)
-
-    return traefik_process
+    traefik_process.kill()
+    traefik_process.wait()
 
 
 @pytest.fixture
@@ -158,7 +145,7 @@ def external_etcd_proxy():
         traefik_api_username="api_admin",
         should_start=False,
     )
-    traefik_process = configure_and_launch_traefik()
+    traefik_process = configure_and_launch_traefik(kv_store="etcd")
     yield proxy
 
     traefik_process.kill()
@@ -176,7 +163,7 @@ def auth_external_etcd_proxy():
         kv_username="root",
         should_start=False,
     )
-    traefik_process = configure_and_launch_traefik("secret")
+    traefik_process = configure_and_launch_traefik(kv_store="etcd", password="secret")
     yield proxy
 
     traefik_process.kill()
@@ -184,22 +171,23 @@ def auth_external_etcd_proxy():
     disable_auth_in_etcd("secret")
 
 
-def enable_auth_in_etcd(password):
-    subprocess.call(["etcdctl", "user", "add", "root:" + password])
-    subprocess.call(["etcdctl", "user", "grant-role", "root", "root"])
-    assert (
-        subprocess.check_output(["etcdctl", "auth", "enable"])
-        .decode(sys.stdout.encoding)
-        .strip()
-        == "Authentication Enabled"
+@pytest.fixture
+def external_toml_proxy():
+    proxy = TraefikTomlProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
     )
-
-
-def disable_auth_in_etcd(password):
-    subprocess.call(["etcdctl", "user", "remove", "root"])
-    subprocess.check_output(
-        ["etcdctl", "--user", "root:" + password, "auth", "disable"]
-    ).decode(sys.stdout.encoding).strip() == "Authentication Disabled"
+    proxy.should_start = False
+    proxy.toml_dynamic_config_file = "./tests/config_files/rules.toml"
+    # Start traefik manually
+    traefik_process = subprocess.Popen(
+        ["traefik", "-c", "./tests/config_files/traefik.toml"], stdout=None
+    )
+    yield proxy
+    open("./tests/config_files/rules.toml", "w").close()
+    traefik_process.kill()
+    traefik_process.wait()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -246,3 +234,76 @@ def consul_acl():
     etcd_proc.kill()
     etcd_proc.wait()
     shutil.rmtree(os.getcwd() + "/consul.data")
+
+
+def configure_and_launch_traefik(kv_store, password=""):
+    if kv_store == "etcd":
+        storeconfig_command = [
+            "traefik",
+            "storeconfig",
+            "-c",
+            "./tests/config_files/traefik_etcd_config.toml",
+            "--etcd",
+            "--etcd.endpoint=127.0.0.1:2379",
+            "--etcd.useapiv3=true",
+        ]
+
+        traefik_launch_command = ["traefik", "--etcd", "--etcd.useapiv3=true"]
+
+        if password:
+            credentials = ["--etcd.username=root", "--etcd.password=" + password]
+            storeconfig_command += credentials
+            traefik_launch_command += credentials
+
+    elif kv_store == "consul":
+        storeconfig_command = [
+            "traefik",
+            "storeconfig",
+            "-c",
+            "./tests/config_files/traefik_consul_config.toml",
+            "--consul",
+            "--consul.endpoint=127.0.0.1:8500",
+        ]
+
+        traefik_launch_command = ["traefik", "--consul"]
+
+        if password:
+            os.environ["CONSUL_HTTP_TOKEN"] = password
+
+    """
+    Try storing the static config to the kv store.
+    Stop if the kv store isn't ready in 60s.
+    """
+    timeout = time.time() + 60
+    while True:
+        if time.time() > timeout:
+            raise Exception("KV not ready! 60s timeout expired!")
+        try:
+            # Put static config from file in kv store.
+            subprocess.check_call(storeconfig_command)
+            break
+        except subprocess.CalledProcessError:
+            pass
+
+    # Start traefik manually
+    traefik_process = subprocess.Popen(traefik_launch_command, stdout=None)
+
+    return traefik_process
+
+
+def enable_auth_in_etcd(password):
+    subprocess.call(["etcdctl", "user", "add", "root:" + password])
+    subprocess.call(["etcdctl", "user", "grant-role", "root", "root"])
+    assert (
+        subprocess.check_output(["etcdctl", "auth", "enable"])
+        .decode(sys.stdout.encoding)
+        .strip()
+        == "Authentication Enabled"
+    )
+
+
+def disable_auth_in_etcd(password):
+    subprocess.call(["etcdctl", "user", "remove", "root"])
+    subprocess.check_output(
+        ["etcdctl", "--user", "root:" + password, "auth", "disable"]
+    ).decode(sys.stdout.encoding).strip() == "Authentication Disabled"
