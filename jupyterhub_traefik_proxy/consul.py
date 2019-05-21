@@ -148,7 +148,7 @@ class TraefikConsulProxy(TKvProxy):
             status = 0
             response = str(e)
 
-        return response, status
+        return status, response
 
     async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
         escaped_jupyterhub_routespec = escapism.escape(
@@ -162,16 +162,23 @@ class TraefikConsulProxy(TKvProxy):
         target = v["Value"]
         escaped_target = escapism.escape(target, safe=self.key_safe_chars)
 
-        status, response = await self.kv_client.txn.put(
-            payload=[
-                {"KV": {"Verb": "delete", "Key": escaped_jupyterhub_routespec}},
-                {"KV": {"Verb": "delete", "Key": escaped_target}},
-                {"KV": {"Verb": "delete", "Key": route_keys.backend_url_path}},
-                {"KV": {"Verb": "delete", "Key": route_keys.backend_weight_path}},
-                {"KV": {"Verb": "delete", "Key": route_keys.frontend_backend_path}},
-                {"KV": {"Verb": "delete", "Key": route_keys.frontend_rule_path}},
-            ]
-        )
+        try:
+            status, response = await self.kv_client.txn.put(
+                payload=[
+                    {"KV": {"Verb": "delete", "Key": escaped_jupyterhub_routespec}},
+                    {"KV": {"Verb": "delete", "Key": escaped_target}},
+                    {"KV": {"Verb": "delete", "Key": route_keys.backend_url_path}},
+                    {"KV": {"Verb": "delete", "Key": route_keys.backend_weight_path}},
+                    {"KV": {"Verb": "delete", "Key": route_keys.frontend_backend_path}},
+                    {"KV": {"Verb": "delete", "Key": route_keys.frontend_rule_path}},
+                ]
+            )
+            status = 1
+            response = ""
+        except Exception as e:
+            status = 0
+            response = str(e)
+
         return status, response
 
     async def _kv_get_target(self, jupyterhub_routespec):

@@ -33,9 +33,14 @@ from jupyterhub_traefik_proxy import TraefikProxy
 
 
 class TKvProxy(TraefikProxy):
-    """JupyterHub Proxy implementation using traefik and a key value store"""
+    """
+    JupyterHub Proxy implementation using traefik and a key-value store.
+    Custom proxy implementations based on trafik and a key-value store
+    can sublass :class:`TKvProxy`.
+    """
 
     kv_client = Any()
+    # Key-value store client
 
     kv_name = Unicode(config=False, help="""The name of the key value store""")
 
@@ -58,26 +63,125 @@ class TKvProxy(TraefikProxy):
     )
 
     def _define_kv_specific_static_config(self):
+        """Define the traefik static configuration that configures
+        traefik's communication with the key-value store.
+
+        Will be called during startup if should_start is True.
+
+        **Subclasses must define this method**
+        if the proxy is to be started by the Hub.
+
+        In order to be picked up by the proxy, the static configuration
+        must be stored into `proxy.static_config` dict under the `kv_name` key.
+        """
         raise NotImplementedError()
 
     async def _kv_atomic_add_route_parts(
         self, jupyterhub_routespec, target, data, route_keys, rule
     ):
+        """Add the key-value pairs associated with a route within a
+        key-value store transaction.
+
+        **Subclasses must define this method**
+
+        Will be called during add_route.
+
+        When retrieving or deleting a route, the parts of a route
+        are expected to have the following structure:
+        [ key: jupyterhub_routespec            , value: target ]
+        [ key: target                          , value: data   ]
+        [ key: route_keys.backend_url_path     , value: target ]
+        [ key: route_keys.frontend_rule_path   , value: rule   ]
+        [ key: route_keys.frontend_backend_path, value:
+                                       route_keys.backend_alias]
+        [ key: route_keys.backend_weight_path  , value: w(int) ]
+            (where `w` is the weight of the backend to be used during load balancing)
+
+        Returns:
+            result (tuple):
+                'status'(int): The transaction status
+                    (0: failure, positive: success)
+                'response'(str): The transaction response
+        """
         raise NotImplementedError()
 
     async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
+        """Delete the key-value pairs associated with a route within a
+        key-value store transaction (if the route exists).
+
+        **Subclasses must define this method**
+
+        Will be called during delete_route.
+
+        The keys associated with a route are:
+            jupyterhub_routespec,
+            target,
+            route_keys.backend_url_path,
+            route_keys.frontend_rule_path,
+            route_keys.frontend_backend_path,
+            route_keys.backend_weight_path,
+
+        Returns:
+            result (tuple):
+                'status'(int): The transaction status
+                    (0: failure, positive: success).
+                'response'(str): The transaction response.
+        """
         raise NotImplementedError()
 
     async def _kv_get_target(self, jupyterhub_routespec):
+        """Retrive the target from the key-value store.
+        The target is the value associated with `jupyterhub_routespec` key.
+
+        **Subclasses must define this method**
+
+        Returns:
+            target (str): The full URL associated with this route.
+        """
         raise NotImplementedError()
 
     async def _kv_get_data(self, target):
+        """Retrive the data associated with the `target` from the key-value store.
+
+        **Subclasses must define this method**
+
+        Returns:
+            data (dict): A JSONable dict that holds extra info about the route
+        """
         raise NotImplementedError()
 
     async def _kv_get_route_parts(self, kv_entry):
+        """Retrive all the parts that make up a route (i.e. routespec, target, data)
+        from the key-value store given a `kv_entry`.
+
+        A `kv_entry` is a key-value store entry where the key starts with
+        `proxy.jupyterhub_prefix`. It is expected that only the routespecs
+        will be prefixed with `proxy.jupyterhub_prefix` when added to the kv store.
+
+        **Subclasses must define this method**
+
+        Returns:
+            'routespec': The normalized route specification passed in to add_route
+                ([host]/path/)
+            'target': The target host for this route (proto://host)
+            'data': The arbitrary data dict that was passed in by JupyterHub when adding this
+                route.
+        """
         raise NotImplementedError()
 
     async def _kv_get_jupyterhub_prefixed_entries(self):
+        """Retrive from the kv store all the key-value pairs where the key starts with
+        `proxy.jupyterhub_prefix`.
+        It is expected that only the routespecs will be prefixed with `proxy.jupyterhub_prefix`
+        when added to the kv store.
+
+        **Subclasses must define this method**
+
+        Returns:
+            'routes': A list of key-value store entries where the keys start
+                with `proxy.jupyterhub_prefix`.
+        """
+
         raise NotImplementedError()
 
     def _clean_resources(self):
@@ -115,31 +219,20 @@ class TKvProxy(TraefikProxy):
 
     async def start(self):
         """Start the proxy.
-
         Will be called during startup if should_start is True.
-
-        **Subclasses must define this method**
-        if the proxy is to be started by the Hub
         """
-        # TODO: investigate deploying a traefik cluster instead of a single instance!
         await super().start()
         await self._wait_for_static_config(provider=self.kv_name)
 
     async def stop(self):
         """Stop the proxy.
-
         Will be called during teardown if should_start is True.
-
-        **Subclasses must define this method**
-        if the proxy is to be started by the Hub
         """
         await super().stop()
         self._clean_resources()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
-
-        **Subclasses must define this method**
 
         Args:
             routespec (str): A URL prefix ([host]/path/) for which this route will be matched,
@@ -151,8 +244,9 @@ class TKvProxy(TraefikProxy):
         Will raise an appropriate Exception (FIXME: find what?) if the route could
         not be added.
 
-        The proxy implementation should also have a way to associate the fact that a
-        route came from JupyterHub.
+        This proxy implementation prefixes the routespec with `proxy.jupyterhub_prefix` when
+        adding it to the kv store in orde to associate the fact that the route came from JupyterHub.
+        Everything traefik related is prefixed with `proxy.traefik_prefix`.
         """
         self.log.info("Adding route for %s to %s.", routespec, target)
 
@@ -198,9 +292,8 @@ class TKvProxy(TraefikProxy):
         await self._wait_for_route(routespec, provider=self.kv_name)
 
     async def delete_route(self, routespec):
-        """Delete a route with a given routespec if it exists.
-
-        **Subclasses must define this method**
+        """Delete a route and all the traefik related info associated given a routespec,
+        (if it exists).
         """
         routespec = self.validate_routespec(routespec)
         jupyterhub_routespec = self.kv_jupyterhub_prefix + routespec
@@ -221,9 +314,7 @@ class TKvProxy(TraefikProxy):
         """Fetch and return all the routes associated by JupyterHub from the
         proxy.
 
-        **Subclasses must define this method**
-
-        Should return a dictionary of routes, where the keys are
+        Returns a dictionary of routes, where the keys are
         routespecs and each value is a dict of the form::
 
           {
