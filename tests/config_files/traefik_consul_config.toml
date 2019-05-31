@@ -20,5 +20,5 @@ users = [ "api_admin:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
 
 [consul]
 endpoint = "127.0.0.1:8500"
-prefix = "/traefik/"
+prefix = "traefik/"
 watch = true

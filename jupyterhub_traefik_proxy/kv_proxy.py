@@ -18,16 +18,11 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-from concurrent.futures import ThreadPoolExecutor
 import json
 import os
-from urllib.parse import urlparse
 
-import etcd3
-from tornado.concurrent import run_on_executor
-from traitlets import Any, default, Unicode
+from traitlets import Any, Unicode
 
-from jupyterhub.utils import maybe_future
 from . import traefik_utils
 from jupyterhub_traefik_proxy import TraefikProxy
 
@@ -55,11 +50,11 @@ class TKvProxy(TraefikProxy):
     kv_url = Unicode(config=True, help="""The URL of the key value store server""")
 
     kv_traefik_prefix = Unicode(
-        config=True, help="""The etcd key prefix for traefik static configuration"""
+        config=True, help="""The key value store key prefix for traefik static configuration"""
     )
 
     kv_jupyterhub_prefix = Unicode(
-        config=True, help="""The etcd key prefix for traefik dynamic configuration"""
+        config=True, help="""The key value store key prefix for traefik dynamic configuration"""
     )
 
     def _define_kv_specific_static_config(self):
