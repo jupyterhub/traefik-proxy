@@ -23,6 +23,11 @@ checksums_etcd = {
     "https://github.com/etcd-io/etcd/releases/download/v3.2.25/etcd-v3.3.10-darwin-amd64.tar.gz": "9950684a01d7431bc12c3dba014f222d55a862c6f8af64c09c42d7a59ed6790d",
 }
 
+checksums_consul = {
+    "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_linux_amd64.zip": "1399064050019db05d3378f757e058ec4426a917dd2d240336b51532065880b6",
+    "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_darwin_amd64.zip": "b4033ea6871fe6136ee5d940c834be2248463c3ec248dc22370e6d5360931325",
+}
+
 
 def checksum_file(path):
     """Compute the sha256 checksum of a path"""
@@ -153,6 +158,70 @@ def install_etcd(prefix, plat, etcd_version):
     print("--- Done ---")
 
 
+def install_consul(prefix, plat, consul_version):
+    plat = plat.replace("-", "_")
+    consul_downloaded_dir_name = f"consul_v{consul_version}_{plat}"
+    consul_archive_extension = ".tar.gz"
+    consul_archive_extension = "zip"
+
+    consul_downloaded_archive = os.path.join(
+        prefix, consul_downloaded_dir_name + "." + consul_archive_extension
+    )
+    consul_binaries = os.path.join(prefix, "consul_binaries")
+
+    consul_bin = os.path.join(prefix, "consul")
+
+    consul_url = (
+        "https://releases.hashicorp.com/consul/"
+        f"{consul_version}/consul_{consul_version}_{plat}.{consul_archive_extension}"
+    )
+
+    if os.path.exists(consul_bin):
+        print(f"Consul already exists")
+        if consul_url not in checksums_consul:
+            warnings.warn(
+                "Couldn't verify checksum for consul_v{consul_version}_{plat}."
+            )
+            os.chmod(consul_bin, 0o755)
+            print("--- Done ---")
+            return
+        else:
+            checksum_consul_archive = checksum_file(consul_downloaded_archive)
+            if checksum_consul_archive == checksums_consul[consul_url]:
+                os.chmod(consul_bin, 0o755)
+                print("--- Done ---")
+                return
+            else:
+                print(f"checksum mismatch on consul")
+                os.remove(consul_bin)
+                os.remove(consul_downloaded_archive)
+
+    if not os.path.exists(consul_downloaded_archive):
+        print(f"Downloading {consul_downloaded_dir_name} archive...")
+        urlretrieve(consul_url, consul_downloaded_archive)
+    else:
+        print(f"Archive {consul_downloaded_dir_name} already exists")
+
+    with zipfile.ZipFile(consul_downloaded_archive, "r") as zip_ref:
+        zip_ref.extract("consul", consul_binaries)
+
+    shutil.copy(os.path.join(consul_binaries, "consul"), consul_bin)
+
+    if consul_url in checksums_consul:
+        checksum_consul_archive = checksum_file(consul_downloaded_archive)
+        if checksum_consul_archive != checksums_consul[consul_url]:
+            raise IOError("Checksum failed")
+    else:
+        warnings.warn("Couldn't verify checksum for consul_v{consul_version}_{plat}.")
+
+    os.chmod(consul_bin, 0o755)
+
+    # Cleanup
+    shutil.rmtree(consul_binaries)
+
+    print("--- Done ---")
+
+
 def main():
 
     parser = argparse.ArgumentParser(
@@ -170,6 +239,9 @@ def main():
                 - v3.3.10-darwin-amd64
                 - v3.2.25-linux-amd64
                 - v3.2.25-darwin-amd64
+            - consul:
+                - v1.5.0_linux_amd64
+                - v1.5.0_darwin_amd64
             """
         ),
         formatter_class=argparse.RawTextHelpFormatter,
@@ -230,11 +302,25 @@ def main():
         ),
     )
 
+    parser.add_argument(
+        "--consul-version",
+        dest="consul_version",
+        default="1.5.0",
+        help=textwrap.dedent(
+            """\
+            The version of consul to download.
+            If no version is provided, it defaults to:
+            --- %(default)s ---
+            """
+        ),
+    )
+
     args = parser.parse_args()
     deps_dir = args.installation_dir
     plat = args.plat
     traefik_version = args.traefik_version
     etcd_version = args.etcd_version
+    consul_version = args.consul_version
 
     if os.path.exists(deps_dir):
         print(f"Dependencies directory already exists.")
@@ -244,6 +330,7 @@ def main():
 
     install_traefik(deps_dir, plat, traefik_version)
     install_etcd(deps_dir, plat, etcd_version)
+    install_consul(deps_dir, plat, consul_version)
 
 
 if __name__ == "__main__":

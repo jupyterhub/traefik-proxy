@@ -1,5 +1,7 @@
 jupyterhub>=0.9
 etcd3
+aiohttp
+python-consul
 passlib
 toml
 escapism

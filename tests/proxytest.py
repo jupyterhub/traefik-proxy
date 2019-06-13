@@ -67,6 +67,7 @@ class MockUser(User):
     def __init__(self, name):
         orm_user = Mock()
         orm_user.name = name
+        orm_user.orm_spawners = ""
         super().__init__(orm_user=orm_user, db=Mock())
 
     def _new_spawner(self, spawner_name, **kwargs):

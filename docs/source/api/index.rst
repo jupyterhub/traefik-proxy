@@ -15,14 +15,26 @@ Module: :mod:`jupyterhub_traefik_proxy`
 .. autoconfigurable:: TraefikProxy
     :members:
 
+:class:`TraefikTomlProxy`
+-------------------------
+
+.. autoconfigurable:: TraefikTomlProxy
+    :members:
+
+:class:`TKvProxy`
+-----------------
+
+.. autoconfigurable:: TKvProxy
+    :members:
+
 :class:`TraefikEtcdProxy`
 -------------------------
 
 .. autoconfigurable:: TraefikEtcdProxy
     :members:
 
-:class:`TraefikTomlProxy`
--------------------------
+:class:`TraefikConsulProxy`
+---------------------------
 
-.. autoconfigurable:: TraefikTomlProxy
+.. autoconfigurable:: TraefikConsulProxy
     :members:

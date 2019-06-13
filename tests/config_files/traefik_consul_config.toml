@@ -9,10 +9,6 @@ entrypoint = "auth_api"
 [wss]
 protocol = "http"
 
-[file]
-filename = "./tests/toml_files/rules.toml"
-watch = true
-
 [entryPoints.http]
 address = "127.0.0.1:8000"
 
@@ -21,3 +17,8 @@ address = "127.0.0.1:8099"
 
 [entryPoints.auth_api.auth.basic]
 users = [ "api_admin:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
+
+[consul]
+endpoint = "127.0.0.1:8500"
+prefix = "traefik/"
+watch = true

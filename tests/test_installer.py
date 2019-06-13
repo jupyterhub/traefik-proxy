@@ -16,10 +16,12 @@ def assert_binaries_existence(deps_dir):
     traefik_bin = os.path.join(deps_dir, "traefik")
     etcd_bin = os.path.join(deps_dir, "etcd")
     etcdctl_bin = os.path.join(deps_dir, "etcdctl")
+    consul_bin = os.path.join(deps_dir, "consul")
 
     assert os.path.exists(traefik_bin)
     assert os.path.exists(etcd_bin)
     assert os.path.exists(etcdctl_bin)
+    assert os.path.exists(consul_bin)
 
 
 def test_default_conf():
@@ -58,6 +60,7 @@ def test_version(tmpdir):
             f"--output={deps_dir}",
             "--traefik-version=1.7.0",
             "--etcd-version=3.2.25",
+            "--consul-version=1.5.0",
         ]
     )
 

@@ -178,11 +178,7 @@ class TraefikProxy(Proxy):
         self.traefik_process.wait()
 
     def _launch_traefik(self, config_type):
-        if config_type == "etcd" and not self.etcd_password:
-            self.traefik_process = Popen(
-                ["traefik", "--etcd", "--etcd.useapiv3=true"], stdout=None
-            )
-        elif config_type == "toml" or config_type == "etcd":
+        if config_type == "toml" or config_type == "etcdv3" or config_type == "consul":
             config_file_path = abspath(join(dirname(__file__), "traefik.toml"))
             self.traefik_process = Popen(
                 ["traefik", "-c", config_file_path], stdout=None
