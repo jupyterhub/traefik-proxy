@@ -8,6 +8,7 @@ import numpy as np
 
 from jupyterhub.tests.mocking import MockHub
 from jupyterhub.proxy import ConfigurableHTTPProxy
+from jupyterhub_traefik_proxy import TraefikConsulProxy
 from jupyterhub_traefik_proxy import TraefikEtcdProxy
 from jupyterhub_traefik_proxy import TraefikTomlProxy
 
@@ -79,6 +80,7 @@ def configure_argument_parser():
             Available proxies:
             -TomlProxy
             -EtcdProxy
+            -ConsulProxy
             -CHP
             If no proxy is provided, it defaults to:
             --- %(default)s ---
@@ -171,6 +173,21 @@ def measure_time(print_message, stdout_print, time_taken):
     time_taken["real"] = real_time
 
 
+async def no_auth_consul_proxy():
+    """
+    Function returning a configured TraefikEtcdProxy.
+    No etcd authentication.
+    """
+    proxy = TraefikConsulProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="admin",
+        should_start=True,
+    )
+    await proxy.start()
+    return proxy
+
+
 async def no_auth_etcd_proxy():
     """
     Function returning a configured TraefikEtcdProxy.
@@ -222,6 +239,8 @@ async def get_proxy(proxy_class):
         proxy = await toml_proxy()
     elif proxy_class == "EtcdProxy":
         proxy = await no_auth_etcd_proxy()
+    elif proxy_class == "ConsulProxy":
+        proxy = await no_auth_consul_proxy()
     elif proxy_class == "CHP":
         proxy = await configurable_http_proxy()
     else:
