@@ -46,6 +46,10 @@ class TraefikProxy(Proxy):
         help="""traefik authenticated api endpoint url""",
     )
 
+    traefik_log_level = Unicode(
+        "ERROR", config=True, help="""traefik's log level"""
+    )
+
     traefik_api_password = Unicode(
         config=True, help="""The password for traefik api login"""
     )
@@ -196,7 +200,7 @@ class TraefikProxy(Proxy):
         self.static_config = {}
         self.static_config["defaultentrypoints"] = ["http"]
         self.static_config["debug"] = True
-        self.static_config["logLevel"] = "ERROR"
+        self.static_config["logLevel"] = self.traefik_log_level
         entryPoints = {}
         entryPoints["http"] = {"address": ":" + str(urlparse(self.public_url).port)}
         auth = {
