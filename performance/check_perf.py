@@ -180,7 +180,7 @@ async def make_ws_small_req(proxy, routespec):
 
 async def measure_proxy_throughput(
     proxy_class,
-    requests_no,
+    total_requests_number,
     concurrent_no,
     proto,
     request_size,
@@ -188,7 +188,7 @@ async def measure_proxy_throughput(
     stdout_print=True,
 ):
     """
-    Makes 'requests_no' GET http/websocket requests
+    Makes 'total_requests_number' GET http/websocket requests
     to the proxy with max 'concurrent_no' concurrent.
 
     Returns the throughput(number of requests/milisec)
@@ -204,11 +204,11 @@ async def measure_proxy_throughput(
 
     time_taken = {}
     with perf_utils.measure_time(
-        f"The {requests_no} {request_size} {proto} reqests with {concurrent_no} running concurrently, took",
+        f"The {total_requests_number} {request_size} {proto} reqests with {concurrent_no} running concurrently, took",
         stdout_print,
         time_taken,
     ):
-        for i in range(requests_no):
+        for i in range(total_requests_number):
             if len(running_tasks) == concurrent_no:
                 # Wait for some task to finish before adding a new one
                 _done, running_tasks = await asyncio.wait(
@@ -223,7 +223,7 @@ async def measure_proxy_throughput(
         res = await asyncio.wait(running_tasks, return_when=asyncio.ALL_COMPLETED)
     real_time = time_taken["real"]
 
-    throughput = requests_no / real_time
+    throughput = total_requests_number / real_time
     print(
         f"{concurrent_no} concurrent requests: throughput = {throughput:.3f} requests/s\n"
     )
@@ -242,10 +242,10 @@ def main():
     proxy_class = args.proxy_class
     routes_number = int(args.routes_number)
     concurrent_requests_number = int(args.concurrent_requests_number)
+    total_requests_number = int(args.total_requests_number)
     csv_filename = args.csv_filename
     backend_port = args.backend_port
     test_iterations = int(args.test_iterations)
-    requests_no = 1000
 
     loop = asyncio.get_event_loop()
     if not csv:
@@ -284,63 +284,73 @@ def main():
     else:
         print(f"Started measuring {metric}")
         print(
-            f"Running {requests_no} requests with up to {concurrent_requests_number} concurrent...\n"
+            f"Running {total_requests_number} requests with up to {concurrent_requests_number} concurrent...\n"
         )
         if metric == "http_throughput_small":
             result = {}
-            for concurrent_req in range(1, concurrent_requests_number):
-                result[concurrent_req] = loop.run_until_complete(
-                    measure_proxy_throughput(
-                        proxy_class,
-                        requests_no,
-                        concurrent_req,
-                        "http",
-                        "small",
-                        backend_port,
-                        not csv_filename,
+            for i in range(test_iterations):
+                result[i] = {}
+                for concurrent_req in range(1, concurrent_requests_number + 1):
+                    result[i][concurrent_req] = loop.run_until_complete(
+                        measure_proxy_throughput(
+                            proxy_class,
+                            total_requests_number,
+                            concurrent_req,
+                            "http",
+                            "small",
+                            backend_port,
+                            not csv_filename,
+                        )
                     )
-                )
-            print("Request throughput small requests: " + str(result))
+            print("Request throughput small http requests: " + str(result))
         elif metric == "http_throughput_large":
             result = {}
-            for concurrent_req in range(1, concurrent_requests_number):
-                result[concurrent_req] = loop.run_until_complete(
-                    measure_proxy_throughput(
-                        proxy_class,
-                        requests_no,
-                        concurrent_req,
-                        "http",
-                        "large",
-                        backend_port,
-                        not csv_filename,
+            for i in range(test_iterations):
+                result[i] = {}
+                for concurrent_req in range(1, concurrent_requests_number + 1):
+                    result[i][concurrent_req] = loop.run_until_complete(
+                        measure_proxy_throughput(
+                            proxy_class,
+                            total_requests_number,
+                            concurrent_req,
+                            "http",
+                            "large",
+                            backend_port,
+                            not csv_filename,
+                        )
                     )
-                )
-            print("Request throughput large requests: " + str(result))
+            print("Request throughput large http requests: " + str(result))
         elif metric == "ws_throughput":
             result = {}
-            for concurrent_req in range(1, concurrent_requests_number):
-                result[concurrent_req] = loop.run_until_complete(
-                    measure_proxy_throughput(
-                        proxy_class,
-                        requests_no,
-                        concurrent_req,
-                        "ws",
-                        "small",
-                        backend_port,
-                        not csv_filename,
+            for i in range(test_iterations):
+                result[i] = {}
+                for concurrent_req in range(1, concurrent_requests_number + 1):
+                    result[i][concurrent_req] = loop.run_until_complete(
+                        measure_proxy_throughput(
+                            proxy_class,
+                            total_requests_number,
+                            concurrent_req,
+                            "ws",
+                            "small",
+                            backend_port,
+                            not csv_filename,
+                        )
                     )
-                )
+            print("Request throughput ws requests: " + str(result))
         if csv_filename:
             with open(csv_filename, mode="a+") as csv_file:
-                fieldnames = [i for i in range(1, concurrent_requests_number)]
+                fieldnames = [i for i in range(1, concurrent_requests_number + 1)]
+                print(concurrent_requests_number)
+                fieldnames.insert(0, "TestID")
                 fieldnames.insert(0, "Proxy")
                 writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-                result["Proxy"] = proxy_class
                 if os.stat(csv_filename).st_size == 0:
                     writer.writeheader()
-                writer.writerow(result)
+                for i in range(test_iterations):
+                    result[i]["Proxy"] = proxy_class
+                    result[i]["TestID"] = i
+                    writer.writerow(result[i])
 
 
 if __name__ == "__main__":
     main()
-    # cProfile.run('main()', 'etcd_restats_sequentially')

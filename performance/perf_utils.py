@@ -115,9 +115,22 @@ def configure_argument_parser():
     )
 
     parser.add_argument(
+        "--total_requests_number",
+        dest="total_requests_number",
+        default=1000,
+        help=textwrap.dedent(
+            """\
+            Total number of requests when computing the throughput.
+            If no number is provided, it defaults to:
+            --- %(default)s ---
+            """
+        ),
+    )
+
+    parser.add_argument(
         "--iterations",
         dest="test_iterations",
-        default=5,
+        default=1,
         help=textwrap.dedent(
             """
             How many times to run the measurement.
