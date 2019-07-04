@@ -73,7 +73,7 @@ setup(
     cmdclass=cmdclass,
     entry_points={
         "jupyterhub.proxies": [
-            "traefik_consul = jupyterhub_consul_proxy:TraefikConsulProxy",
+            "traefik_consul = jupyterhub_traefik_proxy:TraefikConsulProxy",
             "traefik_etcd = jupyterhub_traefik_proxy:TraefikEtcdProxy",
             "traefik_toml = jupyterhub_traefik_proxy:TraefikTomlProxy",
         ]
