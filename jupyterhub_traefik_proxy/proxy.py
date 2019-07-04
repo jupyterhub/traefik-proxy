@@ -46,9 +46,7 @@ class TraefikProxy(Proxy):
         help="""traefik authenticated api endpoint url""",
     )
 
-    traefik_log_level = Unicode(
-        "ERROR", config=True, help="""traefik's log level"""
-    )
+    traefik_log_level = Unicode("ERROR", config=True, help="""traefik's log level""")
 
     traefik_api_password = Unicode(
         config=True, help="""The password for traefik api login"""
