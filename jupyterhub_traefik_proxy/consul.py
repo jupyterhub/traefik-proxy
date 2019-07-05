@@ -224,3 +224,7 @@ class TraefikConsulProxy(TKvProxy):
         )
 
         return routes["Results"]
+
+    async def stop(self):
+        await super().stop()
+        await self.kv_client.http._session.close()

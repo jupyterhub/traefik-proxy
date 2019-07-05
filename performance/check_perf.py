@@ -106,9 +106,7 @@ async def run_methods_concurrent(method, proxy, routes_number, stdout_print):
 async def run_methods_sequentially(method, proxy, routes_number, stdout_print):
     res = {}
     with perf_utils.measure_time(
-        f"Running {method.__name__} for {routes_number} total routes, took",
-        True,
-        {},
+        f"Running {method.__name__} for {routes_number} total routes, took", True, {}
     ):
         for route_idx in range(routes_number):
             _, t = await method(proxy, route_idx, stdout_print)
@@ -258,7 +256,9 @@ def main():
                 mode = "concurrent"
             else:
                 mode = "sequentially"
-            print(f"Starting {metric} {mode} measurement number {i} for {proxy_class} ...\n")
+            print(
+                f"Starting {metric} {mode} measurement number {i} for {proxy_class} ...\n"
+            )
             results[i] = loop.run_until_complete(
                 measure_methods_performance(
                     concurrent, proxy_class, routes_number, csv_filename is None
