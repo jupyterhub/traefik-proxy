@@ -37,6 +37,13 @@ class TKvProxy(TraefikProxy):
     kv_client = Any()
     # Key-value store client
 
+    kv_client_ca_cert = Unicode(
+        config=True,
+        allow_none=True,
+        default_value=None,
+        help="""Key value store client certificate""",
+    )
+
     kv_name = Unicode(config=False, help="""The name of the key value store""")
 
     kv_username = Unicode(

@@ -39,13 +39,26 @@ class TraefikEtcdProxy(TKvProxy):
 
     kv_name = "etcdv3"
 
+    etcd_client_cert_crt = Unicode(
+        config=True,
+        allow_none=True,
+        default_value=None,
+        help="""Key value store client private key to the certificate""",
+    )
+    etcd_client_cert_key = Unicode(
+        config=True,
+        allow_none=True,
+        default_value=None,
+        help="""Key value store client signed certificate""",
+    )
+
     @default("executor")
     def _default_executor(self):
         return ThreadPoolExecutor(1)
 
     @default("kv_url")
     def _default_kv_url(self):
-        return "http://127.0.0.1:2379"
+        return "https://127.0.0.1:2379"
 
     @default("kv_client")
     def _default_client(self):
@@ -56,6 +69,9 @@ class TraefikEtcdProxy(TKvProxy):
                 port=etcd_service.port,
                 user=self.kv_username,
                 password=self.kv_password,
+                ca_cert=self.kv_client_ca_cert,
+                cert_cert=self.etcd_client_cert_crt,
+                cert_key=self.etcd_client_cert_key,
             )
         return etcd3.client(host=str(etcd_service.hostname), port=etcd_service.port)
 

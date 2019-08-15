@@ -55,6 +55,7 @@ class TraefikConsulProxy(TKvProxy):
                 host=str(consul_service.hostname),
                 port=consul_service.port,
                 token=self.kv_password,
+                cert=self.kv_client_ca_cert,
             )
             client.http._session._default_headers.update(
                 {"X-Consul-Token": self.kv_password}
