@@ -43,13 +43,15 @@ class TraefikEtcdProxy(TKvProxy):
         config=True,
         allow_none=True,
         default_value=None,
-        help="""Key value store client private key to the certificate""",
+        help="""Key value store client certificate
+            (etcd_client_cert_key must also be specified)""",
     )
     etcd_client_cert_key = Unicode(
         config=True,
         allow_none=True,
         default_value=None,
-        help="""Key value store client signed certificate""",
+        help="""Key value store client key to the certificate
+            (etcd_client_cert_crt must also be specified)""",
     )
 
     @default("executor")
