@@ -62,7 +62,9 @@ class TraefikConsulProxy(TKvProxy):
             )
             return client
         return consul.aio.Consul(
-            host=str(consul_service.hostname), port=consul_service.port
+            host=str(consul_service.hostname),
+            port=consul_service.port,
+            cert=self.kv_client_ca_cert,
         )
 
     @default("kv_traefik_prefix")

@@ -58,7 +58,7 @@ class TraefikEtcdProxy(TKvProxy):
 
     @default("kv_url")
     def _default_kv_url(self):
-        return "https://127.0.0.1:2379"
+        return "http://127.0.0.1:2379"
 
     @default("kv_client")
     def _default_client(self):
@@ -73,7 +73,13 @@ class TraefikEtcdProxy(TKvProxy):
                 cert_cert=self.etcd_client_cert_crt,
                 cert_key=self.etcd_client_cert_key,
             )
-        return etcd3.client(host=str(etcd_service.hostname), port=etcd_service.port)
+        return etcd3.client(
+            host=str(etcd_service.hostname),
+            port=etcd_service.port,
+            ca_cert=self.kv_client_ca_cert,
+            cert_cert=self.etcd_client_cert_crt,
+            cert_key=self.etcd_client_cert_key,
+        )
 
     @default("kv_traefik_prefix")
     def _default_kv_traefik_prefix(self):
