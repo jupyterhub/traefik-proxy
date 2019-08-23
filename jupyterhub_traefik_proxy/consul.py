@@ -43,6 +43,13 @@ class TraefikConsulProxy(TKvProxy):
 
     kv_name = "consul"
 
+    consul_client_ca_cert = Unicode(
+        config=True,
+        allow_none=True,
+        default_value=None,
+        help="""Consul client root certificates""",
+    )
+
     @default("kv_url")
     def _default_kv_url(self):
         return "http://127.0.0.1:8500"
@@ -55,13 +62,16 @@ class TraefikConsulProxy(TKvProxy):
                 host=str(consul_service.hostname),
                 port=consul_service.port,
                 token=self.kv_password,
+                cert=self.consul_client_ca_cert,
             )
             client.http._session._default_headers.update(
                 {"X-Consul-Token": self.kv_password}
             )
             return client
         return consul.aio.Consul(
-            host=str(consul_service.hostname), port=consul_service.port
+            host=str(consul_service.hostname),
+            port=consul_service.port,
+            cert=self.consul_client_ca_cert,
         )
 
     @default("kv_traefik_prefix")

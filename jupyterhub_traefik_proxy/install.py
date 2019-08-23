@@ -50,7 +50,8 @@ def install_traefik(prefix, plat, traefik_version):
         print(f"Traefik already exists")
         if traefik_url not in checksums_traefik:
             warnings.warn(
-                f"Couldn't verify checksum for traefik-v{traefik_version}-{plat}", stacklevel=2
+                f"Couldn't verify checksum for traefik-v{traefik_version}-{plat}",
+                stacklevel=2,
             )
             os.chmod(traefik_bin, 0o755)
             print("--- Done ---")
@@ -73,7 +74,10 @@ def install_traefik(prefix, plat, traefik_version):
         if checksum != checksums_traefik[traefik_url]:
             raise IOError("Checksum failed")
     else:
-        warnings.warn(f"Couldn't verify checksum for traefik-v{traefik_version}-{plat}", stacklevel=2)
+        warnings.warn(
+            f"Couldn't verify checksum for traefik-v{traefik_version}-{plat}",
+            stacklevel=2,
+        )
 
     os.chmod(traefik_bin, 0o755)
 
@@ -103,7 +107,10 @@ def install_etcd(prefix, plat, etcd_version):
     if os.path.exists(etcd_bin) and os.path.exists(etcdctl_bin):
         print(f"Etcd and etcdctl already exist")
         if etcd_url not in checksums_etcd:
-            warnings.warn(f"Couldn't verify checksum for etcd-v{etcd_version}-{plat}", stacklevel=2)
+            warnings.warn(
+                f"Couldn't verify checksum for etcd-v{etcd_version}-{plat}",
+                stacklevel=2,
+            )
             os.chmod(etcd_bin, 0o755)
             os.chmod(etcdctl_bin, 0o755)
             print("--- Done ---")
@@ -147,7 +154,9 @@ def install_etcd(prefix, plat, etcd_version):
         if checksum_etcd_archive != checksums_etcd[etcd_url]:
             raise IOError("Checksum failed")
     else:
-        warnings.warn(f"Couldn't verify checksum for etcd-v{etcd_version}-{plat}", stacklevel=2)
+        warnings.warn(
+            f"Couldn't verify checksum for etcd-v{etcd_version}-{plat}", stacklevel=2
+        )
 
     os.chmod(etcd_bin, 0o755)
     os.chmod(etcdctl_bin, 0o755)
@@ -180,7 +189,8 @@ def install_consul(prefix, plat, consul_version):
         print(f"Consul already exists")
         if consul_url not in checksums_consul:
             warnings.warn(
-                f"Couldn't verify checksum for consul_v{consul_version}_{plat}", stacklevel=2
+                f"Couldn't verify checksum for consul_v{consul_version}_{plat}",
+                stacklevel=2,
             )
             os.chmod(consul_bin, 0o755)
             print("--- Done ---")
@@ -212,7 +222,10 @@ def install_consul(prefix, plat, consul_version):
         if checksum_consul_archive != checksums_consul[consul_url]:
             raise IOError("Checksum failed")
     else:
-        warnings.warn(f"Couldn't verify checksum for consul_v{consul_version}_{plat}", stacklevel=2)
+        warnings.warn(
+            f"Couldn't verify checksum for consul_v{consul_version}_{plat}",
+            stacklevel=2,
+        )
 
     os.chmod(consul_bin, 0o755)
 

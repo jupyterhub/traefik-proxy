@@ -39,6 +39,29 @@ class TraefikEtcdProxy(TKvProxy):
 
     kv_name = "etcdv3"
 
+    etcd_client_ca_cert = Unicode(
+        config=True,
+        allow_none=True,
+        default_value=None,
+        help="""Etcd client root certificates""",
+    )
+
+    etcd_client_cert_crt = Unicode(
+        config=True,
+        allow_none=True,
+        default_value=None,
+        help="""Etcd client certificate chain
+            (etcd_client_cert_key must also be specified)""",
+    )
+
+    etcd_client_cert_key = Unicode(
+        config=True,
+        allow_none=True,
+        default_value=None,
+        help="""Etcd client private key
+            (etcd_client_cert_crt must also be specified)""",
+    )
+
     @default("executor")
     def _default_executor(self):
         return ThreadPoolExecutor(1)
@@ -56,8 +79,17 @@ class TraefikEtcdProxy(TKvProxy):
                 port=etcd_service.port,
                 user=self.kv_username,
                 password=self.kv_password,
+                ca_cert=self.etcd_client_ca_cert,
+                cert_cert=self.etcd_client_cert_crt,
+                cert_key=self.etcd_client_cert_key,
             )
-        return etcd3.client(host=str(etcd_service.hostname), port=etcd_service.port)
+        return etcd3.client(
+            host=str(etcd_service.hostname),
+            port=etcd_service.port,
+            ca_cert=self.etcd_client_ca_cert,
+            cert_cert=self.etcd_client_cert_crt,
+            cert_key=self.etcd_client_cert_key,
+        )
 
     @default("kv_traefik_prefix")
     def _default_kv_traefik_prefix(self):
