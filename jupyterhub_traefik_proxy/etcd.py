@@ -39,18 +39,26 @@ class TraefikEtcdProxy(TKvProxy):
 
     kv_name = "etcdv3"
 
+    etcd_client_ca_cert = Unicode(
+        config=True,
+        allow_none=True,
+        default_value=None,
+        help="""Etcd client root certificates""",
+    )
+
     etcd_client_cert_crt = Unicode(
         config=True,
         allow_none=True,
         default_value=None,
-        help="""Key value store client certificate
+        help="""Etcd client certificate chain
             (etcd_client_cert_key must also be specified)""",
     )
+
     etcd_client_cert_key = Unicode(
         config=True,
         allow_none=True,
         default_value=None,
-        help="""Key value store client key to the certificate
+        help="""Etcd client private key
             (etcd_client_cert_crt must also be specified)""",
     )
 
