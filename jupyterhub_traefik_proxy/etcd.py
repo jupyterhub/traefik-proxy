@@ -79,14 +79,14 @@ class TraefikEtcdProxy(TKvProxy):
                 port=etcd_service.port,
                 user=self.kv_username,
                 password=self.kv_password,
-                ca_cert=self.kv_client_ca_cert,
+                ca_cert=self.etcd_client_ca_cert,
                 cert_cert=self.etcd_client_cert_crt,
                 cert_key=self.etcd_client_cert_key,
             )
         return etcd3.client(
             host=str(etcd_service.hostname),
             port=etcd_service.port,
-            ca_cert=self.kv_client_ca_cert,
+            ca_cert=self.etcd_client_ca_cert,
             cert_cert=self.etcd_client_cert_crt,
             cert_key=self.etcd_client_cert_key,
         )
