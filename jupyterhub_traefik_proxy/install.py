@@ -290,6 +290,17 @@ def main():
     )
 
     parser.add_argument(
+        "--traefik",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether or not to install traefik.
+            By default traefik is NOT going to be installed.
+            """
+        ),
+    )
+
+    parser.add_argument(
         "--traefik-version",
         dest="traefik_version",
         default="1.7.5",
@@ -303,6 +314,17 @@ def main():
     )
 
     parser.add_argument(
+        "--etcd",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether or not to install etcd.
+            By default etcd is NOT going to be installed.
+            """
+        ),
+    )
+
+    parser.add_argument(
         "--etcd-version",
         dest="etcd_version",
         default="3.3.10",
@@ -311,6 +333,17 @@ def main():
             The version of etcd to download.
             If no version is provided, it defaults to:
             --- %(default)s ---
+            """
+        ),
+    )
+
+    parser.add_argument(
+        "--consul",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether or not to install consul.
+            By default consul is NOT going to be installed:
             """
         ),
     )
@@ -341,9 +374,12 @@ def main():
         print(f"Creating output directory {deps_dir}...")
         os.makedirs(deps_dir)
 
-    install_traefik(deps_dir, plat, traefik_version)
-    install_etcd(deps_dir, plat, etcd_version)
-    install_consul(deps_dir, plat, consul_version)
+    if args.traefik:
+        install_traefik(deps_dir, plat, traefik_version)
+    if args.etcd:
+        install_etcd(deps_dir, plat, etcd_version)
+    if args.consul:
+        install_consul(deps_dir, plat, consul_version)
 
 
 if __name__ == "__main__":
