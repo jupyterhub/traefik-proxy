@@ -68,6 +68,9 @@ class TraefikTomlProxy(TraefikProxy):
                 os.stat(self.toml_dynamic_config_file)
             except FileNotFoundError:
                 # Make sure that the dynamic configuration file exists
+                self.log.info(
+                    f"Creating the toml dynamic configuration file: {self.toml_dynamic_config_file}"
+                )
                 open(self.toml_dynamic_config_file, "a").close()
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
@@ -183,6 +186,10 @@ class TraefikTomlProxy(TraefikProxy):
             self.routes_cache["backends"][backend_alias] = {
                 "servers": {"server1": {"url": target, "weight": 1}}
             }
+            self.log.info(
+                f"Using TOML configuration file {self.toml_dynamic_config_file} to store the routes."
+                " Make sure it's the same configuration file used by Traefik"
+            )
             traefik_utils.persist_routes(
                 self.toml_dynamic_config_file, self.routes_cache
             )
