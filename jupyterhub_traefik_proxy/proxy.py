@@ -26,7 +26,7 @@ from urllib.parse import urlparse
 from traitlets import Any, Dict, Integer, Unicode, default
 from tornado.httpclient import AsyncHTTPClient
 
-from jupyterhub.utils import exponential_backoff, url_path_join
+from jupyterhub.utils import exponential_backoff, url_path_join, new_token
 from jupyterhub.proxy import Proxy
 from . import traefik_utils
 
@@ -54,9 +54,16 @@ class TraefikProxy(Proxy):
 
     @default("traefik_api_password")
     def _warn_empty_password(self):
+        self.log.warning("Traefik API password was not set.")
+
+        if self.should_start:
+            # Generating tokens is fine if the Hub is starting the proxy
+            self.log.warning("Generating a random token for traefik_api_username...")
+            return new_token()
+
         self.log.warning(
-            "Traefik API password not set."
-            " Set c.TraefikProxy.traefik_api_password to authenticate with traefik."
+            "Please set c.TraefikProxy.traefik_api_password to authenticate with traefik"
+            " if the proxy was not started by the Hub."
         )
         return ""
 
@@ -66,9 +73,15 @@ class TraefikProxy(Proxy):
 
     @default("traefik_api_username")
     def _warn_empty_username(self):
+        self.log.warning("Traefik API username was not set.")
+
+        if self.should_start:
+            self.log.warning('Defaulting traefik_api_username to "jupyterhub"')
+            return "jupyterhub"
+
         self.log.warning(
-            "Traefik API username not set."
-            " Set c.TraefikProxy.traefik_api_username to authenticate with traefik."
+            "Please set c.TraefikProxy.traefik_api_username to authenticate with traefik"
+            " if the proxy was not started by the Hub."
         )
         return ""
 
