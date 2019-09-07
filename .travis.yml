@@ -15,7 +15,7 @@ before_install:
   - pip install --pre -r dev-requirements.txt --upgrade .
   - pip install pytest-cov
 install:
-  - python -m jupyterhub_traefik_proxy.install --output=./bin
+  - python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=./bin
   - export PATH=$PWD/bin:$PATH
   - pip freeze
 
