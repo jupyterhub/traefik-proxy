@@ -186,10 +186,6 @@ class TraefikTomlProxy(TraefikProxy):
             self.routes_cache["backends"][backend_alias] = {
                 "servers": {"server1": {"url": target, "weight": 1}}
             }
-            self.log.info(
-                f"Using TOML configuration file {self.toml_dynamic_config_file} to store the routes."
-                " Make sure it's the same configuration file used by Traefik"
-            )
             traefik_utils.persist_routes(
                 self.toml_dynamic_config_file, self.routes_cache
             )
@@ -203,7 +199,13 @@ class TraefikTomlProxy(TraefikProxy):
                     "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
                 )
                 raise
-        await self._wait_for_route(routespec, provider="file")
+        try:
+            await self._wait_for_route(routespec, provider="file")
+        except TimeoutError:
+            self.log.error(
+                f"Is Traefik configured to watch {self.toml_dynamic_config_file}?"
+            )
+            raise
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
