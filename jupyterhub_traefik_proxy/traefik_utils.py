@@ -1,6 +1,7 @@
 import os
 import string
 from tempfile import NamedTemporaryFile
+from traitlets import Unicode
 from urllib.parse import unquote
 
 import escapism
@@ -10,10 +11,18 @@ from contextlib import contextmanager
 from collections import namedtuple
 
 
-def get_formated_kv_traefik_prefix(prefix):
-    if prefix.endswith("/"):
-        return prefix
-    return prefix + "/"
+class KVStorePrefix(Unicode):
+    def validate(self, obj, value):
+        u = super().validate(obj, value)
+        proxy_class = type(obj).__name__
+        if "Consul" in proxy_class and u.startswith("/"):
+            raise Exception(
+                f"kv_traefik_prefix can't start with a slash (/) for {proxy_class}."
+                " Please choose another kv_traefik_prefix."
+            )
+        if not u.endswith("/"):
+            u = u + "/"
+        return u
 
 
 def generate_rule(routespec):
@@ -39,7 +48,7 @@ def generate_backend_entry(
 ):
     backend_entry = ""
     if separator is "/":
-        backend_entry = get_formated_kv_traefik_prefix(proxy.kv_traefik_prefix)
+        backend_entry = proxy.kv_traefik_prefix
     backend_entry += separator.join(["backends", backend_alias, "servers", "server1"])
     if url is True:
         backend_entry += separator + "url"
@@ -50,12 +59,7 @@ def generate_backend_entry(
 
 
 def generate_frontend_backend_entry(proxy, frontend_alias):
-    return (
-        get_formated_kv_traefik_prefix(proxy.kv_traefik_prefix)
-        + "frontends/"
-        + frontend_alias
-        + "/backend"
-    )
+    return proxy.kv_traefik_prefix + "frontends/" + frontend_alias + "/backend"
 
 
 def generate_frontend_rule_entry(proxy, frontend_alias, separator="/"):
@@ -64,10 +68,7 @@ def generate_frontend_rule_entry(proxy, frontend_alias, separator="/"):
     )
     if separator == "/":
         frontend_rule_entry = (
-            get_formated_kv_traefik_prefix(proxy.kv_traefik_prefix)
-            + frontend_rule_entry
-            + separator
-            + "rule"
+            proxy.kv_traefik_prefix + frontend_rule_entry + separator + "rule"
         )
 
     return frontend_rule_entry
