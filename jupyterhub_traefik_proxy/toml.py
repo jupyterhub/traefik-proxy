@@ -68,6 +68,9 @@ class TraefikTomlProxy(TraefikProxy):
                 os.stat(self.toml_dynamic_config_file)
             except FileNotFoundError:
                 # Make sure that the dynamic configuration file exists
+                self.log.info(
+                    f"Creating the toml dynamic configuration file: {self.toml_dynamic_config_file}"
+                )
                 open(self.toml_dynamic_config_file, "a").close()
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
@@ -196,7 +199,13 @@ class TraefikTomlProxy(TraefikProxy):
                     "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
                 )
                 raise
-        await self._wait_for_route(routespec, provider="file")
+        try:
+            await self._wait_for_route(routespec, provider="file")
+        except TimeoutError:
+            self.log.error(
+                f"Is Traefik configured to watch {self.toml_dynamic_config_file}?"
+            )
+            raise
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
