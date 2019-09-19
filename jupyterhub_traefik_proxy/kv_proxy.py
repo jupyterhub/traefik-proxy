@@ -49,7 +49,7 @@ class TKvProxy(TraefikProxy):
 
     kv_url = Unicode(config=True, help="""The URL of the key value store server""")
 
-    kv_traefik_prefix = Unicode(
+    kv_traefik_prefix = traefik_utils.KVStorePrefix(
         config=True,
         help="""The key value store key prefix for traefik static configuration""",
     )

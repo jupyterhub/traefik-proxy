@@ -1,6 +1,7 @@
 import os
 import string
 from tempfile import NamedTemporaryFile
+from traitlets import Unicode
 from urllib.parse import unquote
 
 import escapism
@@ -8,6 +9,19 @@ import toml
 
 from contextlib import contextmanager
 from collections import namedtuple
+
+
+class KVStorePrefix(Unicode):
+    def validate(self, obj, value):
+        u = super().validate(obj, value)
+        if not u.endswith("/"):
+            u = u + "/"
+
+        proxy_class = type(obj).__name__
+        if "Consul" in proxy_class and u.startswith("/"):
+            u = u[1:]
+
+        return u
 
 
 def generate_rule(routespec):
