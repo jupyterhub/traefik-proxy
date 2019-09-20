@@ -7,10 +7,13 @@
 An implementation of the JupyterHub proxy api with [traefik](https://traefik.io): an extremely lightweight,
 portable reverse proxy implementation, that supports load balancing and can configure itself automatically and dynamically.
 
-There are two versions for the proxy, depending on how traefik stores the routes:
+There are three versions for the proxy, depending on how traefik stores the routes:
 
-* TraefikTomlProxy - for **smaller**, single-node deployments
-* TraefikEtcdProxy - for **distributed** setups
+* for **smaller**, single-node deployments:
+	* TraefikTomlProxy
+* for **distributed** setups:
+	* TraefikEtcdProxy
+	* TraefikConsulProxy
 
 ## Instalation
 You can find a complete installation guide [here](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/install.html).
@@ -38,8 +41,9 @@ $ pytest -v ./tests/<test-file-name>
 ```
 
 ## Example setups:
-* For TraefikEtcdProxy: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup
 * For TraefikTomlProxy: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/toml.html#example-setup
+* For TraefikEtcdProxy: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup
+* For TraefikConsulProxy: https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/consul.html#example-setup
 
 ## JupyterHub configuration examples
 You can use the configuration examples in the ```examples``` directory in order to configure JupyterHub to run with TraefikProxy.
