@@ -10,6 +10,8 @@ import hashlib
 import warnings
 
 checksums_traefik = {
+    "https://github.com/containous/traefik/releases/download/v1.7.18/traefik_linux-amd64": "3c2d153d80890b6fc8875af9f8ced32c4d684e1eb5a46d9815337cb343dfd92e",
+    "https://github.com/containous/traefik/releases/download/v1.7.18/traefik_darwin-amd64": "84e07a184c31b7fb86417ba3a237ad334a26bcb1ed53fd56f0774afaa34074d9",
     "https://github.com/containous/traefik/releases/download/v1.7.5/traefik_linux-amd64": "4417a9d83753e1ad6bdd64bbbeaeb4b279bcc71542e779b7bcb3b027c6e3356e",
     "https://github.com/containous/traefik/releases/download/v1.7.5/traefik_darwin-amd64": "379d4af242743a3fe44b44a1ee6df68ea8332578d85de35f264e062c19fd20a0",
     "https://github.com/containous/traefik/releases/download/v1.7.0/traefik_linux-amd64": "b84cb03e8a175b8b7d1a30246d19705f607c6ae5ee89f2dca7a1adccab919135",
@@ -243,6 +245,8 @@ def main():
             """\
             Checksums available for:
             - traefik:
+                - v1.7.18-linux-amd64
+                - v1.7.18-darwin-amd64
                 - v1.7.5-linux-amd64
                 - v1.7.5-darwin-amd64
                 - v1.7.0-linux-amd64
@@ -303,7 +307,7 @@ def main():
     parser.add_argument(
         "--traefik-version",
         dest="traefik_version",
-        default="1.7.5",
+        default="1.7.18",
         help=textwrap.dedent(
             """\
             The version of traefik to download.
