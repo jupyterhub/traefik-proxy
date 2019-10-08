@@ -10,7 +10,7 @@ This package requires Python >= 3.5.
 
 As a Python package, you can set up a development environment by cloning this repo and running:
 
-    python3 -m pip install -e .
+    python3 -m pip install --editable .
 
 from the repo directory.
 
