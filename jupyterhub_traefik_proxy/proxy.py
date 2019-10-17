@@ -209,11 +209,24 @@ class TraefikProxy(Proxy):
         self._generate_htpassword()
 
         self.static_config = {}
-        self.static_config["defaultentrypoints"] = ["http"]
         self.static_config["debug"] = True
         self.static_config["logLevel"] = self.traefik_log_level
         entryPoints = {}
-        entryPoints["http"] = {"address": ":" + str(urlparse(self.public_url).port)}
+
+        if self.ssl_cert and self.ssl_key:
+            self.static_config["defaultentrypoints"] = ["https"]
+            entryPoints["https"] = {
+                "address": ":" + str(urlparse(self.public_url).port),
+                "tls": {
+                    "certificates": [
+                        {"certFile": self.ssl_cert, "keyFile": self.ssl_key}
+                    ]
+                },
+            }
+        else:
+            self.static_config["defaultentrypoints"] = ["http"]
+            entryPoints["http"] = {"address": ":" + str(urlparse(self.public_url).port)}
+
         auth = {
             "basic": {
                 "users": [
