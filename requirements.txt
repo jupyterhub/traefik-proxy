@@ -1,6 +1,6 @@
 jupyterhub>=0.9
 etcd3
-aiohttp
+aiohttp==3.6.2
 python-consul
 passlib
 toml
