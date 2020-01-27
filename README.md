@@ -18,11 +18,13 @@ API](https://jupyterhub.readthedocs.io/en/stable/reference/proxy.html),
 depending on how traefik store its routing configuration.
 
 For **smaller**, single-node deployments:
-	* TraefikTomlProxy
-For **distributed** setups
-	* TraefikEtcdProxy
-	* TraefikConsulProxy
 
+* TraefikTomlProxy
+
+For **distributed** setups:
+
+* TraefikEtcdProxy
+* TraefikConsulProxy
 
 ## Installation
 The [documentation](https://jupyterhub-traefik-proxy.readthedocs.io) contains a
