@@ -33,7 +33,8 @@ repository](https://github.com/jupyterhub/traefik-proxy).
    [choldgraf/github-activity](https://github.com/choldgraf/github-activity)
    utility.
 
-1. Set a shell variable to be the new version you want to release.  
+1. Set a shell variable to be the new version you want to release.
+   The actual project version will be set from git automatically by versioneer.
    
    ```shell
    VERSION=...  # e.g. 1.2.3
@@ -57,12 +58,12 @@ repository](https://github.com/jupyterhub/traefik-proxy).
 1. Create a git tag for the pushed release commit and push it.
 
    ```shell
-   git tag -a $VERSION -m $VERSION HEAD~1
+   git tag -a $VERSION -m "release $VERSION"
 
    # then verify you tagged the right commit
    git log
 
    # then push it
-   git push $ORIGIN refs/tags/$VERSION
+   git push --follow-tags
    ```
 
