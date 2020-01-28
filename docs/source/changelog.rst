@@ -75,6 +75,11 @@ the command line for details.
 `[0.1.3]`_ - 2019-02-26
 -----------------------
 
+-  Load initial routing table from disk in TraefikTomlProxy
+   when resuming from a previous session.
+
+**Details:**
+
 -  Try to load routes from file if cache is empty `#52`_
    (`@GeorgianaElena <https://github.com/GeorgianaElena>`_)
 -  close temporary file before renaming it `#51`_
@@ -91,6 +96,13 @@ the command line for details.
 
 `[0.1.1]`_ - 2019-02-22
 -----------------------
+
+- make proxytest reusable with any Proxy implementation
+- improve documentation
+- improve logging and error handling
+- make check_route_timeout configurable
+
+**Details:**
 
 -  more logging / error handling `#49`_
    (`@minrk <https://github.com/minrk>`_)
