@@ -1,10 +1,8 @@
 language: python
-sudo: false
 cache:
   - pip
 env:
   global:
-    - ASYNC_TEST_TIMEOUT=15
     - ETCDCTL_API=3
 
 # installing dependencies

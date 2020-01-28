@@ -40,12 +40,9 @@ repository](https://github.com/jupyterhub/traefik-proxy).
    git commit -m "release $VERSION"
    ```
 
-   Tip: You can get the current project version with:
+   Tip: You can get the current project version by checking the [latest
+   tag on GitHub](https://github.com/jupyterhub/traefik-proxy/tags).
    
-   ```shell
-   git describe --abbrev=0
-   ```
-
 1. Push your commit to master.
 
    ```shell
