@@ -34,7 +34,9 @@ repository](https://github.com/jupyterhub/traefik-proxy).
    utility.
 
 1. Set a shell variable to be the new version you want to release.
-   The actual project version will be set from git automatically by versioneer.
+   The actual project version will be detected automatically by versioneer
+   from git tags inspection. The versioneer script will be run by setup.py
+   when packaging is occurring.
    
    ```shell
    VERSION=...  # e.g. 1.2.3
@@ -64,6 +66,6 @@ repository](https://github.com/jupyterhub/traefik-proxy).
    git log
 
    # then push it
-   git push --follow-tags
+   git push $ORIGIN --follow-tags
    ```
 
