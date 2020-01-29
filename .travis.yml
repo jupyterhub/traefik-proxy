@@ -33,7 +33,7 @@ jobs:
       if: tag IS present
       deploy:
         provider: pypi
-        user: jupyterhub-bot
+        user: __token__
         # password: see secret PYPI_PASSWORD variable
         distributions: sdist bdist_wheel
         on:
