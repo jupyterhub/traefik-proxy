@@ -1,12 +1,8 @@
 language: python
-sudo: false
 cache:
   - pip
-python:
-  - 3.6
 env:
   global:
-    - ASYNC_TEST_TIMEOUT=15
     - ETCDCTL_API=3
 
 # installing dependencies
@@ -26,12 +22,21 @@ after_success:
   - codecov
 
 # auto-deploy releases on tags
-deploy:
-  provider: pypi
-  distributions: sdist bdist_wheel
-  user: jupyterhub-bot
-  password:
-    secure: mZbQVF80AO+cxJM/0qbeFoAcHSBE3YSeT4igUXlKypRVEc0qNskJbh6Ofh5qIHb4dO/LF7Si3Bms1cP3Wai7wPFAglGPV/CQ3TQjrwjWy1FYwyAvduSiKZ7xsHoSvVakqfzl8R/XSmBbajbECts+7NuJuyJGAvWldeHlWo7UXt+wiKFCK8jGcXcqCcf8F8kVkF7gfx+Z/sO3JMintMclz+N3GoUiNYnmZ3fI3PEoFeDETGy9mzlM8eQi6LnZ16rod53KKA1q3EKziNvqVgYObgD95NfH/gtgZ+rDhEIS0kPMUUu5ihfofvY/I2tV3IX/Pbih2ssHDRolthVcbPP1+L1WdCPos7IpEHKDYZuTwMizuaPaGes2YHREMCN3AtncT456X4gtH7KuWG3gAXOrmTLDp+ShaevoJCF0Qk2E0WzVngqV//stFOhwZaxV1uRb4xujTI0Ak35yKnfuiLbrOyoZ+8eiwOwhE2C0l3BKNy+xLpBMQZVoX87WTPrQzNOv6bV5ZX9Mp+pJTOnUFJOrwvLHCm3hZtWMcijAVNuR3Wi0zsJVaqCtB7/qqUtWw1PUpwyVnA9DpgGOxXo4+tVDy75izq0GTYivqpFq9EyXzE2UyxDjgRK+I3OAEUiSJ1tIGw/T2306iVf2EfpMVjWQdX4Wnz+b123bTIE7haoiUxc=
-  on:
-    tags: true
-    repo: jupyterhub/traefik-proxy
+jobs:
+  fast_finish: true
+  include:
+    - python: 3.6
+    - python: 3.7
+    # Only deploy if all test jobs passed
+    - stage: deploy
+      python: 3.7
+      if: tag IS present
+      deploy:
+        provider: pypi
+        user: __token__
+        # password: see secret PYPI_PASSWORD variable
+        distributions: sdist bdist_wheel
+        on:
+          # Without this we get the note about:
+          # Skipping a deployment with the pypi provider because this branch is not permitted: <tag>
+          tags: true
