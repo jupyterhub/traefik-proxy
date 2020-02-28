@@ -20,13 +20,17 @@
 
    1. Through traefik-proxy's **install utility**.
 
-      From `traefik-proxy` directory:
+      ```
+      $ python3 -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=/usr/local/bin
+      ```
+
+      This will install the default versions of traefik, etcd and consul, namely `traefik-1.7.5`, `etcd-3.3.10` and `consul_1.5.0` to `/usr/local/bin` specified through the `--output` option.
+
+      It is also possible to install the binaries individually. For example to install traefik only:
 
       ```
-      $ python3 -m jupyterhub_traefik_proxy.install --output=/usr/local/bin
+      $ python3 -m jupyterhub_traefik_proxy.install --traefik --output=/usr/local/bin
       ```
-     
-      This will install the default versions of traefik, etcd and consul, namely `traefik-1.7.5`, `etcd-3.3.10` and `consul_1.5.0` to `/usr/local/bin` specified through the `--output` option.
 
       If no directory is passed to the installer, a *dependencies* directory will be created in the `traefik-proxy` directory. In this case, you **must** add this directory to `PATH`, e.g.
 
@@ -40,13 +44,20 @@
         * `--consul-version`
         * `--output`
 
-      Example
+      Example:
+
       ```
-      $ python3 -m jupyterhub_traefik_proxy.install --output=dep \
+      $ python3 -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=dep \
                --traefik-version=1.6.6 --etcd-version=3.2.24 --consul-version=1.5.0
       ```
 
       If the desired install directory doesn't exist, it will be created by the installer.
+
+      To get a list of all the available options:
+
+      ```
+      $ python3 -m jupyterhub_traefik_proxy.install --help
+      ```
 
     2. From traefik, etcd and consul **release pages**:
        * Install [`traefik`](https://traefik.io/#easy-to-install)
