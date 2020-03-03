@@ -372,8 +372,16 @@ def main():
     etcd_version = args.etcd_version
     consul_version = args.consul_version
 
+    if not args.traefik and not args.etcd and not args.consul:
+        print(
+            """Please specify what binary to install.
+            Tip: python3 -m jupyterhub_traefik_proxy.install --help
+            to get the list of available options."""
+        )
+        return
+
     if os.path.exists(deps_dir):
-        print(f"Dependencies directory already exists.")
+        print(f"Using existing output directory {deps_dir}...")
     else:
         print(f"Creating output directory {deps_dir}...")
         os.makedirs(deps_dir)
