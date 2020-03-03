@@ -46,11 +46,8 @@ def test_default_conf():
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     default_deps_dir = os.path.join(parent_dir, "dependencies")
 
-    try:
-        subprocess.run([sys.executable, "-m", installer_module])
-        assert_deps_dir_empty(default_deps_dir)
-    finally:
-        cleanup(default_deps_dir)
+    subprocess.run([sys.executable, "-m", installer_module])
+    assert not os.path.exists(default_deps_dir)
 
 
 def test_install_only_traefik_default_version():

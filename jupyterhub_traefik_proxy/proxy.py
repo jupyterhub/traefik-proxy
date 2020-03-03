@@ -164,8 +164,7 @@ class TraefikProxy(Proxy):
 
     async def _wait_for_static_config(self, provider):
         async def _check_traefik_static_conf_ready():
-            """ Check if traefik loaded its static configuration from the
-            etcd cluster """
+            """Check if traefik loaded its static configuration yet"""
             try:
                 resp = await self._traefik_api_request("/api/providers/" + provider)
             except Exception:
@@ -201,7 +200,7 @@ class TraefikProxy(Proxy):
         else:
             raise ValueError(
                 "Configuration mode not supported \n.\
-                The proxy can only be configured through toml and etcd"
+                The proxy can only be configured through toml, etcd and consul"
             )
 
     async def _setup_traefik_static_config(self):
