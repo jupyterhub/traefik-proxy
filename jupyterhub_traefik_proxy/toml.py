@@ -99,9 +99,10 @@ class TraefikTomlProxy(TraefikProxy):
             self.log.error("Failed to remove traefik's configuration files")
             raise
 
-    def _get_route_unsafe(self, routespec):
+    def _get_route_unsafe(self, traefik_routespec):
         safe = string.ascii_letters + string.digits + "_-"
-        escaped_routespec = escapism.escape(routespec, safe=safe)
+        escaped_routespec = escapism.escape(traefik_routespec, safe=safe)
+        routespec = self._routespec_from_traefik_path(traefik_routespec)
         result = {"data": "", "target": "", "routespec": routespec}
 
         def get_target_data(d, to_find):
@@ -170,7 +171,7 @@ class TraefikTomlProxy(TraefikProxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
-        routespec = self.validate_routespec(routespec)
+        routespec = self._routespec_to_traefik_path(routespec)
         backend_alias = traefik_utils.generate_alias(routespec, "backend")
         frontend_alias = traefik_utils.generate_alias(routespec, "frontend")
         data = json.dumps(data)
@@ -212,7 +213,7 @@ class TraefikTomlProxy(TraefikProxy):
 
         **Subclasses must define this method**
         """
-        routespec = self.validate_routespec(routespec)
+        routespec = self._routespec_to_traefik_path(routespec)
         safe = string.ascii_letters + string.digits + "_-"
         escaped_routespec = escapism.escape(routespec, safe=safe)
 
@@ -247,8 +248,9 @@ class TraefikTomlProxy(TraefikProxy):
         async with self.mutex:
             for key, value in self.routes_cache["frontends"].items():
                 escaped_routespec = "".join(key.split("_", 1)[1:])
-                routespec = escapism.unescape(escaped_routespec)
-                all_routes[routespec] = self._get_route_unsafe(routespec)
+                traefik_routespec = escapism.unescape(escaped_routespec)
+                routespec = self._routespec_from_traefik_path(traefik_routespec)
+                all_routes[routespec] = self._get_route_unsafe(traefik_routespec)
 
         return all_routes
 
@@ -272,6 +274,6 @@ class TraefikTomlProxy(TraefikProxy):
 
             None: if there are no routes matching the given routespec
         """
-        routespec = self.validate_routespec(routespec)
+        routespec = self._routespec_to_traefik_path(routespec)
         async with self.mutex:
             return self._get_route_unsafe(routespec)

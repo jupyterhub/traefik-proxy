@@ -247,7 +247,7 @@ class TKvProxy(TraefikProxy):
         """
         self.log.info("Adding route for %s to %s.", routespec, target)
 
-        routespec = self.validate_routespec(routespec)
+        routespec = self._routespec_to_traefik_path(routespec)
         route_keys = traefik_utils.generate_route_keys(self, routespec)
 
         # Store the data dict passed in by JupyterHub
@@ -292,7 +292,7 @@ class TKvProxy(TraefikProxy):
         """Delete a route and all the traefik related info associated given a routespec,
         (if it exists).
         """
-        routespec = self.validate_routespec(routespec)
+        routespec = self._routespec_to_traefik_path(routespec)
         jupyterhub_routespec = self.kv_jupyterhub_prefix + routespec
         route_keys = traefik_utils.generate_route_keys(self, routespec)
 
@@ -324,7 +324,8 @@ class TKvProxy(TraefikProxy):
         routes = await self._kv_get_jupyterhub_prefixed_entries()
 
         for kv_entry in routes:
-            routespec, target, data = await self._kv_get_route_parts(kv_entry)
+            traefik_routespec, target, data = await self._kv_get_route_parts(kv_entry)
+            routespec = self._routespec_from_traefik_path(traefik_routespec)
             all_routes[routespec] = {
                 "routespec": routespec,
                 "target": target,
@@ -354,7 +355,8 @@ class TKvProxy(TraefikProxy):
             None: if there are no routes matching the given routespec
         """
         routespec = self.validate_routespec(routespec)
-        jupyterhub_routespec = self.kv_jupyterhub_prefix + routespec
+        traefik_routespec = self._routespec_to_traefik_path(routespec)
+        jupyterhub_routespec = self.kv_jupyterhub_prefix + traefik_routespec
 
         target = await self._kv_get_target(jupyterhub_routespec)
         if target is None:
