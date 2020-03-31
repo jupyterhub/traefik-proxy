@@ -8,9 +8,18 @@ and its link will bring up a GitHub listing of changes. Use `git log` on
 the command line for details.
 
 
-`[Unreleased]`_
----------------
 
+`[0.1.5]`_ - 2020-03-31
+-----------------------
+
+-  Fix named servers routing `#96`_
+   `(@GeorgianaElena) <https://github.com/GeorgianaElena>`_
+-  Show a message when no binary is provided to the installer `#95`_
+   `(@GeorgianaElena) <https://github.com/GeorgianaElena>`_
+-  Update install utility docs `#93`_
+   `(@jtpio) <https://github.com/jtpio>`_
+-  Travis deploy tags to PyPI `#89`_
+   `(@GeorgianaElena) <https://github.com/GeorgianaElena>`_
 -  Update README `#87`_
    (`@consideRatio <https://github.com/consideRatio>`_)
 -  Handle ssl `#84`_
@@ -22,6 +31,10 @@ the command line for details.
 -  Add info about TraefikConsulProxy in readme `#80`_
    `(@GeorgianaElena) <https://github.com/GeorgianaElena>`_
 
+.. _#96: https://github.com/jupyterhub/traefik-proxy/pull/96
+.. _#95: https://github.com/jupyterhub/traefik-proxy/pull/95
+.. _#93: https://github.com/jupyterhub/traefik-proxy/pull/93
+.. _#89: https://github.com/jupyterhub/traefik-proxy/pull/89
 .. _#87: https://github.com/jupyterhub/traefik-proxy/pull/87
 .. _#84: https://github.com/jupyterhub/traefik-proxy/pull/84
 .. _#82: https://github.com/jupyterhub/traefik-proxy/pull/82
@@ -130,6 +143,7 @@ the command line for details.
 
 First release!
 
+.. _[0.1.5]: https://github.com/jupyterhub/traefik-proxy/compare/0.1.4...0.1.5
 .. _[0.1.4]: https://github.com/jupyterhub/traefik-proxy/compare/0.1.3...0.1.4
 .. _[0.1.3]: https://github.com/jupyterhub/traefik-proxy/compare/0.1.2...0.1.3
 .. _[0.1.2]: https://github.com/jupyterhub/traefik-proxy/compare/0.1.1...0.1.2
