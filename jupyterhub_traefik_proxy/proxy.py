@@ -23,7 +23,7 @@ from os.path import abspath, dirname, join
 from subprocess import Popen
 from urllib.parse import urlparse
 
-from traitlets import Any, Dict, Integer, Unicode, default
+from traitlets import Any, Bool, Dict, Integer, Unicode, default
 from tornado.httpclient import AsyncHTTPClient
 
 from jupyterhub.utils import exponential_backoff, url_path_join, new_token
@@ -44,6 +44,12 @@ class TraefikProxy(Proxy):
         "http://127.0.0.1:8099",
         config=True,
         help="""traefik authenticated api endpoint url""",
+    )
+
+    traefik_api_validate_cert = Bool(
+        True,
+        config=True,
+        help="""validate SSL certificate of traefik api endpoint""",
     )
 
     traefik_log_level = Unicode("ERROR", config=True, help="""traefik's log level""")
@@ -155,6 +161,7 @@ class TraefikProxy(Proxy):
             url,
             auth_username=self.traefik_api_username,
             auth_password=self.traefik_api_password,
+            validate_cert=self.traefik_api_validate_cert,
         )
         if resp.code >= 300:
             self.log.warning("%s GET %s", resp.code, url)
