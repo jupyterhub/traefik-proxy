@@ -299,8 +299,6 @@ class TKvProxy(TraefikProxy):
         status, response = await self._kv_atomic_delete_route_parts(
             jupyterhub_routespec, route_keys
         )
-        if response is None:
-            return
         if status:
             self.log.info("Routespec %s was deleted.", routespec)
         else:
