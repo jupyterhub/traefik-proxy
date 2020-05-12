@@ -148,7 +148,7 @@ class TraefikEtcdProxy(TKvProxy):
         value = await maybe_future(self._etcd_get(jupyterhub_routespec))
         if value is None:
             self.log.warning("Route %s doesn't exist. Nothing to delete", jupyterhub_routespec)
-            return None, None
+            return True, None
 
         target = value.decode()
 
