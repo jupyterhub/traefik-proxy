@@ -23,7 +23,7 @@ from os.path import abspath, dirname, join
 from subprocess import Popen
 from urllib.parse import urlparse
 
-from traitlets import Any, Bool, Dict, Integer, Unicode, default
+from traitlets import Any, Bool, Dict, Integer, List, Unicode, default
 from tornado.httpclient import AsyncHTTPClient
 
 from jupyterhub.utils import exponential_backoff, url_path_join, new_token
@@ -47,15 +47,29 @@ class TraefikProxy(Proxy):
     )
 
     traefik_api_validate_cert = Bool(
-        True,
-        config=True,
-        help="""validate SSL certificate of traefik api endpoint""",
+        True, config=True, help="""validate SSL certificate of traefik api endpoint"""
     )
 
     traefik_log_level = Unicode("ERROR", config=True, help="""traefik's log level""")
 
+    traefik_https_port = Integer(8443, config=True, help="""https port""")
+
+    traefik_auto_https = Bool(
+        False, config=True, help="""enable automatic HTTPS with Let's Encrypt"""
+    )
+
+    traefik_letsencrypt_email = Unicode(config=True, help="""Let's Encrypt email""")
+
+    traefik_letsencrypt_domains = List(config=True, help="""domains list""")
+
+    traefik_acme_server = Unicode(config=True, help="""the CA server to use""")
+
+    traefik_acme_storage = Unicode(
+        "acme.json", config=True, help="""file used for certificates storage"""
+    )
+
     traefik_api_password = Unicode(
-        config=True, help="""The password for traefik api login"""
+        config=True, help="""the password for traefik api login"""
     )
 
     @default("traefik_api_password")
@@ -217,21 +231,48 @@ class TraefikProxy(Proxy):
         self.static_config = {}
         self.static_config["debug"] = True
         self.static_config["logLevel"] = self.traefik_log_level
+
         entryPoints = {}
+        self.static_config["defaultentrypoints"] = ["http"]
+        entryPoints["http"] = {"address": ":" + str(urlparse(self.public_url).port)}
+
+        if self.traefik_auto_https:
+            self.static_config["defaultentrypoints"].append("https")
+
+            entryPoints["http"].update({"redirect": {"entrypoint": "https"}})
+
+            entryPoints["https"] = {
+                "address": ":" + str(self.traefik_https_port),
+                "tls": {},
+            }
+
+            acme = {
+                "email": self.traefik_letsencrypt_email,
+                "storage": self.traefik_acme_storage,
+                "entryPoint": "https",
+                "caServer": self.traefik_acme_server,
+                "httpChallenge": {"entryPoint": "http"},
+            }
+
+            acme["domains"] = []
+
+            for domain in self.traefik_letsencrypt_domains:
+                acme["domains"].append({"main": domain})
+
+            self.static_config["acme"] = acme
 
         if self.ssl_cert and self.ssl_key:
-            self.static_config["defaultentrypoints"] = ["https"]
+            entryPoints["http"] = {"redirect": {"entrypoint": "https"}}
+
+            self.static_config["defaultentrypoints"].append("https")
             entryPoints["https"] = {
-                "address": ":" + str(urlparse(self.public_url).port),
+                "address": ":" + str(self.traefik_https_port),
                 "tls": {
                     "certificates": [
                         {"certFile": self.ssl_cert, "keyFile": self.ssl_key}
                     ]
                 },
             }
-        else:
-            self.static_config["defaultentrypoints"] = ["http"]
-            entryPoints["http"] = {"address": ":" + str(urlparse(self.public_url).port)}
 
         auth = {
             "basic": {
@@ -248,19 +289,16 @@ class TraefikProxy(Proxy):
         self.static_config["api"] = {"dashboard": True, "entrypoint": "auth_api"}
         self.static_config["wss"] = {"protocol": "http"}
 
-
     def _routespec_to_traefik_path(self, routespec):
         path = self.validate_routespec(routespec)
-        if path != '/' and path.endswith('/'):
-            path = path.rstrip('/')
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
         return path
 
-
     def _routespec_from_traefik_path(self, routespec):
-        if not routespec.endswith('/'):
-            routespec = routespec + '/'
+        if not routespec.endswith("/"):
+            routespec = routespec + "/"
         return routespec
-
 
     async def start(self):
         """Start the proxy.

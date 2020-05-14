@@ -94,6 +94,8 @@ class TraefikTomlProxy(TraefikProxy):
         try:
             if self.should_start:
                 os.remove(self.toml_static_config_file)
+                if self.traefik_auto_https:
+                    os.remove(self.traefik_acme_storage)
             os.remove(self.toml_dynamic_config_file)
         except:
             self.log.error("Failed to remove traefik's configuration files")
