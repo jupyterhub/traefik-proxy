@@ -7,6 +7,22 @@ For detailed changes from the prior release, click on the version number
 and its link will bring up a GitHub listing of changes. Use `git log` on
 the command line for details.
 
+`[0.1.6]`_ - 2020-05-16
+-----------------------
+
+-  Fix circular reference error `#107`_
+   `(@GeorgianaElena) <https://github.com/GeorgianaElena>`_
+-  Fix TypeError: 'NoneType' object is not iterable, in
+   delete_route when route doesn't exist `#104`_
+   `(@mofanke) <https://github.com/mofanke>`_
+-  Update etcd.py `#102`_ `(@mofanke) <https://github.com/mofanke>`_
+-  New Proxy config option traefik_api_validate_cert `#98`_
+   `(@devnull-mr) <https://github.com/devnull-mr>`_
+
+.. _#107: https://github.com/jupyterhub/traefik-proxy/pull/107
+.. _#104: https://github.com/jupyterhub/traefik-proxy/pull/104
+.. _#102: https://github.com/jupyterhub/traefik-proxy/pull/102
+.. _#98: https://github.com/jupyterhub/traefik-proxy/pull/98
 
 
 `[0.1.5]`_ - 2020-03-31
@@ -143,6 +159,7 @@ the command line for details.
 
 First release!
 
+.. _[0.1.6]: https://github.com/jupyterhub/traefik-proxy/compare/0.1.5...0.1.6
 .. _[0.1.5]: https://github.com/jupyterhub/traefik-proxy/compare/0.1.4...0.1.5
 .. _[0.1.4]: https://github.com/jupyterhub/traefik-proxy/compare/0.1.3...0.1.4
 .. _[0.1.3]: https://github.com/jupyterhub/traefik-proxy/compare/0.1.2...0.1.3
