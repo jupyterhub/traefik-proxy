@@ -3,5 +3,5 @@ etcd3
 aiohttp==3.6.2
 python-consul
 passlib
-toml
+toml==0.10.0
 escapism
