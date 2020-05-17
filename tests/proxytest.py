@@ -356,3 +356,36 @@ async def test_websockets(proxy, launch_backend):
         port = await websocket.recv()
 
     assert port == str(default_backend_port)
+
+
+async def test_autohttps(autohttps_toml_proxy, pebble, launch_backend):
+    proxy = autohttps_toml_proxy
+
+    routespec = "/autohttps"
+    target = "http://127.0.0.1:9900"
+
+    backend_port = 9900
+    launch_backend(backend_port)
+
+    await wait_for_services([proxy.public_url, target])
+
+    await proxy.add_route(routespec, target, {})
+
+    # Test the actual routing
+    req = HTTPRequest(proxy.public_url + routespec, method="GET", validate_cert=False)
+    resp = await AsyncHTTPClient().fetch(req)
+    backend_response = int(resp.body.decode("utf-8"))
+
+    # Test we were redirected to https
+    # https://127.0.0.1:8443/autohttps
+    expected_final_redirect_url = (
+        "https://"
+        + urlparse(proxy.public_url).hostname
+        + ":"
+        + str(proxy.traefik_https_port)
+        + routespec
+    )
+    assert resp.effective_url == expected_final_redirect_url
+
+    # Test redirection to the route added
+    assert backend_response == backend_port

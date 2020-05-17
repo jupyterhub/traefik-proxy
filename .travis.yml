@@ -1,15 +1,22 @@
 language: python
 cache:
   - pip
+addons:
+  hosts:
+    - jupyter.test
 env:
   global:
     - ETCDCTL_API=3
+    - LEGO_CA_SERVER_NAME=pebble
+    - LEGO_CA_CERTIFICATES=$GOPATH/src/github.com/letsencrypt/pebble/test/certs/localhost/cert.pem
 
 # installing dependencies
 before_install:
   - pip install --upgrade setuptools pip
   - pip install --pre -r dev-requirements.txt --upgrade .
   - pip install pytest-cov
+  - go get -u github.com/letsencrypt/pebble/...
+  - cd $GOPATH/src/github.com/letsencrypt/pebble && go install ./...
 install:
   - python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=./bin
   - export PATH=$PWD/bin:$PATH

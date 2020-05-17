@@ -14,6 +14,39 @@ from jupyterhub_traefik_proxy import TraefikTomlProxy
 
 
 @pytest.fixture
+async def autohttps_toml_proxy():
+    """Fixture returning a configured Let's Encrypt TraefikTomlProxy"""
+    proxy = TraefikTomlProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
+        should_start=True,
+        traefik_auto_https=True,
+        traefik_letsencrypt_email="jovyan@jupyter.test",
+        traefik_letsencrypt_domains=["jupyter.test"],
+        traefik_acme_server="https://0.0.0.0:14000/dir",
+        traefik_https_port=8443,
+    )
+
+    await proxy.start()
+    yield proxy
+    await proxy.stop()
+
+
+@pytest.fixture
+async def pebble():
+    pebble_server = subprocess.Popen(
+        ["pebble", "-config", "./tests/config_files/pebble-config.json"],
+        stdout=None,
+        stderr=None,
+    )
+    yield pebble_server
+
+    pebble_server.kill()
+    pebble_server.wait()
+
+
+@pytest.fixture
 async def no_auth_consul_proxy(consul_no_acl):
     """
     Fixture returning a configured TraefikConsulProxy.
