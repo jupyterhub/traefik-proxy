@@ -262,9 +262,10 @@ class TraefikProxy(Proxy):
             self.static_config["acme"] = acme
 
         if self.ssl_cert and self.ssl_key:
-            entryPoints["http"] = {"redirect": {"entrypoint": "https"}}
-
             self.static_config["defaultentrypoints"].append("https")
+
+            entryPoints["http"].update({"redirect": {"entrypoint": "https"}})
+
             entryPoints["https"] = {
                 "address": ":" + str(self.traefik_https_port),
                 "tls": {
