@@ -25,12 +25,14 @@ async def autohttps_toml_proxy():
         traefik_letsencrypt_email="jovyan@jupyter.test",
         traefik_letsencrypt_domains=["jupyter.test"],
         traefik_acme_server="https://0.0.0.0:14000/dir",
-        traefik_https_port=8443,
     )
 
     await proxy.start()
     yield proxy
     await proxy.stop()
+    if os.path.exists("acme.json"):
+        os.remove("acme.json")
+
 
 
 @pytest.fixture
