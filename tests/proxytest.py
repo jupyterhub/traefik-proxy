@@ -371,6 +371,8 @@ async def test_autohttps(autohttps_toml_proxy, pebble, launch_backend):
 
     await proxy.add_route(routespec, target, {})
 
+    await utils.wait_for_certificate_aquisition(proxy.traefik_acme_storage)
+
     # Test the actual routing
     req = HTTPRequest(proxy.public_url + routespec, method="GET", validate_cert=False)
     resp = await AsyncHTTPClient().fetch(req)

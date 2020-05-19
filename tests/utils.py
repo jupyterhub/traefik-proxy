@@ -32,6 +32,22 @@ async def check_host_up(ip, port):
     return is_open(ip, port)
 
 
+async def wait_for_certificate_aquisition(cert_storage):
+
+    async def _check_certificate_aquisition():
+        with open(cert_storage, 'r') as cert_file:
+            cert_info= json.load(cert_file)
+            if cert_info["Certificates"]:
+                return True
+        return False
+
+    with open(cert_storage, 'r+') as cert_info:
+        await exponential_backoff(
+                _check_certificate_aquisition,
+                "Certificate not available",
+            )
+
+
 async def get_responding_backend_port(traefik_url, path):
     """ Check if traefik followed the configuration and routed the
     request to the right backend """
