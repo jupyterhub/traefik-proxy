@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 
+import json
 import pytest
 
 from jupyterhub_traefik_proxy import TraefikEtcdProxy
@@ -32,20 +33,6 @@ async def autohttps_toml_proxy():
     await proxy.stop()
     if os.path.exists("acme.json"):
         os.remove("acme.json")
-
-
-
-@pytest.fixture
-async def pebble():
-    pebble_server = subprocess.Popen(
-        ["pebble", "-config", "./tests/config_files/pebble-config.json"],
-        stdout=None,
-        stderr=None,
-    )
-    yield pebble_server
-
-    pebble_server.kill()
-    pebble_server.wait()
 
 
 @pytest.fixture
@@ -223,6 +210,37 @@ def external_toml_proxy():
     open("./tests/config_files/rules.toml", "w").close()
     traefik_process.kill()
     traefik_process.wait()
+
+
+@pytest.fixture
+async def pebble():
+    config_file = "./tests/config_files/pebble-config.json"
+    gopath = os.environ["GOPATH"]
+    """
+    Insert the path to certs into the pebble config file.
+    We cannot pass $GOPATH directly as pebble doesn't know how to parse env vars
+    and we cannot hard-code it either as the test would error when run locally.
+    """
+    with open(config_file, "r+") as f:
+        data = json.load(f)
+        data["pebble"]["certificate"] = (
+            gopath + "/src/github.com/letsencrypt/pebble/test/certs/localhost/cert.pem"
+        )
+        data["pebble"]["privateKey"] = (
+            gopath + "/src/github.com/letsencrypt/pebble/test/certs/localhost/key.pem"
+        )
+        f.seek(0)
+        json.dump(data, f, indent=2)
+
+    pebble_server = subprocess.Popen(
+        ["pebble", "-config", "./tests/config_files/pebble-config.json"],
+        stdout=None,
+        stderr=None,
+    )
+    yield pebble_server
+
+    pebble_server.kill()
+    pebble_server.wait()
 
 
 @pytest.fixture(scope="session", autouse=True)

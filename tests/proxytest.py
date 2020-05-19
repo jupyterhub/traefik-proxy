@@ -358,7 +358,7 @@ async def test_websockets(proxy, launch_backend):
     assert port == str(default_backend_port)
 
 
-async def test_autohttps(autohttps_toml_proxy, pebble, launch_backend):
+async def test_autohttps(pebble, autohttps_toml_proxy, launch_backend):
     proxy = autohttps_toml_proxy
 
     routespec = "/autohttps"
