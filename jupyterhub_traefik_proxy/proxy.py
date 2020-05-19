@@ -62,7 +62,11 @@ class TraefikProxy(Proxy):
 
     traefik_letsencrypt_domains = List(config=True, help="""domains list""")
 
-    traefik_acme_server = Unicode(config=True, help="""the CA server to use""")
+    traefik_acme_server = Unicode(
+        "https://acme-staging-v02.api.letsencrypt.org/directory",
+        config=True,
+        help="""the CA server to use""",
+    )
 
     traefik_acme_storage = Unicode(
         "acme.json", config=True, help="""file used for certificates storage"""
