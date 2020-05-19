@@ -39,11 +39,12 @@ Installation Guide
 Getting Started
 ---------------
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    toml
    etcd
    consul
+   https
 
 API Reference
 -------------

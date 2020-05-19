@@ -69,9 +69,9 @@ c.TraefikTomlProxy.toml_dynamic_config_file="/path/to/dynamic_config_filename.to
 ---
 <span style="color:green">**Note !**</span>
 
-**When JupyterHub starts the proxy**, it writes the static config once, then only edits the routes config file. 
+* **When JupyterHub starts the proxy**, it writes the static config once, then only edits the routes config file.
 
-**When JupyterHub does not start the proxy**, the user is totally responsible for the static config and 
+* **When JupyterHub does not start the proxy**, the user is totally responsible for the static config and
 JupyterHub is responsible exclusively for the routes.
 ---
 
