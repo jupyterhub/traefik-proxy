@@ -378,16 +378,5 @@ async def test_autohttps(pebble, autohttps_toml_proxy, launch_backend):
     resp = await AsyncHTTPClient().fetch(req)
     backend_response = int(resp.body.decode("utf-8"))
 
-    # Test we were redirected to https
-    # https://127.0.0.1:8443/autohttps
-    expected_final_redirect_url = (
-        "https://"
-        + urlparse(proxy.public_url).hostname
-        + ":"
-        + str(proxy.traefik_https_port)
-        + routespec
-    )
-    assert resp.effective_url == expected_final_redirect_url
-
     # Test redirection to the route added
     assert backend_response == backend_port

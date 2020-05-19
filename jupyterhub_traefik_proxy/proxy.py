@@ -52,7 +52,9 @@ class TraefikProxy(Proxy):
 
     traefik_log_level = Unicode("ERROR", config=True, help="""traefik's log level""")
 
-    traefik_https_port = Integer(8443, config=True, help="""https port""")
+    traefik_acme_challenge_port = Integer(
+        80, config=True, help="""http port for the acme challenge"""
+    )
 
     traefik_auto_https = Bool(
         False, config=True, help="""enable automatic HTTPS with Let's Encrypt"""
@@ -237,17 +239,25 @@ class TraefikProxy(Proxy):
         self.static_config["logLevel"] = self.traefik_log_level
 
         entryPoints = {}
-        self.static_config["defaultentrypoints"] = ["http"]
-        entryPoints["http"] = {"address": ":" + str(urlparse(self.public_url).port)}
+        scheme = urlparse(self.public_url).scheme
+        address = urlparse(self.public_url).netloc
+        port = urlparse(self.public_url).port
+
+        self.static_config["defaultentrypoints"] = [scheme]
+
+        # Traefik complains if we don't provide a port
+        if not port:
+            if scheme == "http":
+                address += ":80"
+            elif scheme == "https":
+                address += ":443"
+
+        entryPoints[scheme] = {"address": address}
 
         if self.traefik_auto_https:
-            self.static_config["defaultentrypoints"].append("https")
-
-            entryPoints["http"].update({"redirect": {"entrypoint": "https"}})
-
-            entryPoints["https"] = {
-                "address": ":" + str(self.traefik_https_port),
-                "tls": {},
+            entryPoints["https"].update({"tls": {}})
+            entryPoints["acme_challenge"] = {
+                "address": ":" + str(self.traefik_acme_challenge_port)
             }
 
             acme = {
@@ -255,29 +265,25 @@ class TraefikProxy(Proxy):
                 "storage": self.traefik_acme_storage,
                 "entryPoint": "https",
                 "caServer": self.traefik_acme_server,
-                "httpChallenge": {"entryPoint": "http"},
+                "httpChallenge": {"entryPoint": "acme_challenge"},
             }
 
             acme["domains"] = []
 
             for domain in self.traefik_letsencrypt_domains:
                 acme["domains"].append({"main": domain})
-
             self.static_config["acme"] = acme
 
         if self.ssl_cert and self.ssl_key:
-            self.static_config["defaultentrypoints"].append("https")
-
-            entryPoints["http"].update({"redirect": {"entrypoint": "https"}})
-
-            entryPoints["https"] = {
-                "address": ":" + str(self.traefik_https_port),
-                "tls": {
-                    "certificates": [
-                        {"certFile": self.ssl_cert, "keyFile": self.ssl_key}
-                    ]
-                },
-            }
+            entryPoints["https"].update(
+                {
+                    "tls": {
+                        "certificates": [
+                            {"certFile": self.ssl_cert, "keyFile": self.ssl_key}
+                        ]
+                    }
+                }
+            )
 
         auth = {
             "basic": {

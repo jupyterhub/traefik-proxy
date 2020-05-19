@@ -18,7 +18,7 @@ from jupyterhub_traefik_proxy import TraefikTomlProxy
 async def autohttps_toml_proxy():
     """Fixture returning a configured Let's Encrypt TraefikTomlProxy"""
     proxy = TraefikTomlProxy(
-        public_url="http://127.0.0.1:8000",
+        public_url="https://jupyter.test:8443",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
         should_start=True,
