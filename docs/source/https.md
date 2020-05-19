@@ -17,7 +17,7 @@ up **manually** with your own key and certificate.
     ```
     * Set the email address used for Let's Encrypt registration:
     ```python
-    c.Proxy.traefik_letsencrypt_email="jovyan@jupyter.test"
+    c.Proxy.traefik_letsencrypt_email=""
     ```
     * Set the domain list:
     ```python
