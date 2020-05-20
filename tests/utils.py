@@ -42,7 +42,7 @@ async def wait_for_certificate_aquisition(cert_storage):
 
     with open(cert_storage, "r+") as cert_info:
         await exponential_backoff(
-            _check_certificate_aquisition, "Certificate not available"
+            _check_certificate_aquisition, "Certificate not available", timeout=30
         )
 
 
