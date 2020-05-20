@@ -26,6 +26,7 @@ async def autohttps_toml_proxy():
         traefik_letsencrypt_email="jovyan@jupyter.test",
         traefik_letsencrypt_domains=["jupyter.test"],
         traefik_acme_server="https://0.0.0.0:14000/dir",
+        traefik_acme_challenge_port=8000
     )
 
     await proxy.start()
