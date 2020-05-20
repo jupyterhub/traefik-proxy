@@ -1,3 +1,4 @@
+pyOpenSSL
 pytest
 pytest-asyncio
 codecov

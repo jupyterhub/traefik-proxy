@@ -1,23 +1,26 @@
 """Tests for the base traefik proxy"""
 
-import copy
-import utils
-import subprocess
-import sys
-
 from contextlib import contextmanager
+import copy
 from os.path import dirname, join, abspath
-from random import randint
 from unittest.mock import Mock
 from urllib.parse import quote
 from urllib.parse import urlparse
+from random import randint
+import subprocess
+import socket
+import sys
+import ssl
 
+from OpenSSL import crypto
+from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
 import pytest
+import websockets
+
+import utils
 from jupyterhub.objects import Hub, Server
 from jupyterhub.user import User
 from jupyterhub.utils import exponential_backoff, url_path_join
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
-import websockets
 
 
 class MockApp:
@@ -373,10 +376,25 @@ async def test_autohttps(pebble, autohttps_toml_proxy, launch_backend):
 
     await utils.wait_for_certificate_aquisition(proxy.traefik_acme_storage)
 
+    # Test certifcates
+    hostname = urlparse(proxy.public_url).hostname
+    port = urlparse(proxy.public_url).port
+
+    context = ssl.SSLContext()
+    with ssl.create_connection((hostname, port)) as connection:
+        with context.wrap_socket(connection, server_hostname=hostname) as sock:
+            certificate = ssl.DER_cert_to_PEM_cert(sock.getpeercert(True))
+            cert = crypto.load_certificate(crypto.FILETYPE_PEM, certificate)
+
+            # The signer of the server's certificate.
+            issuer = cert.get_issuer().commonName
+            assert "Pebble" in issuer
+
+            # # The subject of this certificate signing request.
+            subject = cert.get_subject().commonName
+            assert hostname == subject
+
     # Test the actual routing
     req = HTTPRequest(proxy.public_url + routespec, method="GET", validate_cert=False)
     resp = await AsyncHTTPClient().fetch(req)
-    backend_response = int(resp.body.decode("utf-8"))
-
-    # Test redirection to the route added
-    assert backend_response == backend_port
+    assert backend_port == int(resp.body.decode("utf-8"))
