@@ -11,10 +11,6 @@ up **manually** with your own key and certificate.
     ```python
     c.Proxy.traefik_auto_https=True
     ```
-    * Configure a HTTPS port. This is where all the traffic coming through the HTTP entrypoint will be redirected to:
-    ```python
-    c.Proxy.traefik_https_port=443
-    ```
     * Set the email address used for Let's Encrypt registration:
     ```python
     c.Proxy.traefik_letsencrypt_email=""
@@ -26,6 +22,10 @@ up **manually** with your own key and certificate.
     * Set the the CA server to be used:
     ```python
     c.Proxy.traefik_acme_server="https://acme-v02.api.letsencrypt.org/directory"
+    ```
+    * Set the port to be used by Traefik for the Acme HTTP challenge:
+    ```python
+    c.Proxy.traefik_acme_challenge_port="https://acme-v02.api.letsencrypt.org/directory"
     ```
     <span style="color:green">**Note !**</span>
 
@@ -41,13 +41,6 @@ up **manually** with your own key and certificate.
       c.JupyterHub.ssl_cert = '/path/to/my.cert'
     ```
 
-    Traefik will then redirect all HTTP traffic to the HTTPS entrypoint. The default HTTPS entrypoint port is 8843, but can be configured through:
-    ```python
-    c.Proxy.traefik_https_port=443
-    ```
-
 ## How-To HTTPS for external Traefik-Proxy
 If the proxy isn't managed by JupyterHub, HTTPS can be enabled through Traefik's static configuration file.
-Checkout Traefik's documentation for:
-* [Setting up ACME (Let's Encrypt) Configuration](https://docs.traefik.io/v1.7/configuration/acme/)
-* [How to redirect HTTP traffic to HTTPS](https://docs.traefik.io/v1.7/user-guide/examples/#http-redirect-on-https)
+Checkout Traefik's documentation for [setting up ACME (Let's Encrypt) configuration](https://docs.traefik.io/v1.7/configuration/acme/)
