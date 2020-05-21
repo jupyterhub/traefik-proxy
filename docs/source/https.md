@@ -25,7 +25,8 @@ up **manually** with your own key and certificate.
     ```
     * Set the port to be used by Traefik for the Acme HTTP challenge:
     ```python
-    c.Proxy.traefik_acme_challenge_port="https://acme-v02.api.letsencrypt.org/directory"
+    # default port is 80
+    c.Proxy.traefik_acme_challenge_port=8000
     ```
     <span style="color:green">**Note !**</span>
 
