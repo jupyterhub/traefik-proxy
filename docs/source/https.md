@@ -23,16 +23,21 @@ up **manually** with your own key and certificate.
     ```python
     c.Proxy.traefik_acme_server="https://acme-v02.api.letsencrypt.org/directory"
     ```
-    * Set the port to be used by Traefik for the Acme HTTP challenge:
-    ```python
-    # default port is 80
-    c.Proxy.traefik_acme_challenge_port=8000
-    ```
-    <span style="color:green">**Note !**</span>
+    <span style="color:green">**Note 1**</span>
 
     **TraefikProxy**, supports only the most common challenge type, i.e. the [HTTP-01 ACME challenge](https://letsencrypt.org/docs/challenge-types/#http-01-challenge).
     If other challenge type is needed, one could setup the proxy to be externally managed to get access to all the Traefik's configuration options (including the
     ACME challenge type).
+
+    <span style="color:green">**Note 2**</span>
+
+    When using Let's Encrypt for certificate aquisition, Traefik **must** to be able to receive the HTTP-01 request from the ACME server on **port 80**. This is a Let's Encrypt limitation as described on the [Let's Encrypt community forum](https://community.letsencrypt.org/t/support-for-ports-other-than-80-and-443/3419/72) and the [Traefik docs](https://docs.traefik.io/v1.7/configuration/acme/#acme-challenge).
+
+    The HTTP port used for the ACME HTTP-01 challenge is set by default to 80 in TraefikProxy. However, it can be configured for testing purposes (when using the ACME testing server, [Pebble](https://github.com/letsencrypt/pebble) for example) using:
+
+      ```python
+      c.Proxy.traefik_acme_challenge_port=8000
+      ```
 
 2. **Manually**, by providing your own key and certificate:
 
