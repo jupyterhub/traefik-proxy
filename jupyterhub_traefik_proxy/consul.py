@@ -39,7 +39,7 @@ class TraefikConsulProxy(TKvProxy):
     """JupyterHub Proxy implementation using traefik and Consul"""
 
     # Consul doesn't accept keys containing // or starting with / so we have to escape them
-    key_safe_chars = string.ascii_letters + string.digits + "!@#$%^&*();<>_-.+?:"
+    key_safe_chars = string.ascii_letters + string.digits + "!@#$%^&*();<>-.+?:"
 
     kv_name = "consul"
 

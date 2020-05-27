@@ -100,7 +100,7 @@ class TraefikTomlProxy(TraefikProxy):
             raise
 
     def _get_route_unsafe(self, traefik_routespec):
-        safe = string.ascii_letters + string.digits + "_-"
+        safe = string.ascii_letters + string.digits + "-"
         escaped_routespec = escapism.escape(traefik_routespec, safe=safe)
         routespec = self._routespec_from_traefik_path(traefik_routespec)
         result = {"data": "", "target": "", "routespec": routespec}
@@ -214,7 +214,7 @@ class TraefikTomlProxy(TraefikProxy):
         **Subclasses must define this method**
         """
         routespec = self._routespec_to_traefik_path(routespec)
-        safe = string.ascii_letters + string.digits + "_-"
+        safe = string.ascii_letters + string.digits + "-"
         escaped_routespec = escapism.escape(routespec, safe=safe)
 
         async with self.mutex:
