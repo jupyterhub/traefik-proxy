@@ -38,7 +38,7 @@ def generate_rule(routespec):
 
 
 def generate_alias(routespec, server_type=""):
-    safe = string.ascii_letters + string.digits + "_-"
+    safe = string.ascii_letters + string.digits + "-"
     return server_type + "_" + escapism.escape(routespec, safe=safe)
 
 
