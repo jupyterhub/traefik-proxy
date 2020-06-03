@@ -9,6 +9,12 @@ env:
     - ETCDCTL_API=3
     - LEGO_CA_SERVER_NAME=pebble
     - LEGO_CA_CERTIFICATES=$GOPATH/src/github.com/letsencrypt/pebble/test/certs/localhost/cert.pem
+    # ref: https://github.com/letsencrypt/pebble#testing-at-full-speed
+    - PEBBLE_VA_NOSLEEP=1
+    # ref: https://github.com/letsencrypt/pebble#invalid-anti-replay-nonce-errors
+    - PEBBLE_WFE_NONCEREJECT=0
+    # ref: https://github.com/letsencrypt/pebble#authorization-reuse
+    - PEBBLE_AUTHZREUSE=100
 
 # installing dependencies
 before_install:
