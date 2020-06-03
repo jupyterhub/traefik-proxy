@@ -25,7 +25,7 @@ async def autohttps_toml_proxy():
         traefik_auto_https=True,
         traefik_letsencrypt_email="jovyan@local.jovyan.org",
         traefik_letsencrypt_domains=["local.jovyan.org"],
-        traefik_acme_server="https://0.0.0.0:14000/dir",
+        traefik_acme_server="https://localhost:14000/dir",
         traefik_acme_challenge_port=8000
     )
 
