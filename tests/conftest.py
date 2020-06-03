@@ -18,13 +18,13 @@ from jupyterhub_traefik_proxy import TraefikTomlProxy
 async def autohttps_toml_proxy():
     """Fixture returning a configured Let's Encrypt TraefikTomlProxy"""
     proxy = TraefikTomlProxy(
-        public_url="https://jupyter.test:8443",
+        public_url="https://local.jovyan.org:8443",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
         should_start=True,
         traefik_auto_https=True,
-        traefik_letsencrypt_email="jovyan@jupyter.test",
-        traefik_letsencrypt_domains=["jupyter.test"],
+        traefik_letsencrypt_email="jovyan@local.jovyan.org",
+        traefik_letsencrypt_domains=["local.jovyan.org"],
         traefik_acme_server="https://0.0.0.0:14000/dir",
         traefik_acme_challenge_port=8000
     )

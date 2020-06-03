@@ -1,9 +1,6 @@
 language: python
 cache:
   - pip
-addons:
-  hosts:
-    - jupyter.test
 env:
   global:
     - ETCDCTL_API=3
