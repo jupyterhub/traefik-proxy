@@ -18,7 +18,7 @@ defaults:
     shell: bash
 
 jobs:
-  # Run "pytest tests" in various configurations
+  # Run "pytest tests" for various Python versions
   pytest:
     runs-on: ubuntu-20.04
     strategy:
@@ -36,6 +36,7 @@ jobs:
       - name: Configure environment variables
         run: |
           echo "ETCDCTL_API=3" >> $GITHUB_ENV
+          echo "PATH=$PWD/bin:$PATH" >> $GITHUB_ENV
       - uses: actions/checkout@v2
       # NOTE: actions/setup-python@v2 make use of a cache within the GitHub base
       #       environment and setup in a fraction of a second.
@@ -47,7 +48,7 @@ jobs:
         run: |
           pip install --upgrade setuptools pip
           pip install --pre -r dev-requirements.txt --upgrade .
-          python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=/usr/local/bin
+          python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=./bin
           pip freeze
       - name: Run pytest
         run: |
