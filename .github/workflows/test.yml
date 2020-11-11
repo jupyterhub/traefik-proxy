@@ -47,8 +47,7 @@ jobs:
         run: |
           pip install --upgrade setuptools pip
           pip install --pre -r dev-requirements.txt --upgrade .
-          python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=./bin
-          export PATH=$PWD/bin:$PATH
+          python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=/usr/local/bin
           pip freeze
       - name: Run pytest
         run: |
