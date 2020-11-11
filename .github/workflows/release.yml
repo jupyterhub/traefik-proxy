@@ -1,0 +1,41 @@
+# This is a GitHub workflow to auto-deploy releases on tags
+# Useful references:
+# https://packaging.python.org/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
+# https://docs.github.com/en/free-pro-team@latest/actions/guides/building-and-testing-python#publishing-to-package-registries
+# https://github.community/t/how-to-run-github-actions-workflow-only-for-new-tags/16075
+# https://www.codingwithcalvin.net/git-tag-based-released-process-using-github-actions/
+name: Release
+
+# Trigger the workflows on all PRs pushed commits and/or tags
+# to be able to test changes without opening PRs
+on:
+  push:
+    # FIXME: use the release event instead?
+    tags: [0-9]+.[0-9]+.[0-9]+
+    branches: master
+
+jobs:
+  build-n-publish:
+    name: Build and publish on tags to PyPI
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install Tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel twine
+    - name: Package and Upload
+      if: startsWith(github.ref, 'refs/tags')
+      env:
+        TRAEFIK_PROXY_VERSION: ${{ github.event.release.tag_name }}
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_APIKEY }}
+      run: |
+        python setup.py sdist bdist_wheel
+        twine upload dist/*
