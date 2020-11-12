@@ -13,6 +13,28 @@ from jupyterhub_traefik_proxy import TraefikConsulProxy
 from jupyterhub_traefik_proxy import TraefikTomlProxy
 
 
+# Add a "slow" test marker
+# ref: https://docs.pytest.org/en/6.0.1/example/simple.html#control-skipping-of-tests-according-to-command-line-option
+def pytest_addoption(parser):
+    parser.addoption(
+        "--slow", action="store_true", default=False, help="run slow tests"
+    )
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "slow: mark test as slow to run")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--slow"):
+        # --slow given in cli: do not skip slow tests
+        return
+    skip_slow = pytest.mark.skip(reason="need --slow option to run")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
+
+
 @pytest.fixture
 async def no_auth_consul_proxy(consul_no_acl):
     """
