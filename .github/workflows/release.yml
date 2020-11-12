@@ -30,9 +30,9 @@ jobs:
         pip install build
         pip freeze
     - name: Build release
-        run: |
-          python -m build --sdist --wheel .
-          ls -l dist
+      run: |
+        python -m build --sdist --wheel .
+        ls -l dist
     - name: Publish to PYPI
         uses: pypa/gh-action-pypi-publish@v1.4.1
         if: startsWith(github.ref, 'refs/tags/')
