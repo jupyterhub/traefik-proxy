@@ -6,13 +6,11 @@
 # https://www.codingwithcalvin.net/git-tag-based-released-process-using-github-actions/
 name: Release
 
-# Trigger the workflows on all PRs pushed commits and/or tags
-# to be able to test changes without opening PRs
+# Always build releases (to make sure wheel-building works)
+# but only publish to PyPI on tags
 on:
   push:
-    # FIXME: use the release event instead?
-    tags: [0-9]+.[0-9]+.[0-9]+*
-    branches: master
+  pull_request:
 
 jobs:
   build-release:
