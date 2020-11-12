@@ -4,10 +4,8 @@ import pytest
 
 from proxytest import *
 
-# Mark all tests in this file as asyncio
-pytestmark = pytest.mark.asyncio
-# Mark all tests in this file as slow
-pytestmark = pytest.mark.slow
+# Mark all tests in this file as asyncio and slow
+pytestmark = [pytest.mark.asyncio, pytest.mark.slow]
 
 
 @pytest.fixture(

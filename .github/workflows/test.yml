@@ -52,13 +52,8 @@ jobs:
           pip freeze
       - name: Run tests
         run: |
-          # This should skip the tests in test_proxy.py because we want to run them in a separate job
-          # using the "--slow" flag
-          pytest -v tests --color=yes --cov=jupyterhub_traefik_proxy
-      - name: Run slow proxy tests
-        run: |
-          # This will run just the tests in test_proxy.py that are slow
-          pytest -v tests/test_proxy.py --slow --color=yes --cov=jupyterhub_traefik_proxy
+          # Using the "--slow-last" flag, should run the slow tests last
+          pytest -v tests --slow-last --color=yes --cov=jupyterhub_traefik_proxy
       - name: Submit codecov report
         run: |
           codecov
