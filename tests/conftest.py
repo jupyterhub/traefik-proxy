@@ -119,7 +119,7 @@ async def toml_proxy():
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
-        check_route_timeout=90,
+        check_route_timeout=180,
         should_start=True,
     )
 
