@@ -2,7 +2,7 @@
 # JupyterHub Traefik Proxy
 
 [![Documentation build status](https://img.shields.io/readthedocs/jupyterhub-traefik-proxy?logo=read-the-docs)](https://jupyterhub-traefik-proxy.readthedocs.org/en/latest/)
-[![TravisCI (.com) build status](https://img.shields.io/travis/com/jupyterhub/traefik-proxy/master?logo=travis)](https://travis-ci.com/jupyterhub/traefik-proxy)
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/jupyterhub/traefik-proxy/Run%20tests?logo=github)](https://github.com/jupyterhub/traefik-proxy/actions)
 [![CircleCI build status](https://img.shields.io/circleci/build/github/jupyterhub/jupyterhub?logo=circleci)](https://circleci.com/gh/jupyterhub/jupyterhub)
 [![Latest PyPI version](https://img.shields.io/pypi/v/jupyterhub-traefik-proxy?logo=pypi)](https://pypi.python.org/pypi/jupyterhub-traefik-proxy)
 [![GitHub](https://img.shields.io/badge/issue_tracking-github-blue?logo=github)](https://github.com/jupyterhub/traefik-proxy/issues)

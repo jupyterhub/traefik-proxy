@@ -5,6 +5,9 @@ import os
 
 installer_module = "jupyterhub_traefik_proxy.install"
 
+# Mark all tests in this file as slow
+pytestmark = pytest.mark.slow
+
 
 def cleanup(dirname):
     import shutil

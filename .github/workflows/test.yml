@@ -1,0 +1,68 @@
+# This is a GitHub workflow defining a set of jobs with a set of steps.
+# Useful GitHub Actions docs:
+# - https://help.github.com/en/actions
+# - https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions
+# - https://help.github.com/en/actions/configuring-and-managing-workflows/configuring-a-workflow
+# - https://help.github.com/en/actions/reference/context-and-expression-syntax-for-github-actions
+# - https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions
+name: Run tests
+
+# Trigger the workflows on all PRs pushed commits and/or tags
+# to be able to test changes without opening PRs
+on:
+  pull_request:
+  push:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Run "pytest tests" for various Python versions
+  pytest:
+    runs-on: ubuntu-20.04
+    strategy:
+      # Keep running even if one variation of the job fail
+      fail-fast: false
+      matrix:
+        python:
+          - "3.7"
+          - "3.8"
+          - "3.9"
+    steps:
+      # NOTE: In GitHub workflows, environment variables are set by writing
+      #       assignment statements to a file. They will be set in the following
+      #       steps as if would used `export MY_ENV=my-value`.
+      - name: Configure environment variables
+        run: |
+          echo "ETCDCTL_API=3" >> $GITHUB_ENV
+          echo "PATH=$PWD/bin:$PATH" >> $GITHUB_ENV
+      - uses: actions/checkout@v2
+      # NOTE: actions/setup-python@v2 make use of a cache within the GitHub base
+      #       environment and setup in a fraction of a second.
+      - name: Install Python ${{ matrix.python }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python }}
+      # Test pkg build for python 3.8
+      - name: Install requirements and build package
+        if: matrix.python == '3.8'
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          pip freeze
+          python -m build --sdist --wheel .
+          ls -l dist
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade setuptools pip
+          pip install --pre -r dev-requirements.txt --upgrade .
+          python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=./bin
+          pip freeze
+      - name: Run tests
+        run: |
+          # Using the "--slow-last" flag, should run the slow tests last
+          pytest -v tests --slow-last --color=yes --cov=jupyterhub_traefik_proxy
+      - name: Submit codecov report
+        run: |
+          codecov

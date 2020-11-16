@@ -1,0 +1,42 @@
+# This is a GitHub workflow to auto-deploy releases on tags
+# Useful references:
+# https://packaging.python.org/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
+# https://docs.github.com/en/free-pro-team@latest/actions/guides/building-and-testing-python#publishing-to-package-registries
+# https://github.community/t/how-to-run-github-actions-workflow-only-for-new-tags/16075
+# https://www.codingwithcalvin.net/git-tag-based-released-process-using-github-actions/
+name: Release
+
+# Always build releases (to make sure wheel-building works)
+# but only publish to PyPI on tags
+on:
+  push:
+    tags: v?[0-9]+.[0-9]+.[0-9]+*
+    branches: master
+
+jobs:
+  build-release:
+    name: Build release
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install build package
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+        pip freeze
+    - name: Build release
+      run: |
+        python -m build --sdist --wheel .
+        ls -l dist
+    - name: Publish to PYPI
+      uses: pypa/gh-action-pypi-publish@v1.4.1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        user: __token__
+        password: ${{ secrets.pypi_password }}
