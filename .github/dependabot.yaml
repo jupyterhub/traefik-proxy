@@ -1,0 +1,14 @@
+# dependabot.yml reference: https://docs.github.com/en/free-pro-team@latest/github/administering-a-repository/configuration-options-for-dependency-updates
+version: 2
+updates:
+  # Maintain Python dependencies for jupyterhub-traefik-proxy
+  - package-ecosystem: pip-complie
+    directory: "/"
+    schedule:
+      interval: weekly
+      time: "00:00"
+      timezone: "Etc/UTC"
+    versioning-strategy: lockfile-only
+    labels:
+      - maintenance
+      - dependencies
