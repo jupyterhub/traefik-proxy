@@ -10,6 +10,8 @@ import hashlib
 import warnings
 
 checksums_traefik = {
+    "https://github.com/containous/traefik/releases/download/v1.7.28/traefik_linux-amd64": "b70284ac72b4f9a119be92f206fc0c6dbc0db18ff7295d4df6701c0b292ecbf0",
+    "https://github.com/containous/traefik/releases/download/v1.7.28/traefik_darwin-amd64": "3e4bb0146bed06c842ae7a91e711e5ba98339f529b84aa80c766a01dd39d9731",
     "https://github.com/containous/traefik/releases/download/v1.7.18/traefik_linux-amd64": "3c2d153d80890b6fc8875af9f8ced32c4d684e1eb5a46d9815337cb343dfd92e",
     "https://github.com/containous/traefik/releases/download/v1.7.18/traefik_darwin-amd64": "84e07a184c31b7fb86417ba3a237ad334a26bcb1ed53fd56f0774afaa34074d9",
     "https://github.com/containous/traefik/releases/download/v1.7.5/traefik_linux-amd64": "4417a9d83753e1ad6bdd64bbbeaeb4b279bcc71542e779b7bcb3b027c6e3356e",
@@ -26,6 +28,8 @@ checksums_etcd = {
 }
 
 checksums_consul = {
+    "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip": "a8568ca7b6797030b2c32615b4786d4cc75ce7aee2ed9025996fe92b07b31f7e",
+    "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_darwin_amd64.zip": "4bc205e06b2921f998cb6ddbe70de57f8e558e226e44aba3f337f2f245678b85",
     "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_linux_amd64.zip": "1399064050019db05d3378f757e058ec4426a917dd2d240336b51532065880b6",
     "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_darwin_amd64.zip": "b4033ea6871fe6136ee5d940c834be2248463c3ec248dc22370e6d5360931325",
 }
@@ -245,6 +249,8 @@ def main():
             """\
             Checksums available for:
             - traefik:
+                - v1.7.28-linux-amd64
+                - v1.7.28-darwin-amd64
                 - v1.7.18-linux-amd64
                 - v1.7.18-darwin-amd64
                 - v1.7.5-linux-amd64
@@ -259,6 +265,8 @@ def main():
             - consul:
                 - v1.5.0_linux_amd64
                 - v1.5.0_darwin_amd64
+                - v1.6.1_linux_amd64
+                - v1.6.1_darwin_amd64
             """
         ),
         formatter_class=argparse.RawTextHelpFormatter,
@@ -307,7 +315,7 @@ def main():
     parser.add_argument(
         "--traefik-version",
         dest="traefik_version",
-        default="1.7.18",
+        default="1.7.28",
         help=textwrap.dedent(
             """\
             The version of traefik to download.
@@ -355,7 +363,7 @@ def main():
     parser.add_argument(
         "--consul-version",
         dest="consul_version",
-        default="1.5.0",
+        default="1.6.1",
         help=textwrap.dedent(
             """\
             The version of consul to download.

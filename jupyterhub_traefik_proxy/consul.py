@@ -64,10 +64,8 @@ class TraefikConsulProxy(TKvProxy):
                 token=self.kv_password,
                 cert=self.consul_client_ca_cert,
             )
-            client.http._session._default_headers.update(
-                {"X-Consul-Token": self.kv_password}
-            )
             return client
+
         return consul.aio.Consul(
             host=str(consul_service.hostname),
             port=consul_service.port,
@@ -237,4 +235,3 @@ class TraefikConsulProxy(TKvProxy):
 
     async def stop(self):
         await super().stop()
-        await self.kv_client.http._session.close()

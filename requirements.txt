@@ -1,7 +1,7 @@
 jupyterhub>=0.9
 etcd3
-aiohttp==3.6.2
-python-consul
+aiohttp
+python-consul2
 passlib
-toml==0.10.0
+toml
 escapism
