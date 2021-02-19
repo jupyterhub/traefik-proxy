@@ -261,6 +261,8 @@ def main():
             - consul:
                 - v1.5.0_linux_amd64
                 - v1.5.0_darwin_amd64
+                - v1.6.1_linux_amd64
+                - v1.6.1_darwin_amd64
             """
         ),
         formatter_class=argparse.RawTextHelpFormatter,
