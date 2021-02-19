@@ -26,6 +26,8 @@ checksums_etcd = {
 }
 
 checksums_consul = {
+    "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip": "a8568ca7b6797030b2c32615b4786d4cc75ce7aee2ed9025996fe92b07b31f7e",
+    "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_darwin_amd64.zip": "4bc205e06b2921f998cb6ddbe70de57f8e558e226e44aba3f337f2f245678b85",
     "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_linux_amd64.zip": "1399064050019db05d3378f757e058ec4426a917dd2d240336b51532065880b6",
     "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_darwin_amd64.zip": "b4033ea6871fe6136ee5d940c834be2248463c3ec248dc22370e6d5360931325",
 }
@@ -355,7 +357,7 @@ def main():
     parser.add_argument(
         "--consul-version",
         dest="consul_version",
-        default="1.5.0",
+        default="1.6.1",
         help=textwrap.dedent(
             """\
             The version of consul to download.
