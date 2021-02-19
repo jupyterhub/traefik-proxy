@@ -2,7 +2,7 @@
 version: 2
 updates:
   # Maintain Python dependencies for jupyterhub-traefik-proxy
-  - package-ecosystem: pip-complie
+  - package-ecosystem: pip-compile
     directory: "/"
     schedule:
       interval: weekly
