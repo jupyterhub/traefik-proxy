@@ -1,9 +1,0 @@
-# This file is automatically maintained by Dependabot, as configured in
-# .github/dependabot.yaml.
-jupyterhub
-etcd3
-aiohttp
-python-consul2
-passlib
-toml
-escapism
