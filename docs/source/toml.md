@@ -1,4 +1,4 @@
-# Using traefik-proxy with TOML configuration files
+# Using TraefikTomlProxy
 
 **jupyterhub-traefik-proxy** can be used with simple toml configuration files, for smaller, single-node deployments such as
 [The Littlest JupyterHub](https://tljh.jupyter.org).
@@ -19,13 +19,13 @@ You can choose to:
 
 * use the `traefik_toml` entrypoint, new in JupyterHub 1.0, e.g.:
 
-    ```
+    ```python
     c.JupyterHub.proxy_class = "traefik_toml"
     ```
 
 * use the TraefikTomlProxy object, in which case, you have to import the module, e.g.:
 
-    ```
+    ```python
     from jupyterhub_traefik_proxy import TraefikTomlProxy
     c.JupyterHub.proxy_class = TraefikTomlProxy
     ```
@@ -41,12 +41,10 @@ where the routing table will be updated continuously.
 
 Traefik allows us to have one file for the static configuration (the `traefik.toml`) and one or several files for the routes, that traefik would watch.
 
----
-<span style="color:green">**Note !**</span>
+```{note}
+  **TraefikTomlProxy**, uses two configuration files: one file for the routes (**rules.toml**), and one for the static configuration (**traefik.toml**).
+```
 
-**TraefikTomlProxy**, uses two configuration files: one file for the routes (**rules.toml**), and one for the static configuration (**traefik.toml**).
-
----
 
 By **default**, Traefik will search for `traefik.toml` and `rules.toml` in the following places:
 
@@ -56,24 +54,23 @@ By **default**, Traefik will search for `traefik.toml` and `rules.toml` in the f
 
 You can override this in TraefikTomlProxy, by modifying the **toml_static_config_file** argument:
 
-```
+```python
 c.TraefikTomlProxy.toml_static_config_file="/path/to/static_config_filename.toml"
 ```
 
 Similarly, you can override the dynamic configuration file by modifying the **toml_dynamic_config_file** argument:
 
-```
+```python
 c.TraefikTomlProxy.toml_dynamic_config_file="/path/to/dynamic_config_filename.toml"
 ```
 
----
-<span style="color:green">**Note !**</span>
+```{note}
 
-**When JupyterHub starts the proxy**, it writes the static config once, then only edits the routes config file. 
+* **When JupyterHub starts the proxy**, it writes the static config once, then only edits the routes config file. 
 
-**When JupyterHub does not start the proxy**, the user is totally responsible for the static config and 
+* **When JupyterHub does not start the proxy**, the user is totally responsible for the static config and 
 JupyterHub is responsible exclusively for the routes.
----
+```
 
 ## Externally managed TraefikTomlProxy
 
@@ -83,11 +80,11 @@ or [docker](https://www.docker.com/) will be responsible for starting and stoppi
 If TraefikTomlProxy is used as an externally managed service, then make sure you follow the steps enumerated below:
 
 1. Let JupyterHub know that the proxy being used is TraefikTomlProxy, using the *proxy_class* configuration option:
-    ```
+    ```python
     c.JupyterHub.proxy_class = "traefik_toml"
     ```
 
-2. Configure `TraeficTomlProxy` in **jupyterhub_config.py**
+2. Configure `TraefikTomlProxy` in **jupyterhub_config.py**
 
    JupyterHub configuration file, *jupyterhub_config.py* must specify at least:
    * That the proxy is externally managed
@@ -97,7 +94,7 @@ If TraefikTomlProxy is used as an externally managed service, then make sure you
      in another place than traefik's default search directories (etc/traefik/, $HOME/.traefik/, the working directory)
 
     Example configuration:
-    ```
+    ```python
     # JupyterHub shouldn't start the proxy, it's already running
     c.TraefikTomlProxy.should_start = False
 
@@ -124,7 +121,7 @@ This is an example setup for using JupyterHub and TraefikTomlProxy managed by an
 
 1. Configure the proxy through the JupyterHub configuration file, *jupyterhub_config.py*, e.g.:
 
-   ```
+   ```python
    from jupyterhub_traefik_proxy import TraefikTomlProxy
 
    # mark the proxy as externally managed
@@ -177,6 +174,6 @@ This is an example setup for using JupyterHub and TraefikTomlProxy managed by an
    ```
 
 3. Start traefik with the configuration specified above, e.g.:
-    ```
+    ```bash
     $ traefik -c traefik.toml
     ```
