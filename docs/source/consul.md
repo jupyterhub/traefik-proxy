@@ -1,4 +1,4 @@
-# Using traefik-proxy with consul
+# Using TraefikConsulProxy
 
 [Consul](https://www.consul.io/)
 is a distributed key-value store.
@@ -24,13 +24,13 @@ You can choose to:
 
 * use the `traefik_consul` entrypoint, new in JupyterHub 1.0, e.g.:
 
-    ```
+    ```python
     c.JupyterHub.proxy_class = "traefik_consul"
     ```
 
 * use the TraefikConsulProxy object, in which case, you have to import the module, e.g.:
 
-    ```
+    ```python
     from jupyterhub_traefik_proxy import TraefikConsulProxy
     c.JupyterHub.proxy_class = TraefikConsulProxy
     ```
@@ -50,7 +50,9 @@ You can choose to:
 
    Similarly, the dynamic configuration is built by searching the **kv_jupyterhub_prefix**.
 
-   **Note**: If you want to change or add traefik's static configuration options, you can add them to consul under this prefix and traefik will pick them up.
+   ```{note}
+    If you want to change or add traefik's static configuration options, you can add them to consul under this prefix and traefik will pick them up.
+   ```
 
     * The **default** values of this configurations options are:
         ```
@@ -66,42 +68,40 @@ You can choose to:
 
 3. By **default**, TraefikConsulProxy assumes consul accepts client requests on the official **default** consul port `8500` for client requests.
 
-    ```
-    c.TraefikConsulProxy.kv_url="http://127.0.0.1:8500"
+    ```python
+    c.TraefikConsulProxy.kv_url = "http://127.0.0.1:8500"
     ```
 
     If the consul cluster is deployed differently than using the consul defaults, then you **must** pass the consul url to the proxy using 
     the `kv_url` option in *jupyterhub_config.py*:
 
+    ```python
+    c.TraefikConsulProxy.kv_url = "scheme://hostname:port"
     ```
-    c.TraefikConsulProxy.kv_url="scheme://hostname:port"
+
+    ```{note}
+    **TraefikConsulProxy does not manage the consul cluster** and assumes it is up and running before the proxy itself starts.
+    However, based on how consul is configured and started, TraefikConsulProxy needs to be told about 
+    some consul configuration details, such as:
+      * consul **address** where it accepts client requests
+        ```
+          c.TraefikConsulProxy.kv_url="scheme://hostname:port"
+        ```
+      * consul **credentials** (if consul has acl enabled)
+        ```
+          c.TraefikConsulProxy.kv_password="123"
+        ```
+
+    Checkout the [consul documentation](https://learn.hashicorp.com/consul/) 
+    to find out more about possible consul configuration options.
     ```
-
----
-<span style="color:green">**Note 1**</span>
-
-   **TraefikConsulProxy does not manage the consul cluster** and assumes it is up and running before the proxy itself starts.
-
-   However, based on how consul is configured and started, TraefikConsulProxy needs to be told about 
-   some consul configuration details, such as:
-   * consul **address** where it accepts client requests
-     ```
-     c.TraefikConsulProxy.kv_url="scheme://hostname:port"
-     ```
-   * consul **credentials** (if consul has acl enabled)
-     ```
-     c.TraefikConsulProxy.kv_password="123"
-     ```
-
-Checkout the [consul documentation](https://learn.hashicorp.com/consul/) 
-to find out more about possible consul configuration options.
 
 ## Externally managed TraefikConsulProxy
 
 If TraefikConsulProxy is used as an externally managed service, then make sure you follow the steps enumerated below:
 
 1. Let JupyterHub know that the proxy being used is TraefikConsulProxy, using the *proxy_class* configuration option:
-    ```
+    ```python
     c.JupyterHub.proxy_class = "traefik_consul"
     ```
 
@@ -113,7 +113,7 @@ If TraefikConsulProxy is used as an externally managed service, then make sure y
    * The consul credentials (if consul acl is enabled)
 
    Example configuration:
-   ```
+   ```python
    # JupyterHub shouldn't start the proxy, it's already running
    c.TraefikConsulProxy.should_start = False
 
@@ -170,12 +170,13 @@ If TraefikConsulProxy is used as an externally managed service, then make sure y
       watch = true
      ```
 
-     **Note**: **If you choose to enable consul Access Control Lists (ACLs) to secure the UI, API, CLI, service communications, and agent communications**, you can use this *toml* file to pass the credentials to traefik, e.g.:
-
-      ```
-      [consul]
-      password = "admin"
-      ...
+     ```{note}
+     If you choose to enable consul Access Control Lists (ACLs) to secure the UI, API, CLI, service communications, and agent communications, you can use this *toml* file to pass the credentials to traefik, e.g.:
+        ```
+          [consul]
+          password = "admin"
+          ...
+        ```
      ```
 
 ## Example setup
@@ -184,7 +185,7 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
 
 1. Configure the proxy through the JupyterHub configuration file, *jupyterhub_config.py*, e.g.:
 
-   ```
+   ```python
    from jupyterhub_traefik_proxy import TraefikConsulProxy
 
    # mark the proxy as externally managed
@@ -201,21 +202,23 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
 
    # configure JupyterHub to use TraefikConsulProxy
    c.JupyterHub.proxy_class = TraefikConsulProxy
-    ```
+   ```
 
-    **Note:** If you intend to enable consul acl, add the acl token to *jupyterhub_config.py* under *kv_password*:
+    ```{note}
+    If you intend to enable consul acl, add the acl token to *jupyterhub_config.py* under *kv_password*:
 
-    ```
-    # consul token
-    c.TraefikConsulProxy.kv_password = "456"
+        # consul token
+        c.TraefikConsulProxy.kv_password = "456"
     ```
 
 2. Starts the agent in development mode on the default port on localhost. e.g.:
-   ```
+   ```bash
    $ consul agent -dev
    ```
-   **Note:** If you intend to enable consul acl, checkout
-   [this guide](https://learn.hashicorp.com/consul/security-networking/production-acls):
+
+   ```{note}
+    If you intend to enable consul acl, checkout [this guide](https://learn.hashicorp.com/consul/security-networking/production-acls).
+   ```
 
 3. Create a traefik static configuration file, *traefik.toml*, e.g:.
 
@@ -256,6 +259,6 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
    ```
 
 4. Start traefik with the configuration specified above, e.g.:
-    ```
+    ```bash
     $ traefik -c traefik.toml
     ```

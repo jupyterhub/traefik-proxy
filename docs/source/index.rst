@@ -9,8 +9,6 @@ JupyterHub Traefik Proxy
 
 An implementation of the JupyterHub proxy api with `traefik <https://traefik.io>`__ : an extremely lightweight, portable reverse proxy implementation, that supports load balancing and can configure itself automatically and dynamically. 
 
-Version: |version|
-
 Why traefik?
 ============
 
