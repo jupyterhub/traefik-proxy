@@ -25,7 +25,6 @@ import string
 import base64
 
 import asyncio
-import consul.aio
 import escapism
 from tornado.concurrent import run_on_executor
 from traitlets import Any, default, Unicode
@@ -56,6 +55,10 @@ class TraefikConsulProxy(TKvProxy):
 
     @default("kv_client")
     def _default_client(self):
+        try:
+            import consul.aio
+        except ImportError:
+            raise ImportError("Please install python-consul2 package to use traefik-proxy with consul")
         consul_service = urlparse(self.kv_url)
         if self.kv_password:
             client = consul.aio.Consul(
