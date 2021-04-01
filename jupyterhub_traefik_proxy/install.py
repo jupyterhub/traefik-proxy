@@ -12,7 +12,7 @@ import warnings
 checksums_traefik = {
     "https://github.com/traefik/traefik/releases/download/v1.7.29/traefik_linux-arm64": "d27c220bdcc8bae33436adce309fd856c2ee295bd3dd5416428d3b4a173b8310",
     "https://github.com/traefik/traefik/releases/download/v1.7.29/traefik_linux-amd64": "70cd8847354326fb17acd10251c44450cf5d6c4fd8df130f2c6f86dd7b1b52d1",
-    "https://github.com/traefik/traefik/releases/download/v1.7.29/traefik_darwin-amd64" "bbe30c8e7aa5e76442187be409c07e6b798e7ba67d7d3d60856e0a7664654c46",
+    "https://github.com/traefik/traefik/releases/download/v1.7.29/traefik_darwin-amd64": "bbe30c8e7aa5e76442187be409c07e6b798e7ba67d7d3d60856e0a7664654c46",
     "https://github.com/containous/traefik/releases/download/v1.7.28/traefik_linux-amd64": "b70284ac72b4f9a119be92f206fc0c6dbc0db18ff7295d4df6701c0b292ecbf0",
     "https://github.com/containous/traefik/releases/download/v1.7.28/traefik_darwin-amd64": "3e4bb0146bed06c842ae7a91e711e5ba98339f529b84aa80c766a01dd39d9731",
     "https://github.com/containous/traefik/releases/download/v1.7.18/traefik_linux-amd64": "3c2d153d80890b6fc8875af9f8ced32c4d684e1eb5a46d9815337cb343dfd92e",
