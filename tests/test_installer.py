@@ -116,7 +116,23 @@ def test_version(tmpdir):
     assert_binaries_existence(deps_dir)
 
 
-def test_linux_platform(tmpdir):
+def test_linux_arm_platform(tmpdir):
+    deps_dir = str(tmpdir.join("deps"))
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            installer_module,
+            f"--output={deps_dir}",
+            "--traefik",
+            "--platform=linux-arm64",
+        ]
+    )
+
+    assert os.path.exists(deps_dir)
+    assert_only_traefik_existence(deps_dir)
+
+def test_linux_amd64_platform(tmpdir):
     deps_dir = str(tmpdir.join("deps"))
     subprocess.run(
         [
