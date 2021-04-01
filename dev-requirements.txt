@@ -5,3 +5,7 @@ codecov
 black
 notebook>=4.0
 websockets
+# etcd3 & python-consul2 are now soft dependencies
+# Adding them here prevents CI from failing
+etcd3
+python-consul2
