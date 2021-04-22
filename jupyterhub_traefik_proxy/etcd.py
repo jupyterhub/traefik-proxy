@@ -147,7 +147,9 @@ class TraefikEtcdProxy(TKvProxy):
     async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
         value = await maybe_future(self._etcd_get(jupyterhub_routespec))
         if value is None:
-            self.log.warning("Route %s doesn't exist. Nothing to delete", jupyterhub_routespec)
+            self.log.warning(
+                "Route %s doesn't exist. Nothing to delete", jupyterhub_routespec
+            )
             return True, None
 
         target = value.decode()

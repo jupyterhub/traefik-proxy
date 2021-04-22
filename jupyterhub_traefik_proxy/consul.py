@@ -165,7 +165,9 @@ class TraefikConsulProxy(TKvProxy):
 
         index, v = await self.kv_client.kv.get(escaped_jupyterhub_routespec)
         if v is None:
-            self.log.warning("Route %s doesn't exist. Nothing to delete", jupyterhub_routespec)
+            self.log.warning(
+                "Route %s doesn't exist. Nothing to delete", jupyterhub_routespec
+            )
             return True, None
         target = v["Value"]
         escaped_target = escapism.escape(target, safe=self.key_safe_chars)
