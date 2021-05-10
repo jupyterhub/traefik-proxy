@@ -27,14 +27,14 @@ def is_open(ip, port):
 
 
 async def check_host_up(ip, port):
-    """ Check if the service opened the connection on the
-    designated port """
+    """Check if the service opened the connection on the
+    designated port"""
     return is_open(ip, port)
 
 
 async def get_responding_backend_port(traefik_url, path):
-    """ Check if traefik followed the configuration and routed the
-    request to the right backend """
+    """Check if traefik followed the configuration and routed the
+    request to the right backend"""
     if not path.endswith("/"):
         path += "/"
 

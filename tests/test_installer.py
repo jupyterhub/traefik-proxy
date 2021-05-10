@@ -132,6 +132,7 @@ def test_linux_arm_platform(tmpdir):
     assert os.path.exists(deps_dir)
     assert_only_traefik_existence(deps_dir)
 
+
 def test_linux_amd64_platform(tmpdir):
     deps_dir = str(tmpdir.join("deps"))
     subprocess.run(

@@ -101,94 +101,185 @@ async def wait_for_services(urls):
 
 
 @pytest.mark.parametrize(
-    "routespec",
+    "routespec, existing_routes",
     [
-        "/",  # default route
-        "/has%20space/foo/",
-        "/missing-trailing/slash",
-        "/has/@/",
-        "/has/" + quote("üñîçø∂é"),
-        "host.name/path/",
-        "other.host/path/no/slash",
+        # default route
+        (
+            "/",
+            [
+                "/abc",
+                "/has%20space/",
+                "/has%20space/foo/",
+                "/missing-trailing/",
+                "/missing-trailing/slash",
+                "/has/",
+                "/has/@/",
+                "host.name/",
+                "host.name/path/",
+                "other.host/",
+                "other.host/path/",
+                "other.host/path/no/",
+                "other.host/path/no/slash",
+            ],
+        ),
+        ("/has%20space/foo/", ["/", "/has%20space/", "/has%20space/foo/abc/"]),
+        (
+            "/missing-trailing/slash",
+            ["/", "/missing-trailing/", "/missing-trailing/slash/abc"],
+        ),
+        ("/has/@/", ["/", "/has/", "/has/@/abc/"]),
+        (
+            "/has/" + quote("üñîçø∂é"),
+            ["/", "/has/", "/has/" + quote("üñîçø∂é") + "/abc/"],
+        ),
+        ("host.name/path/", ["/", "host.name/", "host.name/path/abc/"]),
+        (
+            "other.host/path/no/slash",
+            [
+                "/",
+                "other.host/",
+                "other.host/path/",
+                "other.host/path/no/",
+                "other.host/path/no/slash/abc/",
+            ],
+        ),
     ],
 )
-async def test_add_get_delete(proxy, launch_backend, routespec):
-    target = "http://127.0.0.1:9000"
+async def test_add_get_delete(
+    request, proxy, launch_backend, routespec, existing_routes, event_loop
+):
+    default_target = "http://127.0.0.1:9000"
     data = {"test": "test1", "user": "username"}
-    expected_output = {
-        "routespec": routespec if routespec.endswith("/") else routespec + "/",
-        "target": target,
-        "data": data,
-    }
 
-    backend_port = urlparse(target).port
-    launch_backend(backend_port)
-    await wait_for_services([proxy.public_url, target])
+    default_backend = urlparse(default_target)
+    extra_backends = []
 
-    # host-routes when not host-routing raises an error
-    # and vice versa
-    subdomain_host = False
-    try:
-        subdomain_host = bool(proxy.app.subdomain_host)
-    except AttributeError:
-        pass
-    finally:
-        expect_value_error = subdomain_host ^ (not routespec.startswith("/"))
+    proxy_url = proxy.public_url.rstrip("/")
+
+    def normalize_spec(spec):
+        return proxy.validate_routespec(spec)
+
+    def expected_output(spec, url):
+        return {
+            "routespec": normalize_spec(spec),
+            "target": url,
+            "data": data,
+        }
+
+    # just use existing Jupyterhub check instead of making own one
+    def expect_value_error(spec):
+        try:
+            normalize_spec(spec)
+        except ValueError:
+            return True
+
+        return False
 
     @contextmanager
-    def context():
-        if expect_value_error:
+    def context(spec):
+        if expect_value_error(spec):
             with pytest.raises(ValueError):
                 yield
         else:
             yield
 
-    """ Test add and get """
-    with context():
-        await proxy.add_route(routespec, target, copy.copy(data))
-        # Make sure the route was added
-        route = await proxy.get_route(routespec)
-    if not expect_value_error:
-        try:
-            del route["data"]["last_activity"]  # CHP
-        except KeyError:
-            pass
-        finally:
-            assert route == expected_output
-        if proxy.public_url.endswith("/"):
-            req_url = proxy.public_url[:-1]
-        else:
-            req_url = proxy.public_url
-        # Test the actual routing
-        responding_backend1 = await utils.get_responding_backend_port(
-            req_url, routespec
-        )
-        responding_backend2 = await utils.get_responding_backend_port(
-            req_url, routespec + "/something"
-        )
-        assert (
-            responding_backend1 == backend_port and responding_backend2 == backend_port
-        )
+    async def test_route_exist(spec, backend):
+        with context(spec):
+            route = await proxy.get_route(spec)
 
-    """ Test delete + get """
-    with context():
+        if not expect_value_error(spec):
+            try:
+                del route["data"]["last_activity"]  # CHP
+            except KeyError:
+                pass
+
+            assert route == expected_output(spec, backend.geturl())
+
+            # Test the actual routing
+            responding_backend1 = await utils.get_responding_backend_port(
+                proxy_url, normalize_spec(spec)
+            )
+            responding_backend2 = await utils.get_responding_backend_port(
+                proxy_url, normalize_spec(spec) + "something"
+            )
+            assert (
+                responding_backend1 == backend.port
+                and responding_backend2 == backend.port
+            )
+
+    for i, spec in enumerate(existing_routes, start=1):
+        backend = default_backend._replace(
+            netloc=f"{default_backend.hostname}:{default_backend.port+i}"
+        )
+        launch_backend(backend.port, backend.scheme)
+        extra_backends.append(backend)
+
+    launch_backend(default_backend.port, default_backend.scheme)
+    await wait_for_services(
+        [proxy.public_url, default_backend.geturl()]
+        + [backend.geturl() for backend in extra_backends]
+    )
+
+    # Create existing routes
+    for i, spec in enumerate(existing_routes):
+        try:
+            await proxy.add_route(spec, extra_backends[i].geturl(), copy.copy(data))
+        except Exception:
+            pass
+
+    def finalizer():
+        async def cleanup():
+            """ Cleanup """
+            for spec in existing_routes:
+                try:
+                    await proxy.delete_route(spec)
+                except Exception:
+                    pass
+
+        event_loop.run_until_complete(cleanup())
+
+    request.addfinalizer(finalizer)
+
+    # Test add
+    with context(routespec):
+        await proxy.add_route(routespec, default_backend.geturl(), copy.copy(data))
+
+    # Test get
+    await test_route_exist(routespec, default_backend)
+    for i, spec in enumerate(existing_routes):
+        await test_route_exist(spec, extra_backends[i])
+
+    # Test delete
+    with context(routespec):
         await proxy.delete_route(routespec)
         route = await proxy.get_route(routespec)
-    if not expect_value_error:
+
+    # Test that deleted route does not exist anymore
+    if not expect_value_error(routespec):
         assert route == None
 
         async def _wait_for_deletion():
-            deleted = False
-            try:
-                await utils.get_responding_backend_port(req_url, routespec)
-            except HTTPClientError:
-                deleted = True
-            finally:
-                return deleted
+            deleted = 0
+            for spec in [
+                normalize_spec(routespec),
+                normalize_spec(routespec) + "something",
+            ]:
+                try:
+                    result = await utils.get_responding_backend_port(proxy_url, spec)
+                    if result != default_backend.port:
+                        deleted += 1
+                except HTTPClientError:
+                    deleted += 1
 
-        """ If this raises a TimeoutError, the route wasn't properly deleted,
-        thus the proxy still has a route for the given routespec"""
+            return deleted == 2
+
+        # If this raises a TimeoutError, the route wasn't properly deleted,
+        # thus the proxy still has a route for the given routespec
         await exponential_backoff(_wait_for_deletion, "Route still exists")
+
+    # Test that other routes are still exist
+    for i, spec in enumerate(existing_routes):
+        await test_route_exist(spec, extra_backends[i])
 
 
 async def test_get_all_routes(proxy, launch_backend):
@@ -233,8 +324,8 @@ async def test_get_all_routes(proxy, launch_backend):
             del routes[route_key]["data"]["last_activity"]  # CHP
     except KeyError:
         pass
-    finally:
-        assert routes == expected_output
+
+    assert routes == expected_output
 
 
 async def test_host_origin_headers(proxy, launch_backend):

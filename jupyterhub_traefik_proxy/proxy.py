@@ -248,19 +248,16 @@ class TraefikProxy(Proxy):
         self.static_config["api"] = {"dashboard": True, "entrypoint": "auth_api"}
         self.static_config["wss"] = {"protocol": "http"}
 
-
     def _routespec_to_traefik_path(self, routespec):
         path = self.validate_routespec(routespec)
-        if path != '/' and path.endswith('/'):
-            path = path.rstrip('/')
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
         return path
 
-
     def _routespec_from_traefik_path(self, routespec):
-        if not routespec.endswith('/'):
-            routespec = routespec + '/'
+        if not routespec.endswith("/"):
+            routespec = routespec + "/"
         return routespec
-
 
     async def start(self):
         """Start the proxy.

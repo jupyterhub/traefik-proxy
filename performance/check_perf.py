@@ -42,9 +42,9 @@ async def add_route_perf(proxy, route_idx, stdout_print):
 async def delete_route_perf(proxy, route_idx, stdout_print):
     """
     Computes time taken (ns) to delete the "route_idx"
-    route from the proxy's routing table (which 
+    route from the proxy's routing table (which
     contains route_idx + 1 routes when ran sequentially).
-    
+
     It assumes the route to be deleted exists.
 
     Returns a tuple:

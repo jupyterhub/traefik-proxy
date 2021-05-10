@@ -48,5 +48,5 @@ async def test_traefik_api_auth(proxy, username, password, expected_rc):
         rc = None
     except Exception as e:
         rc = e.response.code
-    finally:
-        assert rc == expected_rc
+
+    assert rc == expected_rc
