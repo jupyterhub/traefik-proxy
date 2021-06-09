@@ -12,11 +12,11 @@ pytestmark = pytest.mark.asyncio
 
 @pytest.fixture(
     params=[
-        "no_auth_consul_proxy",
-        "auth_consul_proxy",
+        "toml_proxy",
         "no_auth_etcd_proxy",
         "auth_etcd_proxy",
-        "toml_proxy",
+        "no_auth_consul_proxy",
+        "auth_consul_proxy",
     ]
 )
 def proxy(request):
@@ -48,5 +48,5 @@ async def test_traefik_api_auth(proxy, username, password, expected_rc):
         rc = None
     except Exception as e:
         rc = e.response.code
-    finally:
-        assert rc == expected_rc
+
+    assert rc == expected_rc

@@ -23,7 +23,6 @@ import json
 import os
 from urllib.parse import urlparse
 
-import etcd3
 from tornado.concurrent import run_on_executor
 from traitlets import Any, default, Unicode
 
@@ -73,6 +72,10 @@ class TraefikEtcdProxy(TKvProxy):
     @default("kv_client")
     def _default_client(self):
         etcd_service = urlparse(self.kv_url)
+        try:
+            import etcd3
+        except ImportError:
+            raise ImportError("Please install etcd3 package to use traefik-proxy with etcd3")
         if self.kv_password:
             return etcd3.client(
                 host=str(etcd_service.hostname),
@@ -147,8 +150,10 @@ class TraefikEtcdProxy(TKvProxy):
     async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
         value = await maybe_future(self._etcd_get(jupyterhub_routespec))
         if value is None:
-            self.log.warning("Route %s doesn't exist. Nothing to delete", routespec)
-            return
+            self.log.warning(
+                "Route %s doesn't exist. Nothing to delete", jupyterhub_routespec
+            )
+            return True, None
 
         target = value.decode()
 

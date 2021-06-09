@@ -25,7 +25,6 @@ import string
 import base64
 
 import asyncio
-import consul.aio
 import escapism
 from tornado.concurrent import run_on_executor
 from traitlets import Any, default, Unicode
@@ -39,7 +38,7 @@ class TraefikConsulProxy(TKvProxy):
     """JupyterHub Proxy implementation using traefik and Consul"""
 
     # Consul doesn't accept keys containing // or starting with / so we have to escape them
-    key_safe_chars = string.ascii_letters + string.digits + "!@#$%^&*();<>_-.+?:"
+    key_safe_chars = string.ascii_letters + string.digits + "!@#$%^&*();<>-.+?:"
 
     kv_name = "consul"
 
@@ -56,6 +55,10 @@ class TraefikConsulProxy(TKvProxy):
 
     @default("kv_client")
     def _default_client(self):
+        try:
+            import consul.aio
+        except ImportError:
+            raise ImportError("Please install python-consul2 package to use traefik-proxy with consul")
         consul_service = urlparse(self.kv_url)
         if self.kv_password:
             client = consul.aio.Consul(
@@ -64,10 +67,8 @@ class TraefikConsulProxy(TKvProxy):
                 token=self.kv_password,
                 cert=self.consul_client_ca_cert,
             )
-            client.http._session._default_headers.update(
-                {"X-Consul-Token": self.kv_password}
-            )
             return client
+
         return consul.aio.Consul(
             host=str(consul_service.hostname),
             port=consul_service.port,
@@ -167,8 +168,10 @@ class TraefikConsulProxy(TKvProxy):
 
         index, v = await self.kv_client.kv.get(escaped_jupyterhub_routespec)
         if v is None:
-            self.log.warning("Route %s doesn't exist. Nothing to delete", routespec)
-            return
+            self.log.warning(
+                "Route %s doesn't exist. Nothing to delete", jupyterhub_routespec
+            )
+            return True, None
         target = v["Value"]
         escaped_target = escapism.escape(target, safe=self.key_safe_chars)
 
@@ -237,4 +240,3 @@ class TraefikConsulProxy(TKvProxy):
 
     async def stop(self):
         await super().stop()
-        await self.kv_client.http._session.close()

@@ -1,4 +1,4 @@
-# Using traefik-proxy with etcd
+# Using TraefikEtcdProxy
 
 [Etcd](https://coreos.com/etcd/)
 is a distributed key-value store.
@@ -24,13 +24,13 @@ You can choose to:
 
 * use the `traefik_etcd` entrypoint, new in JupyterHub 1.0, e.g.:
 
-    ```
+    ```python
     c.JupyterHub.proxy_class = "traefik_etcd"
     ```
 
 * use the TraefikEtcdProxy object, in which case, you have to import the module, e.g.:
 
-    ```
+    ```python
     from jupyterhub_traefik_proxy import TraefikEtcdProxy
     c.JupyterHub.proxy_class = TraefikEtcdProxy
     ```
@@ -50,37 +50,38 @@ You can choose to:
 
    Similarly, the dynamic configuration is built by searching the **kv_jupyterhub_prefix**.
 
-   **Note**: If you want to change or add traefik's static configuration options, you can add them to etcd under this prefix and traefik will pick them up.
+   ```{note}
+   If you want to change or add traefik's static configuration options, you can add them to etcd under this prefix and traefik will pick them up.
+   ```
 
     * The **default** values of this configurations options are:
-        ```
+        ```python
         kv_traefik_prefix = "/traefik/"
         kv_jupyterhub_prefix = "/jupyterhub/"
         ```
 
     * You can **override** the default values of the prefixes by passing their desired values through `jupyterhub_config.py` e.g.:
-        ```
-        c.TraefikEtcdProxy.kv_traefik_prefix="/some_static_config_prefix/"
-        c.TraefikEtcdProxy.kv_jupyterhub_prefix="/some_dynamic_config_prefix/"
+        ```python
+        c.TraefikEtcdProxy.kv_traefik_prefix = "/some_static_config_prefix/"
+        c.TraefikEtcdProxy.kv_jupyterhub_prefix = "/some_dynamic_config_prefix/"
         ```
 
 3. By **default**, TraefikEtcdProxy assumes etcd accepts client requests on the official **default** etcd port `2379` for client requests.
 
-    ```
-    c.TraefikEtcdProxy.kv_url="http://127.0.0.1:2379"
+    ```python
+    c.TraefikEtcdProxy.kv_url = "http://127.0.0.1:2379"
     ```
 
     If the etcd cluster is deployed differently than using the etcd defaults, then you **must** pass the etcd url to the proxy using 
     the `kv_url` option in *jupyterhub_config.py*:
 
-    ```
-    c.TraefikEtcdProxy.kv_url="scheme://hostname:port"
+    ```python
+    c.TraefikEtcdProxy.kv_url = "scheme://hostname:port"
     ```
 
----
-<span style="color:green">**Note 1**</span>
+```{note}
 
-   **TraefikEtcdProxy does not manage the etcd cluster** and assumes it is up and running before the proxy itself starts.
+1. **TraefikEtcdProxy does not manage the etcd cluster** and assumes it is up and running before the proxy itself starts.
 
    However, based on how etcd is configured and started, TraefikEtcdProxy needs to be told about 
    some etcd configuration details, such as:
@@ -94,22 +95,19 @@ You can choose to:
      c.TraefikEtcdProxy.kv_password="123"
      ```
 
-<span style="color:green">**Note 2**</span>
-
-Etcd has two API versions: the API V3 and the API V2. Traefik suggests using Etcd API V3, 
+2. Etcd has two API versions: the API V3 and the API V2. Traefik suggests using Etcd API V3, 
 because the API V2 won't be supported in the future.
 
----
-
-Checkout the [etcd documentation](https://coreos.com/etcd/docs/latest/op-guide/configuration.html) 
+   Checkout the [etcd documentation](https://coreos.com/etcd/docs/latest/op-guide/configuration.html) 
 to find out more about possible etcd configuration options.
+```
 
 ## Externally managed TraefikEtcdProxy
 
 If TraefikEtcdProxy is used as an externally managed service, then make sure you follow the steps enumerated below:
 
 1. Let JupyterHub know that the proxy being used is TraefikEtcdProxy, using the *proxy_class* configuration option:
-    ```
+    ```python
     c.JupyterHub.proxy_class = "traefik_etcd"
     ```
 
@@ -121,7 +119,7 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
    * The etcd credentials (if etcd authentication is enabled)
 
    Example configuration:
-   ```
+   ```python
    # JupyterHub shouldn't start the proxy, it's already running
    c.TraefikEtcdProxy.should_start = False
 
@@ -150,7 +148,7 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
        * The websockets protocol
        * The etcd endpoint
 
-    Example:
+   * **Example:**
 
      ```
       defaultentrypoints = ["http"]
@@ -180,15 +178,15 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
       watch = true
      ```
 
-     **Note**: **If you choose to enable the authentication on etcd**, you can use this *toml* file to pass the credentials to traefik, e.g.:
+    ```{note}
+      **If you choose to enable the authentication on etcd**, you can use this *toml* file to pass the credentials to traefik, e.g.:
 
-      ```
-      [etcd]
-      username = "root"
-      password = "admin"
-      endpoint = "127.0.0.1:2379"
-      ...
-     ```
+          [etcd]
+          username = "root"
+          password = "admin"
+          endpoint = "127.0.0.1:2379"
+          ...
+    ```
 
 ## Example setup
 
@@ -196,7 +194,7 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
 
 1. Configure the proxy through the JupyterHub configuration file, *jupyterhub_config.py*, e.g.:
 
-   ```
+   ```python
    from jupyterhub_traefik_proxy import TraefikEtcdProxy
 
    # mark the proxy as externally managed
@@ -215,22 +213,25 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
    c.JupyterHub.proxy_class = TraefikEtcdProxy
     ```
 
-    **Note:** If you intend to enable authentication on etcd, add the etcd credentials to *jupyterhub_config.py*:
 
-    ```
-    # etcd username
-    c.TraefikEtcdProxy.kv_username = "def"
+   ```{note}
+    If you intend to enable authentication on etcd, add the etcd credentials to *jupyterhub_config.py*:
 
-    # etcd password
-    c.TraefikEtcdProxy.kv_password = "456"
+        # etcd username
+        c.TraefikEtcdProxy.kv_username = "def"
+        # etcd password
+        c.TraefikEtcdProxy.kv_password = "456"
     ```
 
 2. Start a single-note etcd cluster on the default port on localhost. e.g.:
-   ```
+   ```bash
    $ etcd
    ```
-   **Note:** If you intend to enable authentication on etcd checkout
-   [this guide](https://coreos.com/etcd/docs/latest/op-guide/authentication.html):
+
+   ```{note}
+    If you intend to enable authentication on etcd checkout
+    [this guide](https://coreos.com/etcd/docs/latest/op-guide/authentication.html).
+   ```
 
 3. Create a traefik static configuration file, *traefik.toml*, e.g:.
 

@@ -7,10 +7,34 @@ import sys
 import time
 
 import pytest
+from _pytest.mark import Mark
 
 from jupyterhub_traefik_proxy import TraefikEtcdProxy
 from jupyterhub_traefik_proxy import TraefikConsulProxy
 from jupyterhub_traefik_proxy import TraefikTomlProxy
+
+
+# Define a "slow" test marker so that we can run the slow tests at the end
+# ref: https://docs.pytest.org/en/6.0.1/example/simple.html#control-skipping-of-tests-according-to-command-line-option
+# ref: https://stackoverflow.com/questions/61533694/run-slow-pytest-commands-at-the-end-of-the-test-suite
+empty_mark = Mark("", [], {})
+
+
+def by_slow_marker(item):
+    return item.get_closest_marker("slow", default=empty_mark)
+
+
+def pytest_addoption(parser):
+    parser.addoption("--slow-last", action="store_true", default=False)
+
+
+def pytest_collection_modifyitems(items, config):
+    if config.getoption("--slow-last"):
+        items.sort(key=by_slow_marker)
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "slow: marks tests as slow.")
 
 
 @pytest.fixture
@@ -23,6 +47,7 @@ async def no_auth_consul_proxy(consul_no_acl):
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
+        check_route_timeout=45,
         should_start=True,
     )
     await proxy.start()
@@ -41,6 +66,7 @@ async def auth_consul_proxy(consul_acl):
         traefik_api_password="admin",
         traefik_api_username="api_admin",
         kv_password="secret",
+        check_route_timeout=45,
         should_start=True,
     )
     await proxy.start()
@@ -58,6 +84,7 @@ async def no_auth_etcd_proxy():
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
+        check_route_timeout=45,
         should_start=True,
     )
     await proxy.start()
@@ -78,6 +105,7 @@ async def auth_etcd_proxy(etcd):
         traefik_api_username="api_admin",
         kv_password="secret",
         kv_username="root",
+        check_route_timeout=45,
         should_start=True,
     )
     await proxy.start()
@@ -98,6 +126,7 @@ async def toml_proxy():
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
+        check_route_timeout=180,
         should_start=True,
     )
 
@@ -112,6 +141,7 @@ def external_consul_proxy(consul_no_acl):
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
+        check_route_timeout=45,
         should_start=False,
     )
     traefik_process = configure_and_launch_traefik(kv_store="consul")
@@ -128,6 +158,7 @@ def auth_external_consul_proxy(consul_acl):
         traefik_api_password="admin",
         traefik_api_username="api_admin",
         kv_password="secret",
+        check_route_timeout=45,
         should_start=False,
     )
     traefik_process = configure_and_launch_traefik(kv_store="consul", password="secret")
@@ -143,6 +174,7 @@ def external_etcd_proxy():
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
+        check_route_timeout=45,
         should_start=False,
     )
     traefik_process = configure_and_launch_traefik(kv_store="etcd")
@@ -161,6 +193,7 @@ def auth_external_etcd_proxy():
         traefik_api_username="api_admin",
         kv_password="secret",
         kv_username="root",
+        check_route_timeout=45,
         should_start=False,
     )
     traefik_process = configure_and_launch_traefik(kv_store="etcd", password="secret")
@@ -177,6 +210,7 @@ def external_toml_proxy():
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
+        check_route_timeout=45,
     )
     proxy.should_start = False
     proxy.toml_dynamic_config_file = "./tests/config_files/rules.toml"

@@ -51,9 +51,9 @@ class TraefikTomlProxy(TraefikProxy):
             self.routes_cache = traefik_utils.load_routes(self.toml_dynamic_config_file)
         except FileNotFoundError:
             self.routes_cache = {}
-        finally:
-            if not self.routes_cache:
-                self.routes_cache = {"backends": {}, "frontends": {}}
+
+        if not self.routes_cache:
+            self.routes_cache = {"backends": {}, "frontends": {}}
 
     async def _setup_traefik_static_config(self):
         await super()._setup_traefik_static_config()
@@ -100,8 +100,8 @@ class TraefikTomlProxy(TraefikProxy):
             raise
 
     def _get_route_unsafe(self, traefik_routespec):
-        safe = string.ascii_letters + string.digits + "_-"
-        escaped_routespec = escapism.escape(traefik_routespec, safe=safe)
+        backend_alias = traefik_utils.generate_alias(traefik_routespec, "backend")
+        frontend_alias = traefik_utils.generate_alias(traefik_routespec, "frontend")
         routespec = self._routespec_from_traefik_path(traefik_routespec)
         result = {"data": "", "target": "", "routespec": routespec}
 
@@ -118,12 +118,12 @@ class TraefikTomlProxy(TraefikProxy):
                 if isinstance(v, dict):
                     get_target_data(v, to_find)
 
-        for key, value in self.routes_cache["backends"].items():
-            if escaped_routespec in key:
-                get_target_data(value, "url")
-        for key, value in self.routes_cache["frontends"].items():
-            if escaped_routespec in key:
-                get_target_data(value, "data")
+        if backend_alias in self.routes_cache["backends"]:
+            get_target_data(self.routes_cache["backends"][backend_alias], "url")
+
+        if frontend_alias in self.routes_cache["frontends"]:
+            get_target_data(self.routes_cache["frontends"][frontend_alias], "data")
+
         if not result["data"] and not result["target"]:
             self.log.info("No route for {} found!".format(routespec))
             result = None
@@ -214,18 +214,13 @@ class TraefikTomlProxy(TraefikProxy):
         **Subclasses must define this method**
         """
         routespec = self._routespec_to_traefik_path(routespec)
-        safe = string.ascii_letters + string.digits + "_-"
-        escaped_routespec = escapism.escape(routespec, safe=safe)
+        backend_alias = traefik_utils.generate_alias(routespec, "backend")
+        frontend_alias = traefik_utils.generate_alias(routespec, "frontend")
 
         async with self.mutex:
-            for key, value in self.routes_cache["frontends"].items():
-                if escaped_routespec in key:
-                    del self.routes_cache["frontends"][key]
-                    break
-            for key, value in self.routes_cache["backends"].items():
-                if escaped_routespec in key:
-                    del self.routes_cache["backends"][key]
-                    break
+            self.routes_cache["frontends"].pop(frontend_alias, None)
+            self.routes_cache["backends"].pop(backend_alias, None)
+
         traefik_utils.persist_routes(self.toml_dynamic_config_file, self.routes_cache)
 
     async def get_all_routes(self):

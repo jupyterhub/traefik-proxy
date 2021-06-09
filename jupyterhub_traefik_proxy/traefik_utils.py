@@ -38,7 +38,7 @@ def generate_rule(routespec):
 
 
 def generate_alias(routespec, server_type=""):
-    safe = string.ascii_letters + string.digits + "_-"
+    safe = string.ascii_letters + string.digits + "-"
     return server_type + "_" + escapism.escape(routespec, safe=safe)
 
 
@@ -46,12 +46,12 @@ def generate_backend_entry(
     proxy, backend_alias, separator="/", url=False, weight=False
 ):
     backend_entry = ""
-    if separator is "/":
+    if separator == "/":
         backend_entry = proxy.kv_traefik_prefix
     backend_entry += separator.join(["backends", backend_alias, "servers", "server1"])
-    if url is True:
+    if url:
         backend_entry += separator + "url"
-    elif weight is True:
+    elif weight:
         backend_entry += separator + "weight"
 
     return backend_entry
