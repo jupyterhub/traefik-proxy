@@ -87,12 +87,12 @@ class TKvProxy(TraefikProxy):
         are expected to have the following structure:
         [ key: jupyterhub_routespec            , value: target ]
         [ key: target                          , value: data   ]
-        [ key: route_keys.backend_url_path     , value: target ]
-        [ key: route_keys.frontend_rule_path   , value: rule   ]
-        [ key: route_keys.frontend_backend_path, value:
-                                       route_keys.backend_alias]
-        [ key: route_keys.backend_weight_path  , value: w(int) ]
-            (where `w` is the weight of the backend to be used during load balancing)
+        [ key: route_keys.service_url_path     , value: target ]
+        [ key: route_keys.router_rule_path   , value: rule   ]
+        [ key: route_keys.router_service_path, value:
+                                       route_keys.service_alias]
+        [ key: route_keys.service_weight_path  , value: w(int) ]
+            (where `w` is the weight of the service to be used during load balancing)
 
         Returns:
             result (tuple):
@@ -113,10 +113,10 @@ class TKvProxy(TraefikProxy):
         The keys associated with a route are:
             jupyterhub_routespec,
             target,
-            route_keys.backend_url_path,
-            route_keys.frontend_rule_path,
-            route_keys.frontend_backend_path,
-            route_keys.backend_weight_path,
+            route_keys.service_url_path,
+            route_keys.router_rule_path,
+            route_keys.router_service_path,
+            route_keys.service_weight_path,
 
         Returns:
             result (tuple):
@@ -184,7 +184,7 @@ class TKvProxy(TraefikProxy):
     def _clean_resources(self):
         try:
             if self.should_start:
-                os.remove(self.toml_static_config_file)
+                os.remove(self.static_config_file)
         except:
             self.log.error("Failed to remove traefik's configuration files")
             raise
@@ -205,7 +205,7 @@ class TKvProxy(TraefikProxy):
         self._define_kv_specific_static_config()
         try:
             traefik_utils.persist_static_conf(
-                self.toml_static_config_file, self.static_config
+                self.static_config_file, self.static_config
             )
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
@@ -273,12 +273,12 @@ class TKvProxy(TraefikProxy):
                 raise
         if status:
             self.log.info(
-                "Added backend %s with the alias %s.", target, route_keys.backend_alias
+                "Added service %s with the alias %s.", target, route_keys.service_alias
             )
             self.log.info(
-                "Added frontend %s for backend %s with the following routing rule %s.",
-                route_keys.frontend_alias,
-                route_keys.backend_alias,
+                "Added router %s for service %s with the following routing rule %s.",
+                route_keys.router_alias,
+                route_keys.service_alias,
                 routespec,
             )
         else:
@@ -286,7 +286,7 @@ class TKvProxy(TraefikProxy):
                 "Couldn't add route for %s. Response: %s", routespec, response
             )
 
-        await self._wait_for_route(routespec, provider=self.kv_name)
+        await self._wait_for_route(routespec)
 
     async def delete_route(self, routespec):
         """Delete a route and all the traefik related info associated given a routespec,
