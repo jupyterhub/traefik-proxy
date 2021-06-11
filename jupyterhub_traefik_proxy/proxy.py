@@ -36,7 +36,7 @@ class TraefikProxy(Proxy):
 
     traefik_process = Any()
 
-    toml_static_config_file = Unicode(
+    static_config_file = Unicode(
         "traefik.toml", config=True, help="""traefik's static configuration file"""
     )
 
@@ -108,40 +108,42 @@ class TraefikProxy(Proxy):
         ht.set_password(self.traefik_api_username, self.traefik_api_password)
         self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
 
-    async def _check_for_traefik_endpoint(self, routespec, kind, provider):
-        """Check for an expected frontend or backend
+    async def _check_for_traefik_service(self, routespec, kind):
+        """Check for an expected router or service 
 
         This is used to wait for traefik to load configuration
         from a provider
         """
-        expected = traefik_utils.generate_alias(routespec, kind)
-        path = "/api/providers/{}/{}s".format(provider, kind)
+        # expected e.g. 'service' + '_' + routespec @ file
+        expected = traefik_utils.generate_alias(routespec, kind) + "@file"
+        path = "/api/http/{0}s".format(kind)
         try:
             resp = await self._traefik_api_request(path)
-            data = json.loads(resp.body)
+            json_data = json.loads(resp.body)
         except Exception:
             self.log.exception("Error checking traefik api for %s %s", kind, routespec)
             return False
 
-        if expected not in data:
-            self.log.debug("traefik %s not yet in %ss", expected, kind)
-            self.log.debug("Current traefik %ss: %s", kind, data)
+        service_names = [service['name'] for service in json_data]
+        if expected not in service_names:
+            self.log.debug("traefik %s not yet in %s", expected, kind)
+            self.log.debug("Current traefik %ss: %s", kind, json_data)
             return False
 
         # found the expected endpoint
         return True
 
-    async def _wait_for_route(self, routespec, provider):
+    async def _wait_for_route(self, routespec):
         self.log.info("Waiting for %s to register with traefik", routespec)
 
         async def _check_traefik_dynamic_conf_ready():
             """Check if traefik loaded its dynamic configuration yet"""
-            if not await self._check_for_traefik_endpoint(
-                routespec, "backend", provider
+            if not await self._check_for_traefik_service(
+                routespec, "service"
             ):
                 return False
-            if not await self._check_for_traefik_endpoint(
-                routespec, "frontend", provider
+            if not await self._check_for_traefik_service(
+                routespec, "router"
             ):
                 return False
 
@@ -173,7 +175,8 @@ class TraefikProxy(Proxy):
         async def _check_traefik_static_conf_ready():
             """Check if traefik loaded its static configuration yet"""
             try:
-                resp = await self._traefik_api_request("/api/providers/" + provider)
+                #resp = await self._traefik_api_request("/api/overview/providers/" + provider)
+                resp = await self._traefik_api_request("/api/overview")
             except Exception:
                 self.log.exception("Error checking for traefik static configuration")
                 return False
@@ -199,7 +202,7 @@ class TraefikProxy(Proxy):
         self.traefik_process.wait()
 
     def _launch_traefik(self, config_type):
-        if config_type == "toml" or config_type == "etcdv3" or config_type == "consul":
+        if config_type == "fileprovider" or config_type == "etcdv3" or config_type == "consul":
             config_file_path = abspath(join(dirname(__file__), "traefik.toml"))
             self.traefik_process = Popen(
                 ["traefik", "-c", config_file_path], stdout=None

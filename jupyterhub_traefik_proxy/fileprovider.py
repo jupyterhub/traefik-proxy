@@ -31,8 +31,8 @@ from jupyterhub.proxy import Proxy
 from jupyterhub_traefik_proxy import TraefikProxy
 
 
-class TraefikTomlProxy(TraefikProxy):
-    """JupyterHub Proxy implementation using traefik and toml config file"""
+class TraefikFileProviderProxy(TraefikProxy):
+    """JupyterHub Proxy implementation using traefik and toml or yaml config file"""
 
     mutex = Any()
 
@@ -40,7 +40,7 @@ class TraefikTomlProxy(TraefikProxy):
     def _default_mutex(self):
         return asyncio.Lock()
 
-    toml_dynamic_config_file = Unicode(
+    dynamic_config_file = Unicode(
         "rules.toml", config=True, help="""traefik's dynamic configuration file"""
     )
 
@@ -48,30 +48,34 @@ class TraefikTomlProxy(TraefikProxy):
         super().__init__(**kwargs)
         try:
             # Load initial routing table from disk
-            self.routes_cache = traefik_utils.load_routes(self.toml_dynamic_config_file)
+            self.routes_cache = traefik_utils.load_routes(self.dynamic_config_file)
         except FileNotFoundError:
             self.routes_cache = {}
 
         if not self.routes_cache:
-            self.routes_cache = {"backends": {}, "frontends": {}}
+            self.routes_cache = {
+                "http" : {"services": {}, "routers": {}},
+                "jupyter": {"routers" : {} }
+            }
 
     async def _setup_traefik_static_config(self):
         await super()._setup_traefik_static_config()
 
+        # Is this not the same as the dynamic config file?
         self.static_config["file"] = {"filename": "rules.toml", "watch": True}
 
         try:
             traefik_utils.persist_static_conf(
-                self.toml_static_config_file, self.static_config
+                self.static_config_file, self.static_config
             )
             try:
-                os.stat(self.toml_dynamic_config_file)
+                os.stat(self.dynamic_config_file)
             except FileNotFoundError:
                 # Make sure that the dynamic configuration file exists
                 self.log.info(
-                    f"Creating the toml dynamic configuration file: {self.toml_dynamic_config_file}"
+                    f"Creating the dynamic configuration file: {self.dynamic_config_file}"
                 )
-                open(self.toml_dynamic_config_file, "a").close()
+                open(self.dynamic_config_file, "a").close()
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
             raise
@@ -82,7 +86,7 @@ class TraefikTomlProxy(TraefikProxy):
     def _start_traefik(self):
         self.log.info("Starting traefik...")
         try:
-            self._launch_traefik(config_type="toml")
+            self._launch_traefik(config_type="fileprovider")
         except FileNotFoundError as e:
             self.log.error(
                 "Failed to find traefik \n"
@@ -93,24 +97,24 @@ class TraefikTomlProxy(TraefikProxy):
     def _clean_resources(self):
         try:
             if self.should_start:
-                os.remove(self.toml_static_config_file)
-            os.remove(self.toml_dynamic_config_file)
+                os.remove(self.static_config_file)
+            os.remove(self.dynamic_config_file)
         except:
             self.log.error("Failed to remove traefik's configuration files")
             raise
 
     def _get_route_unsafe(self, traefik_routespec):
-        backend_alias = traefik_utils.generate_alias(traefik_routespec, "backend")
-        frontend_alias = traefik_utils.generate_alias(traefik_routespec, "frontend")
+        service_alias = traefik_utils.generate_alias(traefik_routespec, "service")
+        router_alias = traefik_utils.generate_alias(traefik_routespec, "router")
         routespec = self._routespec_from_traefik_path(traefik_routespec)
-        result = {"data": "", "target": "", "routespec": routespec}
+        result = {"data": None, "target": None, "routespec": routespec}
 
         def get_target_data(d, to_find):
             if to_find == "url":
                 key = "target"
             else:
                 key = to_find
-            if result[key]:
+            if result[key] is not None:
                 return
             for k, v in d.items():
                 if k == to_find:
@@ -118,17 +122,35 @@ class TraefikTomlProxy(TraefikProxy):
                 if isinstance(v, dict):
                     get_target_data(v, to_find)
 
-        if backend_alias in self.routes_cache["backends"]:
-            get_target_data(self.routes_cache["backends"][backend_alias], "url")
+        service_node = self.routes_cache["http"]["services"].get(service_alias, None)
+        if service_node is not None:
+            get_target_data(service_node, "url")
 
-        if frontend_alias in self.routes_cache["frontends"]:
-            get_target_data(self.routes_cache["frontends"][frontend_alias], "data")
+        router_node = self.routes_cache["jupyter"]["routers"].get(router_alias, None)
+        if router_node is not None:
+            get_target_data(router_node, "data")
 
-        if not result["data"] and not result["target"]:
+        if result["data"] is None and result["target"] is None:
             self.log.info("No route for {} found!".format(routespec))
             result = None
-        else:
-            result["data"] = json.loads(result["data"])
+        self.log.debug("treefik routespec: {0}".format(traefik_routespec))
+        self.log.debug("result for routespec {0}:-\n{1}".format(routespec, result))
+
+        # No longer bother converting `data` to/from JSON
+        #else:
+        #    result["data"] = json.loads(result["data"])
+
+        #if service_alias in self.routes_cache["services"]:
+        #    get_target_data(self.routes_cache["services"][service_alias], "url")
+
+        #if router_alias in self.routes_cache["routers"]:
+        #    get_target_data(self.routes_cache["routers"][router_alias], "data")
+
+        #if not result["data"] and not result["target"]:
+        #    self.log.info("No route for {} found!".format(routespec))
+        #    result = None
+        #else:
+        #    result["data"] = json.loads(result["data"])
         return result
 
     async def start(self):
@@ -164,6 +186,8 @@ class TraefikTomlProxy(TraefikProxy):
             target (str): A full URL that will be the target of this route.
             data (dict): A JSONable dict that will be associated with this route, and will
                 be returned when retrieving information about this route.
+                FIXME: Why do we need to pass data back and forth to traefik?
+                       Traefik v2 doesn't seem to allow a data key...
 
         Will raise an appropriate Exception (FIXME: find what?) if the route could
         not be added.
@@ -171,25 +195,37 @@ class TraefikTomlProxy(TraefikProxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
-        routespec = self._routespec_to_traefik_path(routespec)
-        backend_alias = traefik_utils.generate_alias(routespec, "backend")
-        frontend_alias = traefik_utils.generate_alias(routespec, "frontend")
-        data = json.dumps(data)
-        rule = traefik_utils.generate_rule(routespec)
+        traefik_routespec = self._routespec_to_traefik_path(routespec)
+        service_alias = traefik_utils.generate_alias(traefik_routespec, "service")
+        router_alias = traefik_utils.generate_alias(traefik_routespec, "router")
+        #data = json.dumps(data)
+        rule = traefik_utils.generate_rule(traefik_routespec)
 
         async with self.mutex:
-            self.routes_cache["frontends"][frontend_alias] = {
-                "backend": backend_alias,
-                "passHostHeader": True,
-                "routes": {"test": {"rule": rule, "data": data}},
+            self.routes_cache["http"]["routers"][router_alias] = {
+                "service": service_alias,
+                "rule": rule,
+                # The data node is passed by JupyterHub. We can store its data in our routes_cache,
+                # but giving it to Traefik causes issues...
+                #"data" : data
+                #"routes": {"test": {"rule": rule, "data": data}},
             }
 
-            self.routes_cache["backends"][backend_alias] = {
-                "servers": {"server1": {"url": target, "weight": 1}}
+            # Add the data node to a separate top-level node
+            self.routes_cache["jupyter"]["routers"][router_alias] = {"data": data}
+
+            self.routes_cache["http"]["services"][service_alias] = {
+                "loadBalancer" : {
+                    "servers": {"server1": {"url": target} },
+                    "passHostHeader": True
+                }
             }
             traefik_utils.persist_routes(
-                self.toml_dynamic_config_file, self.routes_cache
+                self.dynamic_config_file, self.routes_cache
             )
+
+        self.log.debug("treefik routespec: {0}".format(traefik_routespec))
+        self.log.debug("data for routespec {0}:-\n{1}".format(routespec, data))
 
         if self.should_start:
             try:
@@ -201,10 +237,10 @@ class TraefikTomlProxy(TraefikProxy):
                 )
                 raise
         try:
-            await self._wait_for_route(routespec, provider="file")
+            await self._wait_for_route(traefik_routespec)
         except TimeoutError:
             self.log.error(
-                f"Is Traefik configured to watch {self.toml_dynamic_config_file}?"
+                f"Is Traefik configured to watch {self.dynamic_config_file}?"
             )
             raise
 
@@ -214,14 +250,14 @@ class TraefikTomlProxy(TraefikProxy):
         **Subclasses must define this method**
         """
         routespec = self._routespec_to_traefik_path(routespec)
-        backend_alias = traefik_utils.generate_alias(routespec, "backend")
-        frontend_alias = traefik_utils.generate_alias(routespec, "frontend")
+        service_alias = traefik_utils.generate_alias(routespec, "service")
+        router_alias = traefik_utils.generate_alias(routespec, "router")
 
         async with self.mutex:
-            self.routes_cache["frontends"].pop(frontend_alias, None)
-            self.routes_cache["backends"].pop(backend_alias, None)
+            self.routes_cache["http"]["routers"].pop(router_alias, None)
+            self.routes_cache["http"]["services"].pop(service_alias, None)
 
-        traefik_utils.persist_routes(self.toml_dynamic_config_file, self.routes_cache)
+        traefik_utils.persist_routes(self.dynamic_config_file, self.routes_cache)
 
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
@@ -241,11 +277,13 @@ class TraefikTomlProxy(TraefikProxy):
         all_routes = {}
 
         async with self.mutex:
-            for key, value in self.routes_cache["frontends"].items():
+            for key, value in self.routes_cache["http"]["routers"].items():
                 escaped_routespec = "".join(key.split("_", 1)[1:])
                 traefik_routespec = escapism.unescape(escaped_routespec)
                 routespec = self._routespec_from_traefik_path(traefik_routespec)
-                all_routes[routespec] = self._get_route_unsafe(traefik_routespec)
+                all_routes.update({
+                  routespec : self._get_route_unsafe(traefik_routespec)
+                })
 
         return all_routes
 
@@ -272,3 +310,4 @@ class TraefikTomlProxy(TraefikProxy):
         routespec = self._routespec_to_traefik_path(routespec)
         async with self.mutex:
             return self._get_route_unsafe(routespec)
+
