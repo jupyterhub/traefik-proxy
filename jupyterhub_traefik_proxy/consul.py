@@ -40,7 +40,11 @@ class TraefikConsulProxy(TKvProxy):
     # Consul doesn't accept keys containing // or starting with / so we have to escape them
     key_safe_chars = string.ascii_letters + string.digits + "!@#$%^&*();<>-.+?:"
 
-    kv_name = "consul"
+    #kv_name = "consul"
+
+    @default("provider_name")
+    def _provider_name(self):
+        return "consul"
 
     consul_client_ca_cert = Unicode(
         config=True,
@@ -60,41 +64,86 @@ class TraefikConsulProxy(TKvProxy):
         except ImportError:
             raise ImportError("Please install python-consul2 package to use traefik-proxy with consul")
         consul_service = urlparse(self.kv_url)
+        kwargs = {
+            'host': consul_service.hostname,
+            'port': consul_service.port,
+            'cert': self.consul_client_ca_cert
+        }
         if self.kv_password:
-            client = consul.aio.Consul(
-                host=str(consul_service.hostname),
-                port=consul_service.port,
-                token=self.kv_password,
-                cert=self.consul_client_ca_cert,
-            )
-            return client
-
-        return consul.aio.Consul(
-            host=str(consul_service.hostname),
-            port=consul_service.port,
-            cert=self.consul_client_ca_cert,
-        )
-
-    @default("kv_traefik_prefix")
-    def _default_kv_traefik_prefix(self):
-        return "traefik/"
-
-    @default("kv_jupyterhub_prefix")
-    def _default_kv_jupyterhub_prefix(self):
-        return "jupyterhub/"
+            kwargs.update({'token': self.kv_password})
+        return consul.aio.Consul(**kwargs)
 
     def _define_kv_specific_static_config(self):
-        self.static_config["consul"] = {
-            "endpoint": str(urlparse(self.kv_url).hostname)
-            + ":"
-            + str(urlparse(self.kv_url).port),
-            "prefix": self.kv_traefik_prefix,
-            "watch": True,
+        provider_config = {
+            "consul": {
+                "rootKey": self.kv_traefik_prefix,
+                #"watch": True,
+                "endpoints" : [
+                    urlparse(self.kv_url).netloc
+                ]
+            }
         }
+        # Q: Why weren't these in the Traefik v1 implementation?
+        # A: Although defined in the traefik docs, they appear to
+        # do nothing, and CONSUL_HTTP_TOKEN needs to be used instead.
+        # Ref: https://github.com/traefik/traefik/issues/767#issuecomment-270096663
+        if self.kv_username:
+            provider_config["consul"].update({"username": self.kv_username})
 
-    def _launch_traefik(self, config_type):
+        if self.kv_password:
+            provider_config["consul"].update({"password": self.kv_password})
+
+        # FIXME: Same with the tls info
+        if self.consul_client_ca_cert:
+            provider_config["consul"]["tls"] = {
+                "ca" : self.consul_client_ca_cert
+            }
+
+        self.static_config.update({"providers": provider_config})
+            
+    def _start_traefik(self):
         os.environ["CONSUL_HTTP_TOKEN"] = self.kv_password
-        super()._launch_traefik(config_type)
+        super()._start_traefik()
+
+    def _stop_traefik(self):
+        super()._stop_traefik()
+        if "CONSUL_HTTP_TOKEN" in os.environ:
+            os.environ.pop("CONSUL_HTTP_TOKEN")
+
+    async def persist_dynamic_config(self):
+        self.log.debug("Saving dynamic config to consul store")
+        data = self.flatten_dict_for_kv(
+            self.dynamic_config, prefix=self.kv_traefik_prefix
+        )
+        payload = []
+        def append_payload(key, val):
+            payload.append({
+                "KV": {
+                    "Verb": "set",
+                    "Key": key,
+                    "Value": base64.b64encode(val.encode()).decode(),
+                }
+            })
+        for k,v in data.items():
+            append_payload(k, v)
+
+        try:
+            self.log.debug(f"Uploading payload to KV store. Payload: {repr(payload)}")
+            results = await self.kv_client.txn.put(payload=payload)
+            status = 1
+            response = ""
+        except Exception as e:
+            status = 0
+            response = str(e)
+            self.log.exception(f"Error uploading payload to KV store!\n{response}")
+            self.log.exception(f"Are you missing a token? {self.kv_client.token}")
+        else:
+            self.log.debug("Successfully uploaded payload to KV store")
+
+        # Let's check if it's in there then...
+        #index, result = await self.kv_client.kv.get(k)
+        #self.log.debug(f"And the survey says, at {k} we have: {result}")
+        return status, response
 
     async def _kv_atomic_add_route_parts(
         self, jupyterhub_routespec, target, data, route_keys, rule
@@ -105,54 +154,54 @@ class TraefikConsulProxy(TKvProxy):
         )
 
         try:
-            results = await self.kv_client.txn.put(
-                payload=[
-                    {
-                        "KV": {
-                            "Verb": "set",
-                            "Key": escaped_jupyterhub_routespec,
-                            "Value": base64.b64encode(target.encode()).decode(),
-                        }
-                    },
-                    {
-                        "KV": {
-                            "Verb": "set",
-                            "Key": escaped_target,
-                            "Value": base64.b64encode(data.encode()).decode(),
-                        }
-                    },
-                    {
-                        "KV": {
-                            "Verb": "set",
-                            "Key": route_keys.backend_url_path,
-                            "Value": base64.b64encode(target.encode()).decode(),
-                        }
-                    },
-                    {
-                        "KV": {
-                            "Verb": "set",
-                            "Key": route_keys.backend_weight_path,
-                            "Value": base64.b64encode(b"1").decode(),
-                        }
-                    },
-                    {
-                        "KV": {
-                            "Verb": "set",
-                            "Key": route_keys.frontend_backend_path,
-                            "Value": base64.b64encode(
-                                route_keys.backend_alias.encode()
-                            ).decode(),
-                        }
-                    },
-                    {
-                        "KV": {
-                            "Verb": "set",
-                            "Key": route_keys.frontend_rule_path,
-                            "Value": base64.b64encode(rule.encode()).decode(),
-                        }
-                    },
-                ]
-            )
+            payload=[
+                {
+                    "KV": {
+                        "Verb": "set",
+                        "Key": escaped_jupyterhub_routespec,
+                        "Value": base64.b64encode(target.encode()).decode(),
+                    }
+                },
+                {
+                    "KV": {
+                        "Verb": "set",
+                        "Key": escaped_target,
+                        "Value": base64.b64encode(data.encode()).decode(),
+                    }
+                },
+                {
+                    "KV": {
+                        "Verb": "set",
+                        "Key": route_keys.service_url_path,
+                        "Value": base64.b64encode(target.encode()).decode(),
+                    }
+                },
+                #{
+                #    "KV": {
+                #        "Verb": "set",
+                #        "Key": route_keys.service_weight_path,
+                #        "Value": base64.b64encode(b"1").decode(),
+                #    }
+                #},
+                {
+                    "KV": {
+                        "Verb": "set",
+                        "Key": route_keys.router_service_path,
+                        "Value": base64.b64encode(
+                            route_keys.service_alias.encode()
+                        ).decode(),
+                    }
+                },
+                {
+                    "KV": {
+                        "Verb": "set",
+                        "Key": route_keys.router_rule_path,
+                        "Value": base64.b64encode(rule.encode()).decode(),
+                    }
+                }
+            ]
+            self.log.debug(f"Uploading route to KV store. Payload: {repr(payload)}")
+            results = await self.kv_client.txn.put(payload=payload)
             status = 1
             response = ""
         except Exception as e:
@@ -180,10 +229,10 @@ class TraefikConsulProxy(TKvProxy):
                 payload=[
                     {"KV": {"Verb": "delete", "Key": escaped_jupyterhub_routespec}},
                     {"KV": {"Verb": "delete", "Key": escaped_target}},
-                    {"KV": {"Verb": "delete", "Key": route_keys.backend_url_path}},
-                    {"KV": {"Verb": "delete", "Key": route_keys.backend_weight_path}},
-                    {"KV": {"Verb": "delete", "Key": route_keys.frontend_backend_path}},
-                    {"KV": {"Verb": "delete", "Key": route_keys.frontend_rule_path}},
+                    {"KV": {"Verb": "delete", "Key": route_keys.service_url_path}},
+                    #{"KV": {"Verb": "delete", "Key": route_keys.service_weight_path}},
+                    {"KV": {"Verb": "delete", "Key": route_keys.router_service_path}},
+                    {"KV": {"Verb": "delete", "Key": route_keys.router_rule_path}},
                 ]
             )
             status = 1
@@ -240,3 +289,4 @@ class TraefikConsulProxy(TKvProxy):
 
     async def stop(self):
         await super().stop()
+

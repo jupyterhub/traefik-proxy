@@ -104,7 +104,7 @@ def test_version(tmpdir):
             installer_module,
             f"--output={deps_dir}",
             "--traefik",
-            "--traefik-version=1.7.0",
+            "--traefik-version=2.4.8",
             "--etcd",
             "--etcd-version=3.2.25",
             "--consul",
@@ -176,7 +176,7 @@ def test_warning(tmpdir):
             installer_module,
             f"--output={deps_dir}",
             "--traefik",
-            "--traefik-version=1.6.6",
+            "--traefik-version=2.4.1",
         ],
         stderr=subprocess.STDOUT,
     )

@@ -81,14 +81,16 @@ def launch_backend():
 
     def _launch_backend(port, proto="http"):
         backend = subprocess.Popen(
-            [sys.executable, dummy_server_path, str(port), proto], stdout=None
+            [sys.executable, dummy_server_path, str(port), proto]
         )
         running_backends.append(backend)
 
     yield _launch_backend
 
     for proc in running_backends:
-        proc.kill()
+        proc.terminate()
+    for proc in running_backends:
+        proc.communicate()
     for proc in running_backends:
         proc.wait()
 
@@ -189,7 +191,7 @@ async def test_add_get_delete(
 
         if not expect_value_error(spec):
             try:
-                del route["data"]["last_activity"]  # CHP
+                del( route["data"]["last_activity"] )  # CHP
             except KeyError:
                 pass
 
@@ -321,7 +323,7 @@ async def test_get_all_routes(proxy, launch_backend):
     routes = await proxy.get_all_routes()
     try:
         for route_key in routes.keys():
-            del routes[route_key]["data"]["last_activity"]  # CHP
+            del( routes[route_key]["data"]["last_activity"] ) # CHP
     except KeyError:
         pass
 
@@ -424,14 +426,14 @@ async def test_websockets(proxy, launch_backend):
     launch_backend(default_backend_port, "ws")
 
     await exponential_backoff(
-        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
+        utils.check_host_up, "Traefik not reacheable", ip="127.0.0.1", port=traefik_port
     )
 
     # Check if default backend is reacheable
     await exponential_backoff(
         utils.check_host_up,
         "Backend not reacheable",
-        ip="localhost",
+        ip="127.0.0.1",
         port=default_backend_port,
     )
     # Add route to default_backend

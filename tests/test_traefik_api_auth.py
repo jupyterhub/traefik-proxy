@@ -1,10 +1,8 @@
 """Tests for the authentication to the traefik proxy api (dashboard)"""
 import pytest
-import utils
 
-from urllib.parse import urlparse
 from jupyterhub.utils import exponential_backoff
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+from tornado.httpclient import AsyncHTTPClient
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
@@ -12,7 +10,8 @@ pytestmark = pytest.mark.asyncio
 
 @pytest.fixture(
     params=[
-        "toml_proxy",
+        "file_proxy_toml",
+        "file_proxy_yaml",
         "no_auth_etcd_proxy",
         "auth_etcd_proxy",
         "no_auth_consul_proxy",
@@ -28,25 +27,40 @@ def proxy(request):
     [("api_admin", "admin", 200), ("api_admin", "1234", 401), ("", "", 401)],
 )
 async def test_traefik_api_auth(proxy, username, password, expected_rc):
-    traefik_port = urlparse(proxy.public_url).port
+    traefik_api_url = proxy.traefik_api_url + "/api"
+
+    # Must have a trailing slash!
+    dashboard_url = proxy.traefik_api_url + "/dashboard/"
+
+    async def api_login():
+        try:
+            if not username and not password:
+                resp = await AsyncHTTPClient().fetch(traefik_api_url)
+            else:
+                resp = await AsyncHTTPClient().fetch(
+                    dashboard_url,
+                    auth_username=username,
+                    auth_password=password,
+                )
+        except ConnectionRefusedError:
+            rc = None
+        except Exception as e:
+            rc = e.response.code
+        else:
+            rc = resp.code
+        return rc
+
+    async def cmp_api_login():
+        rc = await api_login()
+        if rc == expected_rc:
+            return True
+        else:
+            return False
 
     await exponential_backoff(
-        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
+        cmp_api_login, "Traefik API not reacheable"
     )
 
-    try:
-        if not username and not password:
-            resp = await AsyncHTTPClient().fetch(proxy.traefik_api_url + "/dashboard")
-        else:
-            resp = await AsyncHTTPClient().fetch(
-                proxy.traefik_api_url + "/dashboard/",
-                auth_username=username,
-                auth_password=password,
-            )
-        rc = resp.code
-    except ConnectionRefusedError:
-        rc = None
-    except Exception as e:
-        rc = e.response.code
-
+    rc = await api_login()
     assert rc == expected_rc
+    return

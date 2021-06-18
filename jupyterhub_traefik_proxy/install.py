@@ -10,6 +10,7 @@ import hashlib
 import warnings
 
 checksums_traefik = {
+    "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_linux_arm64.tar.gz": "0931fdd9c855fcafd38eba7568a1d287200fad5afd1aef7d112fb3a48d822fcc",
     "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_linux_amd64.tar.gz": "de8d56f6777c5098834d4f8d9ed419b7353a3afe913393a55b6fd14779564129",
     "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_darwin_amd64.tar.gz": "7d946baa422acfcf166e19779052c005722db03de3ab4d7aff586c4b4873a0f3",
     "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_windows_amd64.zip": "4203443cb1e91d76f81d1e2a41fb70e66452d951b1ffd8964218a7bc211c377d",
@@ -27,14 +28,14 @@ checksums_etcd = {
     "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-darwin-amd64.tar.gz": "c596709069193bffc639a22558bdea4d801128e635909ea01a6fd5b5c85da729",
     "https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz": "1620a59150ec0a0124a65540e23891243feb2d9a628092fb1edcc23974724a45",
     "https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-darwin-amd64.tar.gz": "fac4091c7ba6f032830fad7809a115909d0f0cae5cbf5b34044540def743577b",
-    "https://github.com/etcd-io/etcd/releases/download/v3.2.25/etcd-v3.3.25-linux-amd64.tar.gz": "8a509ffb1443088d501f19e339a0d9c0058ce20599752c3baef83c1c68790ef7",
-    "https://github.com/etcd-io/etcd/releases/download/v3.2.25/etcd-v3.3.25-darwin-amd64.tar.gz": "9950684a01d7431bc12c3dba014f222d55a862c6f8af64c09c42d7a59ed6790d",
+    "https://github.com/etcd-io/etcd/releases/download/v3.2.25/etcd-v3.2.25-linux-amd64.tar.gz": "8a509ffb1443088d501f19e339a0d9c0058ce20599752c3baef83c1c68790ef7",
+    "https://github.com/etcd-io/etcd/releases/download/v3.2.25/etcd-v3.2.25-darwin-amd64.tar.gz": "9950684a01d7431bc12c3dba014f222d55a862c6f8af64c09c42d7a59ed6790d",
 }
 
 checksums_consul = {
-    "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_darwin.zip": "c168240d52f67c71b30ef51b3594673cad77d0dbbf38c412b2ee30b39ef30843",
     "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_linux_amd64.zip": "da3919197ef33c4205bb7df3cc5992ccaae01d46753a72fe029778d7f52fb610",
     "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_linux_arm64.zip": "012c552aff502f907416c9a119d2dfed88b92e981f9b160eb4fe292676afdaeb",
+    "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_darwin.zip": "c168240d52f67c71b30ef51b3594673cad77d0dbbf38c412b2ee30b39ef30843",
     "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip": "a8568ca7b6797030b2c32615b4786d4cc75ce7aee2ed9025996fe92b07b31f7e",
     "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_darwin_amd64.zip": "4bc205e06b2921f998cb6ddbe70de57f8e558e226e44aba3f337f2f245678b85",
     "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_linux_amd64.zip": "1399064050019db05d3378f757e058ec4426a917dd2d240336b51532065880b6",
@@ -70,7 +71,7 @@ def install_traefik(prefix, plat, traefik_version):
     traefik_archive_path = os.path.join(prefix, traefik_archive)
 
     traefik_url = (
-        "https://github.com/containous/traefik/releases"
+        "https://github.com/traefik/traefik/releases"
         f"/download/v{traefik_version}/{traefik_archive}"
     )
 
@@ -78,7 +79,7 @@ def install_traefik(prefix, plat, traefik_version):
         print(f"Traefik already exists")
         if traefik_url not in checksums_traefik:
             warnings.warn(
-                f"Traefik {traefik_version} not supported !",
+                f"Traefik {traefik_version} not tested !",
                 stacklevel=2,
             )
             os.chmod(traefik_bin, 0o755)
@@ -94,28 +95,27 @@ def install_traefik(prefix, plat, traefik_version):
                 os.remove(traefik_archive_path)
                 os.remove(traefik_bin)
 
-    if traefik_url in checksums_traefik:
-        print(f"Downloading traefik {traefik_version}...")
-        urlretrieve(traefik_url, traefik_archive_path)
+    print(f"Downloading traefik {traefik_version} from {traefik_url}...")
+    urlretrieve(traefik_url, traefik_archive_path)
 
+    if traefik_url in checksums_traefik:
         if checksum_file(traefik_archive_path) != checksums_traefik[traefik_url]:
             raise IOError("Checksum failed")
-
-        print("Extracting the archive...")
-        if traefik_archive_extension == "tar.gz":
-            with tarfile.open(traefik_archive_path, "r") as tar_ref:
-                tar_ref.extract("traefik", prefix)
-        else:
-            with zipfile.ZipFile(traefik_archive_path, "r") as zip_ref:
-                zip_ref.extract("traefik.exe", prefix)
-
-        os.chmod(traefik_bin, 0o755)
     else:
         warnings.warn(
-            f"Traefik {traefik_version} not supported !",
+            f"Traefik {traefik_version} not tested !",
             stacklevel=2,
         )
 
+    print("Extracting the archive...")
+    if traefik_archive_extension == "tar.gz":
+        with tarfile.open(traefik_archive_path, "r") as tar_ref:
+            tar_ref.extract("traefik", prefix)
+    else:
+        with zipfile.ZipFile(traefik_archive_path, "r") as zip_ref:
+            zip_ref.extract("traefik.exe", prefix)
+
+    os.chmod(traefik_bin, 0o755)
     print("--- Done ---")
 
 
@@ -142,8 +142,8 @@ def install_etcd(prefix, plat, etcd_version):
         print(f"Etcd and etcdctl already exist")
         if etcd_url not in checksums_etcd:
             warnings.warn(
-                f"Etcd {etcd_version} not supported !",
-                stacklevel=2,
+                f"Etcd {etcd_version} not supported ! Or, at least, we don't "
+                f"recognise {etcd_url} in our checksums", stacklevel=2,
             )
             os.chmod(etcd_bin, 0o755)
             os.chmod(etcdctl_bin, 0o755)
@@ -193,7 +193,8 @@ def install_etcd(prefix, plat, etcd_version):
         shutil.rmtree(etcd_binaries)
     else:
         warnings.warn(
-            f"Etcd {etcd_version} not supported !",
+            f"Etcd {etcd_version} not supported ! Or, at least, we don't "
+            f"recognise {etcd_url} in our checksums",
             stacklevel=2
         )
 
@@ -220,7 +221,8 @@ def install_consul(prefix, plat, consul_version):
         print(f"Consul already exists")
         if consul_url not in checksums_consul:
             warnings.warn(
-                f"Consul {consul_version} not supported !",
+                f"Consul {consul_version} not supported ! Or, at least we don't have "
+                f"it {consul_url} in our checksums",
                 stacklevel=2,
             )
             os.chmod(consul_bin, 0o755)
@@ -255,7 +257,8 @@ def install_consul(prefix, plat, consul_version):
         shutil.rmtree(consul_binaries)
     else:
         warnings.warn(
-            f"Consul {consul_version} not supported !",
+            f"Consul {consul_version} not supported ! Or, at least we don't have "
+            f"it {consul_url} in our checksums",
             stacklevel=2,
         )
 
@@ -367,7 +370,7 @@ def main():
     parser.add_argument(
         "--etcd-version",
         dest="etcd_version",
-        default="3.4.7",
+        default="3.4.15",
         help=textwrap.dedent(
             """\
             The version of etcd to download.

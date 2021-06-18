@@ -40,10 +40,17 @@ if __name__ == "__main__":
         proto = str(argv[2])
         if proto == "http":
             run(port=int(argv[1]))
-        else:
+        elif proto == "ws":
             asyncio.get_event_loop().run_until_complete(
-                websockets.serve(send_port, "localhost", int(argv[1]))
+                # localhost can resolve to ::1. This causes issues on
+                # docker, which disables the IPv6 stack by default,
+                # resulting in the error 'Cannot assign requested address'.
+                websockets.serve(send_port, "127.0.0.1", int(argv[1]))
             )
             asyncio.get_event_loop().run_forever()
+        else:
+            raise ValueError(
+                f"I know how to run 'http' or 'ws' servers, not {proto} servers"
+            )
     else:
         run()

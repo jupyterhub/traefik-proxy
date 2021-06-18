@@ -36,7 +36,9 @@ class TraefikEtcdProxy(TKvProxy):
 
     executor = Any()
 
-    kv_name = "etcdv3"
+    @default("provider_name")
+    def _provider_name(self):
+        return "etcd"
 
     etcd_client_ca_cert = Unicode(
         config=True,
@@ -94,14 +96,6 @@ class TraefikEtcdProxy(TKvProxy):
             cert_key=self.etcd_client_cert_key,
         )
 
-    @default("kv_traefik_prefix")
-    def _default_kv_traefik_prefix(self):
-        return "/traefik/"
-
-    @default("kv_jupyterhub_prefix")
-    def _default_kv_jupyterhub_prefix(self):
-        return "/jupyterhub/"
-
     @run_on_executor
     def _etcd_transaction(self, success_actions):
         status, response = self.kv_client.transaction(
@@ -120,16 +114,19 @@ class TraefikEtcdProxy(TKvProxy):
         return routes
 
     def _define_kv_specific_static_config(self):
-        self.static_config["etcd"] = {
-            "username": self.kv_username,
-            "password": self.kv_password,
-            "endpoint": str(urlparse(self.kv_url).hostname)
-            + ":"
-            + str(urlparse(self.kv_url).port),
-            "prefix": self.kv_traefik_prefix,
-            "useapiv3": True,
-            "watch": True,
-        }
+        self.log.debug("Setting up the etcd provider in the static config")
+        url = urlparse(self.kv_url)
+        self.static_config.update({"providers" : {
+            "etcd" : {
+                "endpoints": [url.netloc],
+                "rootKey": self.kv_traefik_prefix, # Is rootKey the new prefix?
+            }
+        } })
+        if self.kv_username and self.kv_password:
+            self.static_config["providers"]["etcd"].update({
+                "username": self.kv_username,
+                "password": self.kv_password
+            })
 
     async def _kv_atomic_add_route_parts(
         self, jupyterhub_routespec, target, data, route_keys, rule
@@ -137,12 +134,15 @@ class TraefikEtcdProxy(TKvProxy):
         success = [
             self.kv_client.transactions.put(jupyterhub_routespec, target),
             self.kv_client.transactions.put(target, data),
-            self.kv_client.transactions.put(route_keys.backend_url_path, target),
-            self.kv_client.transactions.put(route_keys.backend_weight_path, "1"),
+            self.kv_client.transactions.put(route_keys.service_url_path, target),
+            # The weight is used to balance services, not servers.
+            # Traefik by default will use round-robin load-balancing anyway.
+            # See: https://doc.traefik.io/traefik/routing/services/#load-balancing
+            #self.kv_client.transactions.put(route_keys.service_weight_path, "1"),
             self.kv_client.transactions.put(
-                route_keys.frontend_backend_path, route_keys.backend_alias
+                route_keys.router_service_path, route_keys.service_alias
             ),
-            self.kv_client.transactions.put(route_keys.frontend_rule_path, rule),
+            self.kv_client.transactions.put(route_keys.router_rule_path, rule),
         ]
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response
@@ -151,7 +151,7 @@ class TraefikEtcdProxy(TKvProxy):
         value = await maybe_future(self._etcd_get(jupyterhub_routespec))
         if value is None:
             self.log.warning(
-                "Route %s doesn't exist. Nothing to delete", jupyterhub_routespec
+                "Route {jupyterhub_routespec} doesn't exist. Nothing to delete"
             )
             return True, None
 
@@ -160,10 +160,10 @@ class TraefikEtcdProxy(TKvProxy):
         success = [
             self.kv_client.transactions.delete(jupyterhub_routespec),
             self.kv_client.transactions.delete(target),
-            self.kv_client.transactions.delete(route_keys.backend_url_path),
-            self.kv_client.transactions.delete(route_keys.backend_weight_path),
-            self.kv_client.transactions.delete(route_keys.frontend_backend_path),
-            self.kv_client.transactions.delete(route_keys.frontend_rule_path),
+            self.kv_client.transactions.delete(route_keys.service_url_path),
+            #self.kv_client.transactions.delete(route_keys.service_weight_path),
+            self.kv_client.transactions.delete(route_keys.router_service_path),
+            self.kv_client.transactions.delete(route_keys.router_rule_path),
         ]
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response
@@ -194,3 +194,12 @@ class TraefikEtcdProxy(TKvProxy):
     async def _kv_get_jupyterhub_prefixed_entries(self):
         routes = await maybe_future(self._etcd_get_prefix(self.kv_jupyterhub_prefix))
         return routes
+
+    async def persist_dynamic_config(self):
+        data = self.flatten_dict_for_kv(self.dynamic_config, prefix=self.kv_traefik_prefix)
+        transactions = []
+        for k, v in data.items():
+            transactions.append(self.kv_client.transactions.put(k, v))
+        status, response = await maybe_future(self._etcd_transaction(transactions))
+        return status, response
+

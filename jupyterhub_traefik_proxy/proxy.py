@@ -20,7 +20,8 @@ Route Specification:
 
 import json
 from os.path import abspath, dirname, join
-from subprocess import Popen
+from subprocess import Popen, TimeoutExpired
+import asyncio.subprocess
 from urllib.parse import urlparse
 
 from traitlets import Any, Bool, Dict, Integer, Unicode, default
@@ -40,8 +41,11 @@ class TraefikProxy(Proxy):
         "traefik.toml", config=True, help="""traefik's static configuration file"""
     )
 
+    static_config = Dict()
+    dynamic_config = Dict()
+
     traefik_api_url = Unicode(
-        "http://127.0.0.1:8099",
+        "http://localhost:8099",
         config=True,
         help="""traefik authenticated api endpoint url""",
     )
@@ -52,11 +56,35 @@ class TraefikProxy(Proxy):
         help="""validate SSL certificate of traefik api endpoint""",
     )
 
-    traefik_log_level = Unicode("ERROR", config=True, help="""traefik's log level""")
+    debug = Bool(False, config=True, help="""Debug the proxy class?""")
+
+    traefik_log_level = Unicode("DEBUG", config=True, help="""traefik's log level""")
 
     traefik_api_password = Unicode(
         config=True, help="""The password for traefik api login"""
     )
+
+    provider_name = Unicode(
+        config=True, help="""The provider name that Traefik expects, e.g. file, consul, etcd"""
+    )
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if kwargs.get('debug', self.debug) == True:
+            import sys, logging
+            # Check we don't already have a StreamHandler
+            addHandler = True
+            for handler in self.log.handlers:
+                if isinstance(handler, logging.StreamHandler):
+                    addHandler = False
+            if addHandler:
+                self.log.setLevel("DEBUG")
+                handler = logging.StreamHandler(sys.stdout)
+                handler.setLevel("DEBUG")
+                self.log.addHandler(handler)
+                self.log.debug(f"Initialising {type(self).__name__}")
+
+        #if kwargs.get('debug', self.debug) is True:
 
     @default("traefik_api_password")
     def _warn_empty_password(self):
@@ -99,42 +127,36 @@ class TraefikProxy(Proxy):
         help="""Timeout (in seconds) when waiting for traefik to register an updated route.""",
     )
 
-    static_config = Dict()
-
     def _generate_htpassword(self):
-        from passlib.apache import HtpasswdFile
-
-        ht = HtpasswdFile()
-        ht.set_password(self.traefik_api_username, self.traefik_api_password)
-        self.traefik_api_hashed_password = str(ht.to_string()).split(":")[1][:-3]
+        from passlib.hash import apr_md5_crypt
+        self.traefik_api_hashed_password = apr_md5_crypt.hash(self.traefik_api_password)
 
     async def _check_for_traefik_service(self, routespec, kind):
-        """Check for an expected router or service 
+        """Check for an expected router or service in the Traefik API.
 
         This is used to wait for traefik to load configuration
         from a provider
         """
         # expected e.g. 'service' + '_' + routespec @ file
-        expected = traefik_utils.generate_alias(routespec, kind) + "@file"
-        path = "/api/http/{0}s".format(kind)
+        expected = traefik_utils.generate_alias(routespec, kind) + "@" + self.provider_name
+        path = f"/api/http/{kind}s"
         try:
             resp = await self._traefik_api_request(path)
             json_data = json.loads(resp.body)
         except Exception:
-            self.log.exception("Error checking traefik api for %s %s", kind, routespec)
+            self.log.exception(f"Error checking traefik api for {kind} {routespec}")
             return False
 
         service_names = [service['name'] for service in json_data]
         if expected not in service_names:
-            self.log.debug("traefik %s not yet in %s", expected, kind)
-            self.log.debug("Current traefik %ss: %s", kind, json_data)
+            self.log.debug(f"traefik {expected} not yet in {kind}")
             return False
 
         # found the expected endpoint
         return True
 
     async def _wait_for_route(self, routespec):
-        self.log.info("Waiting for %s to register with traefik", routespec)
+        self.log.info(f"Waiting for {routespec} to register with traefik")
 
         async def _check_traefik_dynamic_conf_ready():
             """Check if traefik loaded its dynamic configuration yet"""
@@ -151,7 +173,7 @@ class TraefikProxy(Proxy):
 
         await exponential_backoff(
             _check_traefik_dynamic_conf_ready,
-            "Traefik route for %s configuration not available" % routespec,
+            f"Traefik route for {routespec} configuration not available",
             timeout=self.check_route_timeout,
         )
 
@@ -169,13 +191,14 @@ class TraefikProxy(Proxy):
             self.log.warning("%s GET %s", resp.code, url)
         else:
             self.log.debug("%s GET %s", resp.code, url)
+
+        self.log.debug(f"Succesfully received data from {path}: {resp.body}")
         return resp
 
-    async def _wait_for_static_config(self, provider):
+    async def _wait_for_static_config(self):
         async def _check_traefik_static_conf_ready():
             """Check if traefik loaded its static configuration yet"""
             try:
-                #resp = await self._traefik_api_request("/api/overview/providers/" + provider)
                 resp = await self._traefik_api_request("/api/overview")
             except Exception:
                 self.log.exception("Error checking for traefik static configuration")
@@ -198,58 +221,121 @@ class TraefikProxy(Proxy):
 
     def _stop_traefik(self):
         self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
-        self.traefik_process.kill()
-        self.traefik_process.wait()
+        self.traefik_process.terminate()
+        try:
+            self.traefik_process.communicate(timeout=10)
+        except TimeoutExpired:
+            self.traefik_process.kill()
+            self.traefik_process.communicate()
+        finally:
+            self.traefik_process.wait()
 
-    def _launch_traefik(self, config_type):
-        if config_type == "fileprovider" or config_type == "etcdv3" or config_type == "consul":
-            config_file_path = abspath(join(dirname(__file__), "traefik.toml"))
-            self.traefik_process = Popen(
-                ["traefik", "-c", config_file_path], stdout=None
-            )
-        else:
+    def _start_traefik(self):
+        if self.provider_name not in ("file", "etcd", "consul"):
             raise ValueError(
                 "Configuration mode not supported \n.\
-                The proxy can only be configured through toml, etcd and consul"
+                The proxy can only be configured through fileprovider, etcd and consul"
             )
+        try:
+            self.traefik_process = Popen([
+                "traefik", "--configfile", abspath(self.static_config_file)
+            ])
+        except FileNotFoundError as e:
+            self.log.error(
+                "Failed to find traefik \n"
+                "The proxy can be downloaded from https://github.com/containous/traefik/releases/download."
+            )
+            raise
+        except Exception as e:
+            self.log.exception(e)
+            raise
 
     async def _setup_traefik_static_config(self):
-        self.log.info("Setting up traefik's static config...")
-        self._generate_htpassword()
+        """When should_start=True, we are in control of traefik's static configuration
+        file. This sets up the entrypoints and api handler in self.static_config, and
+        then saves it to :attrib:`self.static_config_file`. 
 
-        self.static_config = {}
-        self.static_config["debug"] = True
-        self.static_config["logLevel"] = self.traefik_log_level
+        Subclasses should specify any traefik providers themselves, in
+        :attrib:`self.static_config["providers"]` 
+        """
+        self.log.info("Setting up traefik's static config...")
+
+        self.static_config["log"] = { "level": self.traefik_log_level }
+
         entryPoints = {}
 
         if self.ssl_cert and self.ssl_key:
-            self.static_config["defaultentrypoints"] = ["https"]
-            entryPoints["https"] = {
+            entryPoints["websecure"] = {
                 "address": ":" + str(urlparse(self.public_url).port),
-                "tls": {
-                    "certificates": [
-                        {"certFile": self.ssl_cert, "keyFile": self.ssl_key}
-                    ]
-                },
+                "tls": {},
             }
         else:
-            self.static_config["defaultentrypoints"] = ["http"]
-            entryPoints["http"] = {"address": ":" + str(urlparse(self.public_url).port)}
+            entryPoints["web"] = {"address": ":" + str(urlparse(self.public_url).port)}
 
-        auth = {
-            "basic": {
-                "users": [
-                    self.traefik_api_username + ":" + self.traefik_api_hashed_password
-                ]
-            }
-        }
-        entryPoints["auth_api"] = {
+        entryPoints["enter_api"] = {
             "address": ":" + str(urlparse(self.traefik_api_url).port),
-            "auth": auth,
         }
         self.static_config["entryPoints"] = entryPoints
-        self.static_config["api"] = {"dashboard": True, "entrypoint": "auth_api"}
+        self.static_config["api"] = {"dashboard": True} #, "entrypoints": "auth_api"}
         self.static_config["wss"] = {"protocol": "http"}
+
+        try:
+            self.log.debug(f"Persisting the static config: {self.static_config}")
+            traefik_utils.persist_static_conf(
+                self.static_config_file,
+                self.static_config
+            )
+        except IOError:
+            self.log.exception("Couldn't set up traefik's static config.")
+            raise
+        except:
+            self.log.error("Couldn't set up traefik's static config. Unexpected error:")
+            raise
+
+    async def _setup_traefik_dynamic_config(self):
+        self.log.info("Setting up traefik's dynamic config...")
+        self._generate_htpassword()
+        api_url = urlparse(self.traefik_api_url)
+        api_path = api_url.path if api_url.path else '/api'
+        api_credentials = "{0}:{1}".format(
+            self.traefik_api_username,
+            self.traefik_api_hashed_password
+        )
+        self.dynamic_config.update({
+            "http": {
+                "routers": {
+                    "route_api": {
+                        "rule": f"Host(`{api_url.hostname}`) && (PathPrefix(`{api_path}`) || PathPrefix(`/dashboard`))",
+                        "entryPoints": ["enter_api"],
+                        "service": "api@internal",
+                        "middlewares": ["auth_api"]
+                    },
+                },
+                "middlewares": {
+                    "auth_api": {
+                        "basicAuth": {
+                            "users": [
+                                api_credentials
+                            ]
+                        }
+                    }
+                }
+            }
+        })
+        if self.ssl_cert and self.ssl_key:
+            self.dynamic_config.update({
+                "tls": {
+                    "stores": {
+                        "default": {
+                            "defaultCertificate": {
+                                "certFile": self.ssl_cert,
+                                "keyFile": self.ssl_key
+                            }
+                        }
+                    }
+                }
+            })
+
 
     def _routespec_to_traefik_path(self, routespec):
         path = self.validate_routespec(routespec)
@@ -271,6 +357,7 @@ class TraefikProxy(Proxy):
         if the proxy is to be started by the Hub
         """
         await self._setup_traefik_static_config()
+        await self._setup_traefik_dynamic_config()
         self._start_traefik()
 
     async def stop(self):
@@ -346,5 +433,16 @@ class TraefikProxy(Proxy):
                         route.
 
             None: if there are no routes matching the given routespec
+        """
+        raise NotImplementedError()
+
+    async def persist_dynamic_config(self):
+        """Update the Traefik dynamic configuration, depending on the backend
+        provider in use. This is used to e.g. set up the api endpoint's
+        authentication (username and password), as well as default tls
+        certificates to use.
+
+        :arg:`settings` is a Dict containing the traefik settings, which will
+        be updated on the Traefik provider depending on the subclass in use.
         """
         raise NotImplementedError()

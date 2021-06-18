@@ -13,8 +13,8 @@ from collections import namedtuple
 class KVStorePrefix(Unicode):
     def validate(self, obj, value):
         u = super().validate(obj, value)
-        if not u.endswith("/"):
-            u = u + "/"
+        if u.endswith("/"):
+            u = u.rstrip("/")
 
         proxy_class = type(obj).__name__
         if "Consul" in proxy_class and u.startswith("/"):
@@ -41,31 +41,38 @@ def generate_alias(routespec, server_type=""):
     return server_type + "_" + escapism.escape(routespec, safe=safe)
 
 
-def generate_service_entry( proxy, service_alias, separator="/", url=False,
-        weight=False):
-    service_entry = ""
+def generate_service_entry( proxy, service_alias, separator="/", url=False):
+    service_entry = separator.join(
+        ["http", "services", service_alias, "loadBalancer", "servers", "server1"]
+    )
     if separator == "/":
-        service_entry = proxy.kv_traefik_prefix
-    service_entry += separator.join(["services", service_alias, "servers", "server1"])
+        service_entry = proxy.kv_traefik_prefix + separator + service_entry
     if url:
         service_entry += separator + "url"
-    elif weight:
-        service_entry += separator + "weight"
-
     return service_entry
+
+def generate_service_weight_entry( proxy, service_alias, separator="/"):
+    return separator.join(
+        [proxy.kv_traefik_prefix, "http", "services", service_alias,
+        "weighted", "services", "0", "weight"]
+    )
 
 
 def generate_router_service_entry(proxy, router_alias):
-    return proxy.kv_traefik_prefix + "routers/" + router_alias + "/service"
+    return "/".join(
+        [proxy.kv_traefik_prefix, "http", "routers", router_alias, "service"]
+    )
+    #return proxy.kv_traefik_prefix + "routers/" + router_alias + "/service"
 
 
 def generate_router_rule_entry(proxy, router_alias, separator="/"):
     router_rule_entry = separator.join(
-        ["routers", router_alias, "routes", "test"]
+        ["http", "routers", router_alias]
     )
     if separator == "/":
-        router_rule_entry = (
-            proxy.kv_traefik_prefix + router_rule_entry + separator + "rule"
+        router_rule_entry = separator.join(
+            [proxy.kv_traefik_prefix, router_rule_entry, "rule"]
+            #proxy.kv_traefik_prefix + router_rule_entry + separator + "rule"
         )
 
     return router_rule_entry
@@ -80,7 +87,7 @@ def generate_route_keys(proxy, routespec, separator="/"):
         [
             "service_alias",
             "service_url_path",
-            "service_weight_path",
+            #"service_weight_path",
             "router_alias",
             "router_service_path",
             "router_rule_path",
@@ -90,7 +97,8 @@ def generate_route_keys(proxy, routespec, separator="/"):
     if separator != ".":
         service_url_path = generate_service_entry(proxy, service_alias, url=True)
         router_rule_path = generate_router_rule_entry(proxy, router_alias)
-        service_weight_path = generate_service_entry(proxy, service_alias, weight=True)
+        #service_weight_path = generate_service_entry(proxy, service_alias, weight=True)
+        #service_weight_path = generate_service_weight_entry(proxy, service_alias)
         router_service_path = generate_router_service_entry(proxy, router_alias)
     else:
         service_url_path = generate_service_entry(
@@ -99,13 +107,13 @@ def generate_route_keys(proxy, routespec, separator="/"):
         router_rule_path = generate_router_rule_entry(
             proxy, router_alias, separator=separator
         )
-        service_weight_path = ""
+        #service_weight_path = ""
         router_service_path = ""
 
     return RouteKeys(
         service_alias,
         service_url_path,
-        service_weight_path,
+        #service_weight_path,
         router_alias,
         router_service_path,
         router_rule_path,
@@ -146,7 +154,8 @@ class TraefikConfigFileHandler(object):
     def __init__(self, file_path):
         file_ext = file_path.rsplit('.', 1)[-1]
         if file_ext == 'yaml':
-            import yaml as config_handler
+            from ruamel.yaml import YAML
+            config_handler = YAML(typ="safe")
         elif file_ext == 'toml':
             import toml as config_handler
         else:
@@ -161,7 +170,8 @@ class TraefikConfigFileHandler(object):
 
     def load(self):
         """Depending on self.file_path, call either yaml.load or toml.load"""
-        return self._load(self.file_path)
+        with open(self.file_path, "r") as fd:
+            return self._load(fd)
 
     def dump(self, data):
         with open(self.file_path, "w") as f:
@@ -177,10 +187,16 @@ def persist_static_conf(file_path, static_conf_dict):
     handler = TraefikConfigFileHandler(file_path)
     handler.dump(static_conf_dict)
 
-def persist_routes(file_path, routes_dict):
+def persist_dynamic_conf(file_path, routes_dict):
+    # FIXME: Only used by fileprovider, remove?
     handler = TraefikConfigFileHandler(file_path)
     handler.atomic_dump(routes_dict)
 
-def load_routes(file_path):
+def load_dynamic_conf(file_path):
+    # FIXME: Only used by fileprovider, remove?
     handler = TraefikConfigFileHandler(file_path)
     return handler.load()
+
+# FIXME: Alias above functions for backwards compatibility?
+persist_routes = persist_dynamic_conf
+load_routes = load_dynamic_conf
