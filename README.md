@@ -19,7 +19,7 @@ depending on how traefik store its routing configuration.
 
 For **smaller**, single-node deployments:
 
-* TraefikTomlProxy
+* TraefikFileProviderProxy
 
 For **distributed** setups:
 
@@ -32,7 +32,7 @@ The [documentation](https://jupyterhub-traefik-proxy.readthedocs.io) contains a
 guide](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/install.html)
 with examples for the three different implementations.
 
-* [For TraefikTomlProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/toml.html#example-setup)
+* [For TraefikFileProviderProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/file.html#example-setup)
 * [For TraefikEtcdProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup)
 * [For TraefikConsulProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/consul.html#example-setup)
 
