@@ -1,6 +1,6 @@
 """sample jupyterhub config file for testing
 
-configures jupyterhub to run with traefik_toml.
+configures jupyterhub to run with traefik_file.
 
 configures jupyterhub with dummyauthenticator and simplespawner
 to enable testing without administrative privileges.
@@ -8,10 +8,10 @@ to enable testing without administrative privileges.
 requires jupyterhub 1.0.dev
 """
 
-c.JupyterHub.proxy_class = "traefik_toml"
-c.TraefikTomlProxy.traefik_api_username = "admin"
-c.TraefikTomlProxy.traefik_api_password = "admin"
-c.TraefikTomlProxy.traefik_log_level = "INFO"
+c.JupyterHub.proxy_class = "traefik_file"
+c.TraefikFileProviderProxy.traefik_api_username = "admin"
+c.TraefikFileProviderProxy.traefik_api_password = "admin"
+c.TraefikFileProviderProxy.traefik_log_level = "INFO"
 
 # use dummy and simple auth/spawner for testing
 c.JupyterHub.authenticator_class = "dummy"
