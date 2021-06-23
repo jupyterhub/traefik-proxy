@@ -28,8 +28,8 @@ checksums_etcd = {
     "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-darwin-amd64.tar.gz": "c596709069193bffc639a22558bdea4d801128e635909ea01a6fd5b5c85da729",
     "https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz": "1620a59150ec0a0124a65540e23891243feb2d9a628092fb1edcc23974724a45",
     "https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-darwin-amd64.tar.gz": "fac4091c7ba6f032830fad7809a115909d0f0cae5cbf5b34044540def743577b",
-    "https://github.com/etcd-io/etcd/releases/download/v3.2.25/etcd-v3.2.25-linux-amd64.tar.gz": "8a509ffb1443088d501f19e339a0d9c0058ce20599752c3baef83c1c68790ef7",
-    "https://github.com/etcd-io/etcd/releases/download/v3.2.25/etcd-v3.2.25-darwin-amd64.tar.gz": "9950684a01d7431bc12c3dba014f222d55a862c6f8af64c09c42d7a59ed6790d",
+    "https://github.com/etcd-io/etcd/releases/download/v3.2.26/etcd-v3.2.26-linux-amd64.tar.gz": "127d4f2097c09d929beb9d3784590cc11102f4b4d4d4da7ad82d5c9e856afd38",
+    "https://github.com/etcd-io/etcd/releases/download/v3.2.26/etcd-v3.2.26-darwin-amd64.zip": "0393e650ffa3e61b1fd07c61f8c78af1556896c300c9814545ff0e91f52c3513",
 }
 
 checksums_consul = {

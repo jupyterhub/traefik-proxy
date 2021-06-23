@@ -18,10 +18,8 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-import json
 import os
 import asyncio
-import string
 import escapism
 
 from traitlets import Any, default, Unicode, observe
@@ -61,7 +59,6 @@ class TraefikFileProviderProxy(TraefikProxy):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        #self._set_dynamic_config_file(None)
         try:
             # Load initial dynamic config from disk
             self.dynamic_config = self.dynamic_config_handler.load()
@@ -106,7 +103,7 @@ class TraefikFileProviderProxy(TraefikProxy):
     def _get_route_unsafe(self, traefik_routespec):
         service_alias = traefik_utils.generate_alias(traefik_routespec, "service")
         router_alias = traefik_utils.generate_alias(traefik_routespec, "router")
-        routespec = self._routespec_from_traefik_path(traefik_routespec)
+        routespec = self.validate_routespec(traefik_routespec)
         result = {"data": None, "target": None, "routespec": routespec}
 
         def get_target_data(d, to_find):
@@ -133,8 +130,6 @@ class TraefikFileProviderProxy(TraefikProxy):
         if result["data"] is None and result["target"] is None:
             self.log.info(f"No route for {routespec} found!")
             result = None
-        self.log.debug(f"traefik routespec: {traefik_routespec}")
-        self.log.debug(f"result for routespec {routespec}:-\n{result}")
         return result
 
     async def start(self):
@@ -179,11 +174,9 @@ class TraefikFileProviderProxy(TraefikProxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
-        self.log.debug(f"\tTraefikFileProviderProxy.add_route: Adding {routespec} for {target}")
-        traefik_routespec = self._routespec_to_traefik_path(routespec)
+        traefik_routespec = self.validate_routespec(routespec)
         service_alias = traefik_utils.generate_alias(traefik_routespec, "service")
         router_alias = traefik_utils.generate_alias(traefik_routespec, "router")
-        #data = json.dumps(data)
         rule = traefik_utils.generate_rule(traefik_routespec)
 
         async with self.mutex:
@@ -222,9 +215,6 @@ class TraefikFileProviderProxy(TraefikProxy):
             }
             self.persist_dynamic_config()
 
-        self.log.debug(f"traefik routespec: {traefik_routespec}")
-        self.log.debug(f"data for routespec {routespec}:-\n{data}")
-
         if self.should_start:
             try:
                 # Check if traefik was launched
@@ -247,17 +237,17 @@ class TraefikFileProviderProxy(TraefikProxy):
 
         **Subclasses must define this method**
         """
-        routespec = self._routespec_to_traefik_path(routespec)
+        routespec = self.validate_routespec(routespec)
         service_alias = traefik_utils.generate_alias(routespec, "service")
         router_alias = traefik_utils.generate_alias(routespec, "router")
 
         async with self.mutex:
             
+            # Pop each entry and if it's the last one, delete the key
             self.dynamic_config["http"]["routers"].pop(router_alias, None)
             self.dynamic_config["http"]["services"].pop(service_alias, None)
             self.dynamic_config["jupyter"]["routers"].pop(router_alias, None)
 
-            # If empty, delete the keys
             if not self.dynamic_config["http"]["routers"]:
                 self.dynamic_config["http"].pop("routers")
             if not self.dynamic_config["http"]["services"]:
@@ -293,7 +283,7 @@ class TraefikFileProviderProxy(TraefikProxy):
                     continue
                 escaped_routespec = "".join(router.split("_", 1)[1:])
                 traefik_routespec = escapism.unescape(escaped_routespec)
-                routespec = self._routespec_from_traefik_path(traefik_routespec)
+                routespec = self.validate_routespec(traefik_routespec)
                 all_routes.update({
                   routespec : self._get_route_unsafe(traefik_routespec)
                 })
@@ -320,7 +310,7 @@ class TraefikFileProviderProxy(TraefikProxy):
 
             None: if there are no routes matching the given routespec
         """
-        routespec = self._routespec_to_traefik_path(routespec)
+        routespec = self.validate_routespec(routespec)
         async with self.mutex:
             return self._get_route_unsafe(routespec)
 

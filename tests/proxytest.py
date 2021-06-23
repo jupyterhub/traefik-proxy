@@ -20,6 +20,9 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
 import websockets
 
 
+import pprint
+pp = pprint.PrettyPrinter(indent=2)
+
 class MockApp:
     def __init__(self):
         self.hub = Hub(routespec="/")
@@ -73,6 +76,13 @@ class MockUser(User):
     def _new_spawner(self, spawner_name, **kwargs):
         return MockSpawner(spawner_name, user=self, **kwargs)
 
+def assert_equal(value, expected):
+    try:
+        assert value == expected
+    except AssertionError:
+        pp.pprint({'value': value})
+        pp.pprint({"expected": expected})
+        raise
 
 @pytest.fixture
 def launch_backend():
@@ -192,10 +202,12 @@ async def test_add_get_delete(
         if not expect_value_error(spec):
             try:
                 del( route["data"]["last_activity"] )  # CHP
+            except TypeError as e:
+                raise TypeError(f"{e}\nRoute got:{route}")
             except KeyError:
                 pass
 
-            assert route == expected_output(spec, backend.geturl())
+            assert_equal(route, expected_output(spec, backend.geturl()))
 
             # Test the actual routing
             responding_backend1 = await utils.get_responding_backend_port(
@@ -204,10 +216,8 @@ async def test_add_get_delete(
             responding_backend2 = await utils.get_responding_backend_port(
                 proxy_url, normalize_spec(spec) + "something"
             )
-            assert (
-                responding_backend1 == backend.port
-                and responding_backend2 == backend.port
-            )
+            assert_equal(responding_backend1, backend.port)
+            assert_equal(responding_backend2, backend.port)
 
     for i, spec in enumerate(existing_routes, start=1):
         backend = default_backend._replace(
@@ -226,8 +236,8 @@ async def test_add_get_delete(
     for i, spec in enumerate(existing_routes):
         try:
             await proxy.add_route(spec, extra_backends[i].geturl(), copy.copy(data))
-        except Exception:
-            pass
+        except Exception as e:
+            raise type(e)(f"{e}\nProblem adding Route {spec}")
 
     def finalizer():
         async def cleanup():
@@ -258,7 +268,7 @@ async def test_add_get_delete(
 
     # Test that deleted route does not exist anymore
     if not expect_value_error(routespec):
-        assert route == None
+        assert_equal(route, None)
 
         async def _wait_for_deletion():
             deleted = 0
@@ -327,7 +337,7 @@ async def test_get_all_routes(proxy, launch_backend):
     except KeyError:
         pass
 
-    assert routes == expected_output
+    assert_equal(routes, expected_output)
 
 
 async def test_host_origin_headers(proxy, launch_backend):
@@ -369,8 +379,8 @@ async def test_host_origin_headers(proxy, launch_backend):
     )
     resp = await AsyncHTTPClient().fetch(req)
 
-    assert resp.headers["Host"] == expected_host_header
-    assert resp.headers["Origin"] == expected_origin_header
+    assert_equal(resp.headers["Host"], expected_host_header)
+    assert_equal(resp.headers["Origin"], expected_origin_header)
 
 
 @pytest.mark.parametrize("username", ["zoe", "50fia", "秀樹", "~TestJH", "has@"])

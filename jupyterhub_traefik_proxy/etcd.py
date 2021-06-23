@@ -19,15 +19,13 @@ Route Specification:
 # Distributed under the terms of the Modified BSD License.
 
 from concurrent.futures import ThreadPoolExecutor
-import json
-import os
+import escapism
 from urllib.parse import urlparse
 
 from tornado.concurrent import run_on_executor
 from traitlets import Any, default, Unicode
 
 from jupyterhub.utils import maybe_future
-from . import traefik_utils
 from jupyterhub_traefik_proxy import TKvProxy
 
 
@@ -78,23 +76,23 @@ class TraefikEtcdProxy(TKvProxy):
             import etcd3
         except ImportError:
             raise ImportError("Please install etcd3 package to use traefik-proxy with etcd3")
+        kwargs = {
+            'host': etcd_service.hostname,
+            'port': etcd_service.port,
+            'ca_cert': self.etcd_client_ca_cert,
+            'cert_cert': self.etcd_client_cert_crt,
+            'cert_key': self.etcd_client_cert_key,
+        }
         if self.kv_password:
-            return etcd3.client(
-                host=str(etcd_service.hostname),
-                port=etcd_service.port,
-                user=self.kv_username,
-                password=self.kv_password,
-                ca_cert=self.etcd_client_ca_cert,
-                cert_cert=self.etcd_client_cert_crt,
-                cert_key=self.etcd_client_cert_key,
-            )
-        return etcd3.client(
-            host=str(etcd_service.hostname),
-            port=etcd_service.port,
-            ca_cert=self.etcd_client_ca_cert,
-            cert_cert=self.etcd_client_cert_crt,
-            cert_key=self.etcd_client_cert_key,
-        )
+            kwargs.update({
+                'user': self.kv_username,
+                'password': self.kv_password
+            })
+        return etcd3.client(**kwargs)
+
+    def _clean_resources(self):
+        super()._clean_resources()
+        self.kv_client.close()
 
     @run_on_executor
     def _etcd_transaction(self, success_actions):
@@ -119,7 +117,7 @@ class TraefikEtcdProxy(TKvProxy):
         self.static_config.update({"providers" : {
             "etcd" : {
                 "endpoints": [url.netloc],
-                "rootKey": self.kv_traefik_prefix, # Is rootKey the new prefix?
+                "rootKey": self.kv_traefik_prefix,
             }
         } })
         if self.kv_username and self.kv_password:
@@ -131,14 +129,13 @@ class TraefikEtcdProxy(TKvProxy):
     async def _kv_atomic_add_route_parts(
         self, jupyterhub_routespec, target, data, route_keys, rule
     ):
+        jupyterhub_target = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
+        )
         success = [
             self.kv_client.transactions.put(jupyterhub_routespec, target),
-            self.kv_client.transactions.put(target, data),
+            self.kv_client.transactions.put(jupyterhub_target, data),
             self.kv_client.transactions.put(route_keys.service_url_path, target),
-            # The weight is used to balance services, not servers.
-            # Traefik by default will use round-robin load-balancing anyway.
-            # See: https://doc.traefik.io/traefik/routing/services/#load-balancing
-            #self.kv_client.transactions.put(route_keys.service_weight_path, "1"),
             self.kv_client.transactions.put(
                 route_keys.router_service_path, route_keys.service_alias
             ),
@@ -151,15 +148,17 @@ class TraefikEtcdProxy(TKvProxy):
         value = await maybe_future(self._etcd_get(jupyterhub_routespec))
         if value is None:
             self.log.warning(
-                "Route {jupyterhub_routespec} doesn't exist. Nothing to delete"
+                f"Route {jupyterhub_routespec} doesn't exist. Nothing to delete"
             )
             return True, None
 
-        target = value.decode()
+        jupyterhub_target = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "targets", escapism.escape(value.decode())]
+        )
 
         success = [
             self.kv_client.transactions.delete(jupyterhub_routespec),
-            self.kv_client.transactions.delete(target),
+            self.kv_client.transactions.delete(jupyterhub_target),
             self.kv_client.transactions.delete(route_keys.service_url_path),
             #self.kv_client.transactions.delete(route_keys.service_weight_path),
             self.kv_client.transactions.delete(route_keys.router_service_path),
@@ -170,7 +169,7 @@ class TraefikEtcdProxy(TKvProxy):
 
     async def _kv_get_target(self, jupyterhub_routespec):
         value = await maybe_future(self._etcd_get(jupyterhub_routespec))
-        if value == None:
+        if value is None:
             return None
         return value.decode()
 
@@ -182,17 +181,23 @@ class TraefikEtcdProxy(TKvProxy):
 
     async def _kv_get_route_parts(self, kv_entry):
         key = kv_entry[1].key.decode()
-        value = kv_entry[0]
+        value = kv_entry[0].decode()
 
-        # Strip the "/jupyterhub" prefix from the routespec
-        routespec = key.replace(self.kv_jupyterhub_prefix, "")
-        target = value.decode()
-        data = await self._kv_get_data(target)
+        # Strip the "/jupyterhub/routes/" prefix from the routespec and unescape it
+        sep = self.kv_separator
+        route_prefix = sep.join([self.kv_jupyterhub_prefix, "routes" + sep])
+        target_prefix = sep.join([self.kv_jupyterhub_prefix, "targets" + sep])
+        routespec = escapism.unescape(key.replace(route_prefix, "", 1))
+        etcd_target = sep.join([target_prefix, escapism.escape(value)])
+        target = escapism.unescape(etcd_target.replace(target_prefix, "", 1))
+        data = await self._kv_get_data(etcd_target)
 
         return routespec, target, data
 
     async def _kv_get_jupyterhub_prefixed_entries(self):
-        routes = await maybe_future(self._etcd_get_prefix(self.kv_jupyterhub_prefix))
+        sep = self.kv_separator
+        routespecs_prefix = sep.join([self.kv_jupyterhub_prefix, "routes" + sep])
+        routes = await maybe_future(self._etcd_get_prefix(routespecs_prefix))
         return routes
 
     async def persist_dynamic_config(self):

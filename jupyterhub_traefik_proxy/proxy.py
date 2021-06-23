@@ -58,7 +58,8 @@ class TraefikProxy(Proxy):
 
     debug = Bool(False, config=True, help="""Debug the proxy class?""")
 
-    traefik_log_level = Unicode("DEBUG", config=True, help="""traefik's log level""")
+    traefik_log_level = Unicode(config=True, help="""traefik's log level""")
+    log_level = Unicode(config=True, help="""The Proxy's log level""")
 
     traefik_api_password = Unicode(
         config=True, help="""The password for traefik api login"""
@@ -70,21 +71,23 @@ class TraefikProxy(Proxy):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if kwargs.get('debug', self.debug) == True:
-            import sys, logging
-            # Check we don't already have a StreamHandler
-            addHandler = True
-            for handler in self.log.handlers:
-                if isinstance(handler, logging.StreamHandler):
-                    addHandler = False
-            if addHandler:
-                self.log.setLevel("DEBUG")
-                handler = logging.StreamHandler(sys.stdout)
-                handler.setLevel("DEBUG")
-                self.log.addHandler(handler)
-                self.log.debug(f"Initialising {type(self).__name__}")
+        if self.log_level:
+            self._set_log_level()
 
-        #if kwargs.get('debug', self.debug) is True:
+    def _set_log_level(self):
+        import sys, logging
+        # Check we don't already have a StreamHandler
+        # and add one if necessary
+        addHandler = True
+        for handler in self.log.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                addHandler = False
+        level = self.log_level
+        if addHandler:
+            self.log.setLevel(level)
+            handler = logging.StreamHandler(sys.stdout)
+            handler.setLevel(level)
+            self.log.addHandler(handler)
 
     @default("traefik_api_password")
     def _warn_empty_password(self):
@@ -260,7 +263,8 @@ class TraefikProxy(Proxy):
         """
         self.log.info("Setting up traefik's static config...")
 
-        self.static_config["log"] = { "level": self.traefik_log_level }
+        if self.traefik_log_level:
+            self.static_config["log"] = { "level": self.traefik_log_level }
 
         entryPoints = {}
 
@@ -336,14 +340,10 @@ class TraefikProxy(Proxy):
                 }
             })
 
-
-    def _routespec_to_traefik_path(self, routespec):
-        path = self.validate_routespec(routespec)
-        if path != "/" and path.endswith("/"):
-            path = path.rstrip("/")
-        return path
-
-    def _routespec_from_traefik_path(self, routespec):
+    def validate_routespec(self, routespec):
+        """Override jupyterhub's default Proxy.validate_routespec method, as traefik
+        can set router rule's on both Host and PathPrefix rules combined.
+        """
         if not routespec.endswith("/"):
             routespec = routespec + "/"
         return routespec

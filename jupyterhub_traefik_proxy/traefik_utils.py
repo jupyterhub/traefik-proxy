@@ -27,12 +27,11 @@ def generate_rule(routespec):
     routespec = unquote(routespec)
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
-        rule = "PathPrefix(`{0}`)".format(routespec)
+        rule = f"PathPrefix(`{routespec}`)"
     else:
         # Host-based routing, e.g. host.tld/proxy/path/
         host, path_prefix = routespec.split("/", 1)
-        path_prefix = "/" + path_prefix
-        rule = "Host(`{0}`) && PathPrefix(`{1}`)".format(host, path_prefix)
+        rule = f"Host(`{host}`) && PathPrefix(`/{path_prefix}`)"
     return rule
 
 
@@ -50,12 +49,6 @@ def generate_service_entry( proxy, service_alias, separator="/", url=False):
     if url:
         service_entry += separator + "url"
     return service_entry
-
-def generate_service_weight_entry( proxy, service_alias, separator="/"):
-    return separator.join(
-        [proxy.kv_traefik_prefix, "http", "services", service_alias,
-        "weighted", "services", "0", "weight"]
-    )
 
 
 def generate_router_service_entry(proxy, router_alias):
@@ -87,7 +80,6 @@ def generate_route_keys(proxy, routespec, separator="/"):
         [
             "service_alias",
             "service_url_path",
-            #"service_weight_path",
             "router_alias",
             "router_service_path",
             "router_rule_path",
@@ -97,8 +89,6 @@ def generate_route_keys(proxy, routespec, separator="/"):
     if separator != ".":
         service_url_path = generate_service_entry(proxy, service_alias, url=True)
         router_rule_path = generate_router_rule_entry(proxy, router_alias)
-        #service_weight_path = generate_service_entry(proxy, service_alias, weight=True)
-        #service_weight_path = generate_service_weight_entry(proxy, service_alias)
         router_service_path = generate_router_service_entry(proxy, router_alias)
     else:
         service_url_path = generate_service_entry(
@@ -107,13 +97,11 @@ def generate_route_keys(proxy, routespec, separator="/"):
         router_rule_path = generate_router_rule_entry(
             proxy, router_alias, separator=separator
         )
-        #service_weight_path = ""
         router_service_path = ""
 
     return RouteKeys(
         service_alias,
         service_url_path,
-        #service_weight_path,
         router_alias,
         router_service_path,
         router_rule_path,

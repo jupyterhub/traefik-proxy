@@ -111,7 +111,6 @@ class TraefikConsulProxy(TKvProxy):
             os.environ.pop("CONSUL_HTTP_TOKEN")
 
     async def persist_dynamic_config(self):
-        self.log.debug("Saving dynamic config to consul store")
         data = self.flatten_dict_for_kv(
             self.dynamic_config, prefix=self.kv_traefik_prefix
         )
@@ -128,7 +127,6 @@ class TraefikConsulProxy(TKvProxy):
             append_payload(k, v)
 
         try:
-            self.log.debug(f"Uploading payload to KV store. Payload: {repr(payload)}")
             results = await self.kv_client.txn.put(payload=payload)
             status = 1
             response = ""
@@ -140,17 +138,13 @@ class TraefikConsulProxy(TKvProxy):
         else:
             self.log.debug("Successfully uploaded payload to KV store")
 
-        # Let's check if it's in there then...
-        #index, result = await self.kv_client.kv.get(k)
-        #self.log.debug(f"And the survey says, at {k} we have: {result}")
         return status, response
 
     async def _kv_atomic_add_route_parts(
         self, jupyterhub_routespec, target, data, route_keys, rule
     ):
-        escaped_target = escapism.escape(target, safe=self.key_safe_chars)
-        escaped_jupyterhub_routespec = escapism.escape(
-            jupyterhub_routespec, safe=self.key_safe_chars
+        jupyterhub_target = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
         )
 
         try:
@@ -158,14 +152,14 @@ class TraefikConsulProxy(TKvProxy):
                 {
                     "KV": {
                         "Verb": "set",
-                        "Key": escaped_jupyterhub_routespec,
+                        "Key": jupyterhub_routespec,
                         "Value": base64.b64encode(target.encode()).decode(),
                     }
                 },
                 {
                     "KV": {
                         "Verb": "set",
-                        "Key": escaped_target,
+                        "Key": jupyterhub_target,
                         "Value": base64.b64encode(data.encode()).decode(),
                     }
                 },
@@ -176,13 +170,6 @@ class TraefikConsulProxy(TKvProxy):
                         "Value": base64.b64encode(target.encode()).decode(),
                     }
                 },
-                #{
-                #    "KV": {
-                #        "Verb": "set",
-                #        "Key": route_keys.service_weight_path,
-                #        "Value": base64.b64encode(b"1").decode(),
-                #    }
-                #},
                 {
                     "KV": {
                         "Verb": "set",
@@ -211,26 +198,24 @@ class TraefikConsulProxy(TKvProxy):
         return status, response
 
     async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
-        escaped_jupyterhub_routespec = escapism.escape(
-            jupyterhub_routespec, safe=self.key_safe_chars
-        )
 
-        index, v = await self.kv_client.kv.get(escaped_jupyterhub_routespec)
+        index, v = await self.kv_client.kv.get(jupyterhub_routespec)
         if v is None:
             self.log.warning(
                 "Route %s doesn't exist. Nothing to delete", jupyterhub_routespec
             )
             return True, None
         target = v["Value"]
-        escaped_target = escapism.escape(target, safe=self.key_safe_chars)
+        jupyterhub_target = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
+        )
 
         try:
             status, response = await self.kv_client.txn.put(
                 payload=[
-                    {"KV": {"Verb": "delete", "Key": escaped_jupyterhub_routespec}},
-                    {"KV": {"Verb": "delete", "Key": escaped_target}},
+                    {"KV": {"Verb": "delete", "Key": jupyterhub_routespec}},
+                    {"KV": {"Verb": "delete", "Key": jupyterhub_target}},
                     {"KV": {"Verb": "delete", "Key": route_keys.service_url_path}},
-                    #{"KV": {"Verb": "delete", "Key": route_keys.service_weight_path}},
                     {"KV": {"Verb": "delete", "Key": route_keys.router_service_path}},
                     {"KV": {"Verb": "delete", "Key": route_keys.router_rule_path}},
                 ]
@@ -244,17 +229,13 @@ class TraefikConsulProxy(TKvProxy):
         return status, response
 
     async def _kv_get_target(self, jupyterhub_routespec):
-        escaped_jupyterhub_routespec = escapism.escape(
-            jupyterhub_routespec, safe=self.key_safe_chars
-        )
-        _, res = await self.kv_client.kv.get(escaped_jupyterhub_routespec)
+        _, res = await self.kv_client.kv.get(jupyterhub_routespec)
         if res is None:
             return None
         return res["Value"].decode()
 
     async def _kv_get_data(self, target):
-        escaped_target = escapism.escape(target, safe=self.key_safe_chars)
-        _, res = await self.kv_client.kv.get(escaped_target)
+        _, res = await self.kv_client.kv.get(target)
 
         if res is None:
             return None
@@ -264,10 +245,18 @@ class TraefikConsulProxy(TKvProxy):
         key = escapism.unescape(kv_entry["KV"]["Key"])
         value = kv_entry["KV"]["Value"]
 
-        # Strip the "/jupyterhub" prefix from the routespec
-        routespec = key.replace(self.kv_jupyterhub_prefix, "")
+        # Strip the "jupyterhub/routes/" prefix from the routespec
+        route_prefix = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "routes/"]
+        )
+        routespec = key.replace(route_prefix, "")
+
         target = base64.b64decode(value.encode()).decode()
-        data = await self._kv_get_data(target)
+        jupyterhub_target = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
+        )
+
+        data = await self._kv_get_data(jupyterhub_target)
 
         return routespec, target, data
 
@@ -277,9 +266,10 @@ class TraefikConsulProxy(TKvProxy):
                 {
                     "KV": {
                         "Verb": "get-tree",
-                        "Key": escapism.escape(
-                            self.kv_jupyterhub_prefix, safe=self.key_safe_chars
-                        ),
+                        "Key": f"{self.kv_jupyterhub_prefix}/routes"
+                        #escapism.escape(
+                        #    self.kv_jupyterhub_prefix, safe=self.key_safe_chars
+                        #)+ "/routes",
                     }
                 }
             ]
