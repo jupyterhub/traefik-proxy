@@ -394,7 +394,7 @@ async def test_check_routes(proxy, username):
     # run initial check first, to ensure that `/` is in the routes
     await proxy.check_routes(users, services)
     routes = await proxy.get_all_routes()
-    assert sorted(routes) == ["/"]
+    assert_equal(sorted(routes), ["/"])
 
     users[username] = test_user = MockUser(username)
     spawner = test_user.spawners[""]
@@ -422,7 +422,7 @@ async def test_check_routes(proxy, username):
     assert test_user.proxy_spec in after
 
     # check that before and after state are the same
-    assert before == after
+    assert_equal(before, after)
 
 
 async def test_websockets(proxy, launch_backend):

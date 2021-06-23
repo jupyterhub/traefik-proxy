@@ -150,7 +150,8 @@ def install_etcd(prefix, plat, etcd_version):
             print("--- Done ---")
             return
         else:
-            if checksum_file(etcd_downloaded_archive) == checksums_etcd[etcd_url]:
+            checksum_etcd_archive = checksum_file(etcd_downloaded_archive)
+            if checksum_etcd_archive == checksums_etcd[etcd_url]:
                 os.chmod(etcd_bin, 0o755)
                 os.chmod(etcdctl_bin, 0o755)
                 print("--- Done ---")
@@ -161,42 +162,42 @@ def install_etcd(prefix, plat, etcd_version):
                 os.remove(etcdctl_bin)
                 os.remove(etcd_downloaded_archive)
 
+    if not os.path.exists(etcd_downloaded_archive):
+        print(f"Downloading {etcd_downloaded_dir_name} archive...")
+        urlretrieve(etcd_url, etcd_downloaded_archive)
+    else:
+        print(f"Archive {etcd_downloaded_dir_name} already exists")
+
     if etcd_url in checksums_etcd:
-        if not os.path.exists(etcd_downloaded_archive):
-            print(f"Downloading {etcd_downloaded_dir_name} archive...")
-            urlretrieve(etcd_url, etcd_downloaded_archive)
-        else:
-            print(f"Archive {etcd_downloaded_dir_name} already exists")
-
-        if checksum_file(etcd_downloaded_archive) != checksums_etcd[etcd_url]:
+        checksum_etcd_archive = checksum_file(etcd_downloaded_archive)
+        if checksum_etcd_archive != checksums_etcd[etcd_url]:
             raise IOError("Checksum failed")
-
-        print("Extracting the archive...")
-
-        if etcd_archive_extension == "zip":
-            with zipfile.ZipFile(etcd_downloaded_archive, "r") as zip_ref:
-                zip_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
-                zip_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
-        else:
-            with (tarfile.open(etcd_downloaded_archive, "r")) as tar_ref:
-                tar_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
-                tar_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
-
-        shutil.copy(os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcd"), etcd_bin)
-        shutil.copy(
-            os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcdctl"), etcdctl_bin)
-
-        os.chmod(etcd_bin, 0o755)
-        os.chmod(etcdctl_bin, 0o755)
-
-        # Cleanup
-        shutil.rmtree(etcd_binaries)
     else:
         warnings.warn(
             f"Etcd {etcd_version} not supported ! Or, at least, we don't "
             f"recognise {etcd_url} in our checksums",
             stacklevel=2
         )
+
+    print("Extracting the archive...")
+    if etcd_archive_extension == "zip":
+        with zipfile.ZipFile(etcd_downloaded_archive, "r") as zip_ref:
+            zip_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
+            zip_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
+    else:
+        with (tarfile.open(etcd_downloaded_archive, "r")) as tar_ref:
+            tar_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
+            tar_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
+
+    shutil.copy(os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcd"), etcd_bin)
+    shutil.copy(
+        os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcdctl"), etcdctl_bin)
+
+    os.chmod(etcd_bin, 0o755)
+    os.chmod(etcdctl_bin, 0o755)
+
+    # Cleanup
+    shutil.rmtree(etcd_binaries)
 
     print("--- Done ---")
 
@@ -288,8 +289,8 @@ def main():
                 - v3.4.15-windows-amd64
                 - v3.3.10-linux-amd64
                 - v3.3.10-darwin-amd64
-                - v3.2.25-linux-amd64
-                - v3.2.25-darwin-amd64
+                - v3.2.26-linux-amd64
+                - v3.2.26-darwin-amd64
             - consul:
                 - v1.9.4_darwin
                 - v1.9.4_linux_amd64
