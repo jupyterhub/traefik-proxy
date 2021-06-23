@@ -160,7 +160,6 @@ class TraefikEtcdProxy(TKvProxy):
             self.kv_client.transactions.delete(jupyterhub_routespec),
             self.kv_client.transactions.delete(jupyterhub_target),
             self.kv_client.transactions.delete(route_keys.service_url_path),
-            #self.kv_client.transactions.delete(route_keys.service_weight_path),
             self.kv_client.transactions.delete(route_keys.router_service_path),
             self.kv_client.transactions.delete(route_keys.router_rule_path),
         ]
@@ -186,10 +185,10 @@ class TraefikEtcdProxy(TKvProxy):
         # Strip the "/jupyterhub/routes/" prefix from the routespec and unescape it
         sep = self.kv_separator
         route_prefix = sep.join([self.kv_jupyterhub_prefix, "routes" + sep])
-        target_prefix = sep.join([self.kv_jupyterhub_prefix, "targets" + sep])
+        target_prefix = sep.join([self.kv_jupyterhub_prefix, "targets"])
         routespec = escapism.unescape(key.replace(route_prefix, "", 1))
         etcd_target = sep.join([target_prefix, escapism.escape(value)])
-        target = escapism.unescape(etcd_target.replace(target_prefix, "", 1))
+        target = escapism.unescape(etcd_target.replace(target_prefix + sep, "", 1))
         data = await self._kv_get_data(etcd_target)
 
         return routespec, target, data
