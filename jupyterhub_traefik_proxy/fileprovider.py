@@ -191,14 +191,24 @@ class TraefikFileProviderProxy(TraefikProxy):
                 self.dynamic_config["http"]["routers"] = {}
                 self.dynamic_config["jupyter"]["routers"] = {}
 
-            # Is it worth querying the api for all entrypoints?
-            # Otherwise we just bind to all of them ...
-            #entrypoints = [ep for ep in self.static_config["entryPoints"] if ep != "enter_api" ]
             self.dynamic_config["http"]["routers"][router_alias] = {
-            #    "entryPoints": entrypoints,
                 "service": service_alias,
                 "rule": rule,
             }
+
+            # FIXME: Shoule we bind to just one traefik entry point?
+            # If not defined, then traefik will bind to all of them...
+            if self.traefik_entrypoints:
+                self.dynamic_config["http"]["routers"][router_alias].update({
+                    "entryPoints": self.traefik_entrypoints
+                })
+
+            # Enable TLS on this router if globally enabled
+            if self.traefik_tls:
+                self.dynamic_config["http"]["routers"][router_alias].update({
+                    "tls": {}
+                })
+                    
             # Add the data node to a separate top-level node, so traefik doesn't complain.
             self.dynamic_config["jupyter"]["routers"][router_alias] = {
                 "data": data

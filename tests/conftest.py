@@ -195,7 +195,12 @@ async def external_file_proxy_yaml(launch_traefik_file):
     dynamic_config_file = os.path.join(
         os.getcwd(), "tests", "config_files", "dynamic_config", "rules.yaml"
     )
-    proxy = _file_proxy(dynamic_config_file, should_start=False)
+    proxy = _file_proxy(
+        dynamic_config_file,
+        should_start=False,
+        default_entrypoint='my_web_ep'
+    )
+        
     yield proxy
     os.remove(dynamic_config_file)
 
@@ -204,7 +209,11 @@ async def external_file_proxy_toml(launch_traefik_file):
     dynamic_config_file = os.path.join(
         os.getcwd(), "tests", "config_files", "dynamic_config", "rules.toml"
     )
-    proxy = _file_proxy(dynamic_config_file, should_start=False)
+    proxy = _file_proxy(
+        dynamic_config_file,
+        should_start=False,
+        default_entrypoint='my_web_ep'
+    )
     yield proxy
     os.remove(dynamic_config_file)
 

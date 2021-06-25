@@ -129,18 +129,40 @@ class TraefikEtcdProxy(TKvProxy):
     async def _kv_atomic_add_route_parts(
         self, jupyterhub_routespec, target, data, route_keys, rule
     ):
+        # e.g. jupyterhub_target = 'jupyter/targets/{http://foobar.com}'
+        # where {http://foobar.com} is escaped
         jupyterhub_target = self.kv_separator.join(
             [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
         )
+        put = self.kv_client.transactions.put
         success = [
-            self.kv_client.transactions.put(jupyterhub_routespec, target),
-            self.kv_client.transactions.put(jupyterhub_target, data),
-            self.kv_client.transactions.put(route_keys.service_url_path, target),
-            self.kv_client.transactions.put(
-                route_keys.router_service_path, route_keys.service_alias
-            ),
-            self.kv_client.transactions.put(route_keys.router_rule_path, rule),
+            # e.g. jupyter/routers/router-1 = {target}
+            put(jupyterhub_routespec, target),
+            # e.g. jupyter/targets/{escaped_target} = {data}
+            put(jupyterhub_target, data),
+            # e.g. http/services/service-1/loadBalancer/servers/server1 = target
+            put(route_keys.service_url_path, target),
+            # e.g. http/routers/router-1/service = service-1
+            put(route_keys.router_service_path, route_keys.service_alias),
+            # e.g. http/routers/router-1/rule = {rule}
+            put(route_keys.router_rule_path, rule),
         ]
+        # Optionally enable TLS on this router
+        if self.traefik_tls:
+            tls_path = self.kv_separator.join(
+                ["traefik", "http", "routers", route_keys.router_alias, "tls"]
+            )
+            success.append(put(tls_path, None))
+
+        # If specified in the config, assign to specific entryPoints
+        # FIXME: Should we add a router for each entrypoint, enabling TLS
+        # on only select ones?
+        for n, ep in enumerate(self.traefik_entrypoints):
+            ep_path = self.kv_separator.join(
+                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", str(n)]
+            )
+            success.append(put(ep_path, ep))
+                
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response
 
@@ -156,13 +178,27 @@ class TraefikEtcdProxy(TKvProxy):
             [self.kv_jupyterhub_prefix, "targets", escapism.escape(value.decode())]
         )
 
+        delete = self.kv_client.transactions.delete
         success = [
-            self.kv_client.transactions.delete(jupyterhub_routespec),
-            self.kv_client.transactions.delete(jupyterhub_target),
-            self.kv_client.transactions.delete(route_keys.service_url_path),
-            self.kv_client.transactions.delete(route_keys.router_service_path),
-            self.kv_client.transactions.delete(route_keys.router_rule_path),
+            delete(jupyterhub_routespec),
+            delete(jupyterhub_target),
+            delete(route_keys.service_url_path),
+            delete(route_keys.router_service_path),
+            delete(route_keys.router_rule_path),
         ]
+        # If it was enabled, delete TLS on the router too
+        if self.traefik_tls:
+            tls_path = self.kv_separator.join(
+                ["traefik", "http", "routers", route_keys.router_alias, "tls"]
+            )
+            success.append(delete(tls_path))
+
+        # Delete entrypoints, if any were specified
+        for n in range(len(self.traefik_entrypoints)):
+            ep_path = self.kv_separator.join(
+                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", str(n)]
+            )
+            success.append(delete(ep_path))
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response
 

@@ -12,7 +12,7 @@
  watch = true
 
 [entryPoints]
- [entryPoints.my_web_api]
+ [entryPoints.my_web_ep]
   address = "127.0.0.1:8000"
 
  [entryPoints.enter_api]

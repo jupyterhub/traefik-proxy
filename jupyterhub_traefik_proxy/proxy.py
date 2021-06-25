@@ -24,7 +24,7 @@ from subprocess import Popen, TimeoutExpired
 import asyncio.subprocess
 from urllib.parse import urlparse
 
-from traitlets import Any, Bool, Dict, Integer, Unicode, default
+from traitlets import Any, Bool, Dict, Integer, List, Unicode, default, observe
 from tornado.httpclient import AsyncHTTPClient
 
 from jupyterhub.utils import exponential_backoff, url_path_join, new_token
@@ -69,10 +69,37 @@ class TraefikProxy(Proxy):
         config=True, help="""The provider name that Traefik expects, e.g. file, consul, etcd"""
     )
 
+    # FIXME: How best to enable TLS on routers assigned to only select
+    # entrypoints defined here?
+    traefik_entrypoints = List(
+        trait=Unicode(), config=True,
+        help="""A list of entrypoint names, to which each Traefik router is assigned"""
+    )
+
+    default_entrypoint = Unicode(
+        "web", config=True,
+        help="""Default entrypoint to apply to jupyterhub-configured traefik routers"""
+    )
+
+    @observe("default_entrypoint", type="change")
+    def _update_entrypoints(self, change):
+        """Update the list of traefik_entrypoints, should default_entrypoint be changed"""
+        if change["old"] in self.traefik_entrypoints:
+            self.traefik_entrypoints.remove(change["old"])
+        if change["new"] not in self.traefik_entrypoints:
+            self.traefik_entrypoints.append(change["new"])
+
+    # FIXME: As above, can we enable TLS on only certain routers / entrypoints?
+    traefik_tls = Bool(
+        config=True, help="""Enable TLS on the jupyterhub-configured traefik routers."""
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if self.log_level:
             self._set_log_level()
+        if self.default_entrypoint not in self.traefik_entrypoints:
+            self.traefik_entrypoints.append(self.default_entrypoint)
 
     def _set_log_level(self):
         import sys, logging
@@ -266,20 +293,26 @@ class TraefikProxy(Proxy):
         if self.traefik_log_level:
             self.static_config["log"] = { "level": self.traefik_log_level }
 
-        entryPoints = {}
+        entry_points = {}
 
-        if self.ssl_cert and self.ssl_key:
-            entryPoints["websecure"] = {
+        is_https = urlparse(self.public_url).scheme == "https"
+
+        # FIXME: Do we only create a single entrypoint for jupyterhub?
+        # Why not have an http and https entrypoint?
+        if self.ssl_cert and self.ssl_key or is_https:
+            entry_points[self.default_entrypoint] = {
                 "address": ":" + str(urlparse(self.public_url).port),
                 "tls": {},
             }
         else:
-            entryPoints["web"] = {"address": ":" + str(urlparse(self.public_url).port)}
+            entry_points[self.default_entrypoint] = {
+                "address": ":" + str(urlparse(self.public_url).port)
+            }
 
-        entryPoints["enter_api"] = {
+        entry_points["enter_api"] = {
             "address": ":" + str(urlparse(self.traefik_api_url).port),
         }
-        self.static_config["entryPoints"] = entryPoints
+        self.static_config["entryPoints"] = entry_points
         self.static_config["api"] = {"dashboard": True} #, "entrypoints": "auth_api"}
         self.static_config["wss"] = {"protocol": "http"}
 

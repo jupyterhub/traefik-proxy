@@ -65,7 +65,6 @@ def generate_router_rule_entry(proxy, router_alias, separator="/"):
     if separator == "/":
         router_rule_entry = separator.join(
             [proxy.kv_traefik_prefix, router_rule_entry, "rule"]
-            #proxy.kv_traefik_prefix + router_rule_entry + separator + "rule"
         )
 
     return router_rule_entry
