@@ -9,9 +9,9 @@ import time
 import pytest
 from _pytest.mark import Mark
 
-from jupyterhub_traefik_proxy import TraefikEtcdProxy
-from jupyterhub_traefik_proxy import TraefikConsulProxy
-from jupyterhub_traefik_proxy import TraefikFileProviderProxy
+from jupyterhub_traefik_proxy.etcd import TraefikEtcdProxy
+from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
+from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
 
 from jupyterhub.utils import exponential_backoff
 
@@ -40,6 +40,10 @@ class Config:
     traefik_api_user = "api_admin"
     traefik_api_pass = "admin"
 
+    # The URL that should be proxied to jupyterhub
+    # Putting here, can easily change between http and https
+    public_url = "https://localhost:8000"
+
 # Define a "slow" test marker so that we can run the slow tests at the end
 # ref: https://docs.pytest.org/en/6.0.1/example/simple.html#control-skipping-of-tests-according-to-command-line-option
 # ref: https://stackoverflow.com/questions/61533694/run-slow-pytest-commands-at-the-end-of-the-test-suite
@@ -64,18 +68,19 @@ def pytest_configure(config):
 
 
 @pytest.fixture
-async def no_auth_consul_proxy(launch_consul):
+async def no_auth_consul_proxy(request, launch_consul):
     """
     Fixture returning a configured TraefikConsulProxy.
     Consul acl disabled.
     """
     proxy = TraefikConsulProxy(
-        public_url="http://127.0.0.1:8000",
+        public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
         should_start=True,
-        log_level='DEBUG'
+        log_level='DEBUG',
+        traefik_log_level="DEBUG"
     )
     await proxy.start()
     yield proxy
@@ -89,7 +94,7 @@ async def auth_consul_proxy(launch_consul_acl):
     Consul acl enabled.
     """
     proxy = TraefikConsulProxy(
-        public_url="http://127.0.0.1:8000",
+        public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         kv_password=Config.consul_token,
@@ -109,7 +114,7 @@ async def no_auth_etcd_proxy(launch_etcd, wait_for_etcd):
     No etcd authentication.
     """
     proxy = TraefikEtcdProxy(
-        public_url="http://127.0.0.1:8000",
+        public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
@@ -128,7 +133,7 @@ async def auth_etcd_proxy(launch_etcd_auth):
     Etcd has credentials set up
     """
     proxy = TraefikEtcdProxy(
-        public_url="http://127.0.0.1:8000",
+        public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         kv_username="root",
@@ -181,7 +186,7 @@ def _file_proxy(dynamic_config_file, **kwargs):
         os.getcwd(), f"traefik.{ext}"
     )
     return TraefikFileProviderProxy(
-        public_url="http://127.0.0.1:8000",
+        public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         dynamic_config_file = dynamic_config_file,
@@ -197,10 +202,9 @@ async def external_file_proxy_yaml(launch_traefik_file):
     )
     proxy = _file_proxy(
         dynamic_config_file,
-        should_start=False,
-        default_entrypoint='my_web_ep'
+        should_start=False
     )
-        
+    await proxy._wait_for_static_config()
     yield proxy
     os.remove(dynamic_config_file)
 
@@ -211,9 +215,9 @@ async def external_file_proxy_toml(launch_traefik_file):
     )
     proxy = _file_proxy(
         dynamic_config_file,
-        should_start=False,
-        default_entrypoint='my_web_ep'
+        should_start=False
     )
+    await proxy._wait_for_static_config()
     yield proxy
     os.remove(dynamic_config_file)
 
@@ -221,48 +225,51 @@ async def external_file_proxy_toml(launch_traefik_file):
 @pytest.fixture
 async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_consul):
     proxy = TraefikConsulProxy(
-        public_url="http://127.0.0.1:8000",
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
-        check_route_timeout=45,
-        should_start=False,
-        debug=True
-    )
-    yield proxy
-
-
-@pytest.fixture
-async def auth_external_consul_proxy(launch_consul_acl, configure_consul_auth, launch_traefik_consul_auth):
-    proxy = TraefikConsulProxy(
-        public_url="http://127.0.0.1:8000",
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
-        kv_password=Config.consul_token,
-        check_route_timeout=45,
-        should_start=False,
-        debug=True
-    )
-    yield proxy
-
-
-@pytest.fixture
-async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
-    proxy = TraefikEtcdProxy(
-        public_url="http://127.0.0.1:8000",
+        public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
         should_start=False,
         log_level="DEBUG"
     )
+    await proxy._wait_for_static_config()
+    yield proxy
+
+
+@pytest.fixture
+async def auth_external_consul_proxy(launch_consul_acl, configure_consul_auth, launch_traefik_consul_auth):
+    proxy = TraefikConsulProxy(
+        public_url=Config.public_url,
+        traefik_api_password=Config.traefik_api_pass,
+        traefik_api_username=Config.traefik_api_user,
+        kv_password=Config.consul_token,
+        check_route_timeout=45,
+        should_start=False,
+        log_level="DEBUG"
+    )
+    await proxy._wait_for_static_config()
+    yield proxy
+
+
+@pytest.fixture
+async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
+    proxy = TraefikEtcdProxy(
+        public_url=Config.public_url,
+        traefik_api_password=Config.traefik_api_pass,
+        traefik_api_username=Config.traefik_api_user,
+        check_route_timeout=45,
+        should_start=False,
+        log_level="DEBUG"
+    )
+    await proxy._wait_for_static_config()
     yield proxy
     proxy.kv_client.close()
 
 
 @pytest.fixture
-def auth_external_etcd_proxy(launch_etcd_auth, configure_etcd_auth, launch_traefik_etcd_auth):
+async def auth_external_etcd_proxy(launch_etcd_auth, configure_etcd_auth, launch_traefik_etcd_auth):
     proxy = TraefikEtcdProxy(
-        public_url="http://127.0.0.1:8000",
+        public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         kv_password=Config.etcd_password,
@@ -271,9 +278,9 @@ def auth_external_etcd_proxy(launch_etcd_auth, configure_etcd_auth, launch_traef
         should_start=False,
         log_level="DEBUG"
     )
+    await proxy._wait_for_static_config()
     yield proxy
     proxy.kv_client.close()
-
 
 
 #########################################################################

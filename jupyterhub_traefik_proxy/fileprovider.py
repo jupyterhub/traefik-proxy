@@ -25,8 +25,7 @@ import escapism
 from traitlets import Any, default, Unicode, observe
 
 from . import traefik_utils
-from jupyterhub.proxy import Proxy
-from jupyterhub_traefik_proxy import TraefikProxy
+from .proxy import TraefikProxy
 
 
 class TraefikFileProviderProxy(TraefikProxy):
@@ -165,8 +164,6 @@ class TraefikFileProviderProxy(TraefikProxy):
             target (str): A full URL that will be the target of this route.
             data (dict): A JSONable dict that will be associated with this route, and will
                 be returned when retrieving information about this route.
-                FIXME: Why do we need to pass data back and forth to traefik?
-                       Traefik v2 doesn't seem to allow a data key...
 
         Will raise an appropriate Exception (FIXME: find what?) if the route could
         not be added.
@@ -178,6 +175,9 @@ class TraefikFileProviderProxy(TraefikProxy):
         service_alias = traefik_utils.generate_alias(traefik_routespec, "service")
         router_alias = traefik_utils.generate_alias(traefik_routespec, "router")
         rule = traefik_utils.generate_rule(traefik_routespec)
+
+        if not self.traefik_entrypoint:
+            self.traefik_entrypoint = await self._get_traefik_entrypoint()
 
         async with self.mutex:
             # If we've emptied the http and/or routers section, create it.
@@ -194,17 +194,11 @@ class TraefikFileProviderProxy(TraefikProxy):
             self.dynamic_config["http"]["routers"][router_alias] = {
                 "service": service_alias,
                 "rule": rule,
+                "entryPoints": [self.traefik_entrypoint]
             }
 
-            # FIXME: Shoule we bind to just one traefik entry point?
-            # If not defined, then traefik will bind to all of them...
-            if self.traefik_entrypoints:
-                self.dynamic_config["http"]["routers"][router_alias].update({
-                    "entryPoints": self.traefik_entrypoints
-                })
-
             # Enable TLS on this router if globally enabled
-            if self.traefik_tls:
+            if self.is_https:
                 self.dynamic_config["http"]["routers"][router_alias].update({
                     "tls": {}
                 })

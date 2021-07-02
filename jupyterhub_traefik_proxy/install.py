@@ -64,12 +64,6 @@ def install_traefik(prefix, plat, traefik_version):
     traefik_archive = "traefik_v" + traefik_version + "_" + plat + "." + traefik_archive_extension
     traefik_archive_path = os.path.join(prefix, traefik_archive)
 
-    traefik_archive = "traefik_v" + traefik_version + "_" + plat + "." + traefik_archive_extension
-    traefik_archive_path = os.path.join(prefix, traefik_archive)
-
-    traefik_archive = "traefik_v" + traefik_version + "_" + plat + "." + traefik_archive_extension
-    traefik_archive_path = os.path.join(prefix, traefik_archive)
-
     traefik_url = (
         "https://github.com/traefik/traefik/releases"
         f"/download/v{traefik_version}/{traefik_archive}"

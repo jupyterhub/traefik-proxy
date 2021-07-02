@@ -376,6 +376,7 @@ async def test_host_origin_headers(proxy, launch_backend):
         req_url,
         method="GET",
         headers={"Host": expected_host_header, "Origin": expected_origin_header},
+        validate_cert=False
     )
     resp = await AsyncHTTPClient().fetch(req)
 
@@ -426,6 +427,7 @@ async def test_check_routes(proxy, username):
 
 
 async def test_websockets(proxy, launch_backend):
+    import ssl
     routespec = "/user/username/"
     target = "http://127.0.0.1:9000"
     data = {}
@@ -453,9 +455,16 @@ async def test_websockets(proxy, launch_backend):
     if proxy.public_url.endswith("/"):
         public_url = proxy.public_url[:-1]
 
-    req_url = "ws://" + urlparse(proxy.public_url).netloc + routespec
+    if proxy.is_https:
+        kwargs = {'ssl': ssl._create_unverified_context()}
+        scheme = "wss://"
+    else:
+        kwargs = {}
+        scheme = "ws://"
+    req_url = scheme + urlparse(proxy.public_url).netloc + routespec
 
-    async with websockets.connect(req_url) as websocket:
+    # Don't validate the ssl certificate, it's self-signed by traefik
+    async with websockets.connect(req_url, **kwargs) as websocket:
         port = await websocket.recv()
 
     assert port == str(default_backend_port)

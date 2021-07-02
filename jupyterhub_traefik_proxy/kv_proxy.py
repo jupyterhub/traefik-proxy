@@ -26,7 +26,7 @@ from traitlets import Any, Unicode, default
 from collections import MutableMapping
 
 from . import traefik_utils
-from jupyterhub_traefik_proxy import TraefikProxy
+from .proxy import TraefikProxy
 
 
 class TKvProxy(TraefikProxy):
@@ -85,8 +85,8 @@ class TKvProxy(TraefikProxy):
         **Subclasses must define this method**
         if the proxy is to be started by the Hub.
 
-        In order to be picked up by the proxy, the static configuration
-        must be stored into `proxy.static_config` dict under the `provider_name` key.
+        In order to be picked up by the proxy, the static configuration must be
+        stored into `proxy.static_config` dict under the `provider_name` key.
         """
         raise NotImplementedError()
 
@@ -377,36 +377,43 @@ class TKvProxy(TraefikProxy):
         }
 
     def flatten_dict_for_kv(self, data, prefix='traefik'):
-        """Flatten a dictionary of :arg:`data` for storage in the KV store,
-        prefixing each key with :arg:`prefix` and joining each key with
-        `self.kv_separator`.
+        """Flatten a dictionary of `data` for storage in the KV store,
+        prefixing each key with `prefix` and joining each key with
+        :attr:`TKvProxy.kv_separator`.
 
-        If the final value is a `list`, then the provided bottom-level key
+        If the final value is a :class:`list`, then the provided bottom-level key
         shall be appended with an incrementing numeric number, in the style
         that is used by traefik's KV store, e.g.
 
-        flatten_dict_for_kv({
-            'x' : {
-                'y' : {
-                    'z': 'a'
-                }
-            }, {
-                'foo': 'bar'
-            },
-                'baz': [ 'a', 'b', 'c' ]
-        })
+        .. code-block::
 
-        Returns:
-            result (dict):
-                {
+            flatten_dict_for_kv({
+                'x' : {
+                    'y' : {
+                        'z': 'a'
+                    }
+                }, {
+                    'foo': 'bar'
+                },
+                'baz': [ 'a', 'b', 'c' ]
+            })
+
+        :return: The flattened dictionary
+        :rtype: dict
+
+        e.g.
+
+        .. code-block::
+
+            {
                  'traefik/x/y/z' : 'a',
                  'traefik/x/foo': 'bar',
                  'traefik/baz/0': 'a',
                  'traefik/baz/1': 'b',
                  'traefik/baz/2': 'c',
-                }
+            }
 
-        Ref: Inspired by https://stackoverflow.com/a/6027615
+        Inspired by `this answer on StackOverflow <https://stackoverflow.com/a/6027615>`_
         """
         sep = self.kv_separator
         items = {}

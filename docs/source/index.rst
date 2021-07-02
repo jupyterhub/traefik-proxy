@@ -39,7 +39,7 @@ Getting Started
 .. toctree::
    :maxdepth: 1
 
-   fileprovider
+   file
    etcd
    consul
 

@@ -55,7 +55,6 @@ def generate_router_service_entry(proxy, router_alias):
     return "/".join(
         [proxy.kv_traefik_prefix, "http", "routers", router_alias, "service"]
     )
-    #return proxy.kv_traefik_prefix + "routers/" + router_alias + "/service"
 
 
 def generate_router_rule_entry(proxy, router_alias, separator="/"):
@@ -170,20 +169,3 @@ class TraefikConfigFileHandler(object):
         with atomic_writing(self.file_path) as f:
             self._dump(data, f)
 
-def persist_static_conf(file_path, static_conf_dict):
-    handler = TraefikConfigFileHandler(file_path)
-    handler.dump(static_conf_dict)
-
-def persist_dynamic_conf(file_path, routes_dict):
-    # FIXME: Only used by fileprovider, remove?
-    handler = TraefikConfigFileHandler(file_path)
-    handler.atomic_dump(routes_dict)
-
-def load_dynamic_conf(file_path):
-    # FIXME: Only used by fileprovider, remove?
-    handler = TraefikConfigFileHandler(file_path)
-    return handler.load()
-
-# FIXME: Alias above functions for backwards compatibility?
-persist_routes = persist_dynamic_conf
-load_routes = load_dynamic_conf

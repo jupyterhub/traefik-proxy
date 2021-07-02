@@ -26,7 +26,7 @@ from tornado.concurrent import run_on_executor
 from traitlets import Any, default, Unicode
 
 from jupyterhub.utils import maybe_future
-from jupyterhub_traefik_proxy import TKvProxy
+from .kv_proxy import TKvProxy
 
 
 class TraefikEtcdProxy(TKvProxy):
@@ -148,20 +148,19 @@ class TraefikEtcdProxy(TKvProxy):
             put(route_keys.router_rule_path, rule),
         ]
         # Optionally enable TLS on this router
-        if self.traefik_tls:
+        if self.is_https:
             tls_path = self.kv_separator.join(
                 ["traefik", "http", "routers", route_keys.router_alias, "tls"]
             )
-            success.append(put(tls_path, None))
+            success.append(put(tls_path, ""))
 
-        # If specified in the config, assign to specific entryPoints
-        # FIXME: Should we add a router for each entrypoint, enabling TLS
-        # on only select ones?
-        for n, ep in enumerate(self.traefik_entrypoints):
-            ep_path = self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", str(n)]
-            )
-            success.append(put(ep_path, ep))
+        # Specify the entrypoint that jupyterhub's router should bind to
+        ep_path = self.kv_separator.join(
+            ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
+        )
+        if not self.traefik_entrypoint:
+            self.traefik_entrypoint = await self._get_traefik_entrypoint()
+        success.append(put(ep_path, self.traefik_entrypoint))
                 
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response
@@ -185,20 +184,16 @@ class TraefikEtcdProxy(TKvProxy):
             delete(route_keys.service_url_path),
             delete(route_keys.router_service_path),
             delete(route_keys.router_rule_path),
+            delete(self.kv_separator.join(
+                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
+            ))
         ]
         # If it was enabled, delete TLS on the router too
-        if self.traefik_tls:
-            tls_path = self.kv_separator.join(
+        if self.is_https:
+            success.append(delete(self.kv_separator.join(
                 ["traefik", "http", "routers", route_keys.router_alias, "tls"]
-            )
-            success.append(delete(tls_path))
+            )))
 
-        # Delete entrypoints, if any were specified
-        for n in range(len(self.traefik_entrypoints)):
-            ep_path = self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", str(n)]
-            )
-            success.append(delete(ep_path))
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response
 

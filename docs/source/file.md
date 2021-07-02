@@ -52,7 +52,7 @@ By **default**, Traefik will search for `traefik.toml` and `rules.toml` in the f
 * $HOME/.traefik/
 * . the working directory
 
-You can override this in TraefikFileProviderProxy, by modifying the **toml_static_config_file** argument:
+You can override this in TraefikFileProviderProxy, by modifying the **static_config_file** argument:
 
 ```python
 c.TraefikFileProviderProxy.static_config_file="/path/to/static_config_filename.toml"

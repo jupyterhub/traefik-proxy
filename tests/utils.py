@@ -43,9 +43,10 @@ async def get_responding_backend_port(traefik_url, path):
             traefik_url + "".join("/" + path.split("/", 1)[1]),
             method="GET",
             headers={"Host": path.split("/")[0]},
+            validate_cert=False,
         )
     else:
-        req = traefik_url + path
+        req = HTTPRequest(traefik_url + path, validate_cert=False)
 
     try:
         resp = await AsyncHTTPClient().fetch(req)

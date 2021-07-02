@@ -1,15 +1,15 @@
 """autodoc extension for configurable traits"""
-
-from traitlets import TraitType, Undefined
-from sphinx.domains.python import PyClassmember
-from sphinx.ext.autodoc import ClassDocumenter, AttributeDocumenter
+from sphinx.ext.autodoc import AttributeDocumenter
+from sphinx.ext.autodoc import ClassDocumenter
+from traitlets import TraitType
+from traitlets import Undefined
 
 
 class ConfigurableDocumenter(ClassDocumenter):
     """Specialized Documenter subclass for traits with config=True"""
 
-    objtype = 'configurable'
-    directivetype = 'class'
+    objtype = "configurable"
+    directivetype = "class"
 
     def get_object_members(self, want_all):
         """Add traits with .tag(config=True) to members list"""
@@ -24,12 +24,18 @@ class ConfigurableDocumenter(ClassDocumenter):
             # put help in __doc__ where autodoc will look for it
             trait.__doc__ = trait.help
             trait_members.append((name, trait))
-        return check, trait_members + members
+        # Remove duplicates between members and trait_members.  We
+        # can't use sets, because not all items are hashable.  Modify
+        # trait_members in place for returning.
+        for item in members:
+            if item not in trait_members:
+                trait_members.append(item)
+        return check, trait_members
 
 
 class TraitDocumenter(AttributeDocumenter):
-    objtype = 'trait'
-    directivetype = 'attribute'
+    objtype = "trait"
+    directivetype = "attribute"
     member_order = 1
     priority = 100
 
@@ -37,17 +43,18 @@ class TraitDocumenter(AttributeDocumenter):
     def can_document_member(cls, member, membername, isattr, parent):
         return isinstance(member, TraitType)
 
-    def format_name(self):
-        return 'config c.' + super().format_name()
-
     def add_directive_header(self, sig):
         default = self.object.get_default_value()
         if default is Undefined:
-            default_s = ''
+            default_s = ""
         else:
             default_s = repr(default)
-        sig = ' = {}({})'.format(self.object.__class__.__name__, default_s)
-        return super().add_directive_header(sig)
+        self.options.annotation = "c.{name} = {trait}({default})".format(
+            name=self.format_name(),
+            trait=self.object.__class__.__name__,
+            default=default_s,
+        )
+        super().add_directive_header(sig)
 
 
 def setup(app):

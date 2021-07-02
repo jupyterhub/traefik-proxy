@@ -30,7 +30,7 @@ from tornado.concurrent import run_on_executor
 from traitlets import Any, default, Unicode
 
 from . import traefik_utils
-from jupyterhub_traefik_proxy import TKvProxy
+from .kv_proxy import TKvProxy
 import time
 
 
@@ -77,7 +77,6 @@ class TraefikConsulProxy(TKvProxy):
         provider_config = {
             "consul": {
                 "rootKey": self.kv_traefik_prefix,
-                #"watch": True,
                 "endpoints" : [
                     urlparse(self.kv_url).netloc
                 ]
@@ -187,28 +186,28 @@ class TraefikConsulProxy(TKvProxy):
             }
         ]
 
-        if self.traefik_tls:
-            tls_path = self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "tls"]
-            )
+        if self.is_https:
             payload.append({
                 "KV": {
                     "Verb": "set",
-                    "Key": tls_path,
+                    "Key": self.kv_separator.join(
+                        ["traefik", "http", "routers", route_keys.router_alias, "tls"]
+                    ),
                     "Value": base64.b64encode("true".encode()).decode()
                 }
             })
-        for n, ep in enumerate(self.traefik_entrypoints):
-            ep_path = self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", str(n)]
-            )
-            payload.append({
-                "KV": {
-                    "Verb": "set",
-                    "Key": ep_path,
-                    "Value": base64.b64encode(ep.encode()).decode()
-                }
-            })
+        # Specify the router's entryPoint
+        if not self.traefik_entrypoint:
+            self.traefik_entrypoint = await self._get_traefik_entrypoint()
+        payload.append({
+            "KV": {
+                "Verb": "set",
+                "Key": self.kv_separator.join(
+                    ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
+                ),
+                "Value": base64.b64encode(self.traefik_entrypoint.encode()).decode()
+            }
+        })
 
         self.log.debug(f"Uploading route to KV store. Payload: {repr(payload)}")
         try:
@@ -242,18 +241,18 @@ class TraefikConsulProxy(TKvProxy):
             {"KV": {"Verb": "delete", "Key": route_keys.router_rule_path}},
         ]
 
-        if self.traefik_tls:
+        if self.is_https:
             tls_path = self.kv_separator.join(
                 ["traefik", "http", "routers", route_keys.router_alias, "tls"]
             )
             payload.append({"KV": {"Verb": "delete", "Key": tls_path}})
 
         # delete any configured entrypoints
-        for n in range(len(self.traefik_entrypoints)):
-            ep_path = self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", str(n)]
+        payload.append({"KV": {"Verb": "delete", "Key":
+            self.kv_separator.join(
+                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
             )
-            payload.append({"KV": {"Verb": "delete", "Key": ep_path}})
+        }})
 
         try:
             status, response = await self.kv_client.txn.put(payload=payload)
