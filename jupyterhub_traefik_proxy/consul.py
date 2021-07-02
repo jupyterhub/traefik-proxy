@@ -40,8 +40,6 @@ class TraefikConsulProxy(TKvProxy):
     # Consul doesn't accept keys containing // or starting with / so we have to escape them
     key_safe_chars = string.ascii_letters + string.digits + "!@#$%^&*();<>-.+?:"
 
-    #kv_name = "consul"
-
     @default("provider_name")
     def _provider_name(self):
         return "consul"
@@ -315,4 +313,3 @@ class TraefikConsulProxy(TKvProxy):
 
     async def stop(self):
         await super().stop()
-
