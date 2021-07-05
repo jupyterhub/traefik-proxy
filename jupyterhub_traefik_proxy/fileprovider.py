@@ -24,7 +24,7 @@ import asyncio
 import string
 import escapism
 
-from traitlets import Any, default, Unicode
+from traitlets import Any, default, Unicode, observe
 
 from . import traefik_utils
 from jupyterhub.proxy import Proxy
@@ -40,59 +40,58 @@ class TraefikFileProviderProxy(TraefikProxy):
     def _default_mutex(self):
         return asyncio.Lock()
 
+    @default("provider_name")
+    def _provider_name(self):
+        return "file"
+
     dynamic_config_file = Unicode(
         "rules.toml", config=True, help="""traefik's dynamic configuration file"""
     )
 
+    dynamic_config_handler = Any()
+
+    @default("dynamic_config_handler")
+    def _default_handler(self):
+        return traefik_utils.TraefikConfigFileHandler(self.dynamic_config_file)
+
+    # If dynamic_config_file is changed, then update the dynamic config file handler
+    @observe("dynamic_config_file")
+    def _set_dynamic_config_file(self, change):
+        self.dynamic_config_handler = traefik_utils.TraefikConfigFileHandler(self.dynamic_config_file)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         try:
-            # Load initial routing table from disk
-            self.routes_cache = traefik_utils.load_routes(self.dynamic_config_file)
+            # Load initial dynamic config from disk
+            self.dynamic_config = self.dynamic_config_handler.load()
         except FileNotFoundError:
-            self.routes_cache = {}
+            self.dynamic_config = {}
 
-        if not self.routes_cache:
-            self.routes_cache = {
+        if not self.dynamic_config:
+            self.dynamic_config = {
                 "http" : {"services": {}, "routers": {}},
                 "jupyter": {"routers" : {} }
             }
 
+    def persist_dynamic_config(self):
+        """Save the dynamic config file with the current dynamic_config"""
+        self.dynamic_config_handler.atomic_dump(self.dynamic_config)
+
+    async def _setup_traefik_dynamic_config(self):
+        await super()._setup_traefik_dynamic_config()
+        self.log.info(
+            f"Creating the dynamic configuration file: {self.dynamic_config_file}"
+        )
+        self.persist_dynamic_config()
+
     async def _setup_traefik_static_config(self):
+        self.static_config["providers"] = {
+            "file" : {
+                "filename": self.dynamic_config_file,
+                "watch": True
+            }
+        }
         await super()._setup_traefik_static_config()
-
-        # Is this not the same as the dynamic config file?
-        self.static_config["file"] = {"filename": "rules.toml", "watch": True}
-
-        try:
-            traefik_utils.persist_static_conf(
-                self.static_config_file, self.static_config
-            )
-            try:
-                os.stat(self.dynamic_config_file)
-            except FileNotFoundError:
-                # Make sure that the dynamic configuration file exists
-                self.log.info(
-                    f"Creating the dynamic configuration file: {self.dynamic_config_file}"
-                )
-                open(self.dynamic_config_file, "a").close()
-        except IOError:
-            self.log.exception("Couldn't set up traefik's static config.")
-            raise
-        except:
-            self.log.error("Couldn't set up traefik's static config. Unexpected error:")
-            raise
-
-    def _start_traefik(self):
-        self.log.info("Starting traefik...")
-        try:
-            self._launch_traefik(config_type="fileprovider")
-        except FileNotFoundError as e:
-            self.log.error(
-                "Failed to find traefik \n"
-                "The proxy can be downloaded from https://github.com/containous/traefik/releases/download."
-            )
-            raise
 
     def _clean_resources(self):
         try:
@@ -122,35 +121,19 @@ class TraefikFileProviderProxy(TraefikProxy):
                 if isinstance(v, dict):
                     get_target_data(v, to_find)
 
-        service_node = self.routes_cache["http"]["services"].get(service_alias, None)
+        service_node = self.dynamic_config["http"]["services"].get(service_alias, None)
         if service_node is not None:
             get_target_data(service_node, "url")
 
-        router_node = self.routes_cache["jupyter"]["routers"].get(router_alias, None)
-        if router_node is not None:
-            get_target_data(router_node, "data")
+        jupyter_routers = self.dynamic_config["jupyter"]["routers"].get(router_alias, None)
+        if jupyter_routers is not None:
+            get_target_data(jupyter_routers, "data")
 
         if result["data"] is None and result["target"] is None:
-            self.log.info("No route for {} found!".format(routespec))
+            self.log.info(f"No route for {routespec} found!")
             result = None
-        self.log.debug("treefik routespec: {0}".format(traefik_routespec))
-        self.log.debug("result for routespec {0}:-\n{1}".format(routespec, result))
-
-        # No longer bother converting `data` to/from JSON
-        #else:
-        #    result["data"] = json.loads(result["data"])
-
-        #if service_alias in self.routes_cache["services"]:
-        #    get_target_data(self.routes_cache["services"][service_alias], "url")
-
-        #if router_alias in self.routes_cache["routers"]:
-        #    get_target_data(self.routes_cache["routers"][router_alias], "data")
-
-        #if not result["data"] and not result["target"]:
-        #    self.log.info("No route for {} found!".format(routespec))
-        #    result = None
-        #else:
-        #    result["data"] = json.loads(result["data"])
+        self.log.debug(f"traefik routespec: {traefik_routespec}")
+        self.log.debug(f"result for routespec {routespec}:-\n{result}")
         return result
 
     async def start(self):
@@ -162,7 +145,7 @@ class TraefikFileProviderProxy(TraefikProxy):
         if the proxy is to be started by the Hub
         """
         await super().start()
-        await self._wait_for_static_config(provider="file")
+        await self._wait_for_static_config()
 
     async def stop(self):
         """Stop the proxy.
@@ -195,37 +178,50 @@ class TraefikFileProviderProxy(TraefikProxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
+        self.log.debug(f"\tTraefikFileProviderProxy.add_route: Adding {routespec} for {target}")
         traefik_routespec = self._routespec_to_traefik_path(routespec)
         service_alias = traefik_utils.generate_alias(traefik_routespec, "service")
         router_alias = traefik_utils.generate_alias(traefik_routespec, "router")
-        #data = json.dumps(data)
         rule = traefik_utils.generate_rule(traefik_routespec)
 
         async with self.mutex:
-            self.routes_cache["http"]["routers"][router_alias] = {
+            # If we've emptied the http and/or routers section, create it.
+            if "http" not in self.dynamic_config:
+                self.dynamic_config["http"] = {
+                    "routers": {},
+                }
+                self.dynamic_config["jupyter"] = {
+                    "routers": {}
+                }
+
+            elif "routers" not in self.dynamic_config["http"]:
+                self.dynamic_config["http"]["routers"] = {}
+                self.dynamic_config["jupyter"]["routers"] = {}
+
+            # Is it worth querying the api for all entrypoints?
+            # Otherwise we just bind to all of them ...
+            self.dynamic_config["http"]["routers"][router_alias] = {
                 "service": service_alias,
                 "rule": rule,
-                # The data node is passed by JupyterHub. We can store its data in our routes_cache,
-                # but giving it to Traefik causes issues...
-                #"data" : data
-                #"routes": {"test": {"rule": rule, "data": data}},
+            }
+            # Add the data node to a separate top-level node, so traefik doesn't complain.
+            self.dynamic_config["jupyter"]["routers"][router_alias] = {
+                "data": data
             }
 
-            # Add the data node to a separate top-level node
-            self.routes_cache["jupyter"]["routers"][router_alias] = {"data": data}
+            if "services" not in self.dynamic_config["http"]:
+                self.dynamic_config["http"]["services"] = {}
 
-            self.routes_cache["http"]["services"][service_alias] = {
-                "loadBalancer" : {
+            self.dynamic_config["http"]["services"][service_alias] = {
+                "loadBalancer": {
                     "servers": {"server1": {"url": target} },
                     "passHostHeader": True
                 }
             }
-            traefik_utils.persist_routes(
-                self.dynamic_config_file, self.routes_cache
-            )
+            self.persist_dynamic_config()
 
-        self.log.debug("treefik routespec: {0}".format(traefik_routespec))
-        self.log.debug("data for routespec {0}:-\n{1}".format(routespec, data))
+        self.log.debug(f"traefik routespec: {traefik_routespec}")
+        self.log.debug(f"data for routespec {routespec}:-\n{data}")
 
         if self.should_start:
             try:
@@ -254,10 +250,22 @@ class TraefikFileProviderProxy(TraefikProxy):
         router_alias = traefik_utils.generate_alias(routespec, "router")
 
         async with self.mutex:
-            self.routes_cache["http"]["routers"].pop(router_alias, None)
-            self.routes_cache["http"]["services"].pop(service_alias, None)
+            
+            self.dynamic_config["http"]["routers"].pop(router_alias, None)
+            self.dynamic_config["http"]["services"].pop(service_alias, None)
+            self.dynamic_config["jupyter"]["routers"].pop(router_alias, None)
 
-        traefik_utils.persist_routes(self.dynamic_config_file, self.routes_cache)
+            # If empty, delete the keys
+            if not self.dynamic_config["http"]["routers"]:
+                self.dynamic_config["http"].pop("routers")
+            if not self.dynamic_config["http"]["services"]:
+                self.dynamic_config["http"].pop("services")
+            if not self.dynamic_config["http"]:
+                self.dynamic_config.pop("http")
+            if not self.dynamic_config["jupyter"]["routers"]:
+                self.dynamic_config["jupyter"].pop("routers")
+
+            self.persist_dynamic_config()
 
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
@@ -277,8 +285,11 @@ class TraefikFileProviderProxy(TraefikProxy):
         all_routes = {}
 
         async with self.mutex:
-            for key, value in self.routes_cache["http"]["routers"].items():
-                escaped_routespec = "".join(key.split("_", 1)[1:])
+            for router, value in self.dynamic_config["http"]["routers"].items():
+                if router not in self.dynamic_config["jupyter"]["routers"]:
+                    # Only check routers defined in jupyter node
+                    continue
+                escaped_routespec = "".join(router.split("_", 1)[1:])
                 traefik_routespec = escapism.unescape(escaped_routespec)
                 routespec = self._routespec_from_traefik_path(traefik_routespec)
                 all_routes.update({

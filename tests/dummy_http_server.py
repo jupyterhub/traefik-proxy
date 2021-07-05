@@ -42,7 +42,7 @@ if __name__ == "__main__":
             run(port=int(argv[1]))
         else:
             asyncio.get_event_loop().run_until_complete(
-                websockets.serve(send_port, "localhost", int(argv[1]))
+                websockets.serve(send_port, "127.0.0.1", int(argv[1]))
             )
             asyncio.get_event_loop().run_forever()
     else:

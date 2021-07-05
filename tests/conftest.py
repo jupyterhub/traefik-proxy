@@ -9,7 +9,7 @@ import time
 import pytest
 from _pytest.mark import Mark
 
-from jupyterhub_traefik_proxy import TraefikTomlProxy
+from jupyterhub_traefik_proxy import TraefikFileProviderProxy
 
 
 # Define a "slow" test marker so that we can run the slow tests at the end
@@ -36,14 +36,20 @@ def pytest_configure(config):
 
 
 @pytest.fixture
+# There must be a way to parameterise this to run on both yaml and toml files?
 async def toml_proxy():
-    """Fixture returning a configured TraefikTomlProxy"""
-    proxy = TraefikTomlProxy(
+    """Fixture returning a configured TraefikFileProviderProxy"""
+    dynamic_config_file = os.path.join(
+        os.getcwd(), "tests", "config_files", "dynamic_config", "rules.toml"
+    )
+    proxy = TraefikFileProviderProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
         check_route_timeout=180,
         should_start=True,
+        dynamic_config_file=dynamic_config_file,
+        static_config_file="traefik.toml"
     )
 
     await proxy.start()
@@ -52,23 +58,69 @@ async def toml_proxy():
 
 
 @pytest.fixture
-def external_toml_proxy():
-    proxy = TraefikTomlProxy(
+async def yaml_proxy():
+    dynamic_config_file = os.path.join(
+        os.getcwd(), "tests", "config_files", "dynamic_config", "rules.yaml"
+    )
+    proxy = TraefikFileProviderProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
+        check_route_timeout=180,
+        should_start=True,
+        dynamic_config_file=dynamic_config_file,
+        static_config_file="traefik.yaml"
+    )
+
+    await proxy.start()
+    yield proxy
+    await proxy.stop()
+
+
+@pytest.fixture
+async def external_toml_proxy(launch_traefik_file):
+    dynamic_config_file = os.path.join(
+        os.getcwd(), "tests", "config_files", "dynamic_config", "rules.toml"
+    )
+    proxy = TraefikFileProviderProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
         check_route_timeout=45,
+        should_start=False,
+        dynamic_config_file=dynamic_config_file,
     )
-    proxy.should_start = False
-    proxy.toml_dynamic_config_file = "./tests/config_files/rules.toml"
-    # Start traefik manually
-    traefik_process = subprocess.Popen(
-        ["traefik", "-c", "./tests/config_files/traefik.toml"], stdout=None
-    )
+
     yield proxy
-    open("./tests/config_files/rules.toml", "w").close()
-    traefik_process.kill()
-    traefik_process.wait()
+    os.remove(dynamic_config_file)
+
+
+@pytest.fixture
+async def external_yaml_proxy(launch_traefik_file):
+    dynamic_config_file = os.path.join(
+        os.getcwd(), "tests", "config_files", "dynamic_config", "rules.yaml"
+    )
+    proxy = TraefikFileProviderProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="api_admin",
+        check_route_timeout=180,
+        should_start=False,
+        dynamic_config_file=dynamic_config_file,
+    )
+
+    yield proxy
+    os.remove(dynamic_config_file)
+
+
+@pytest.fixture
+def launch_traefik_file():
+    proc = subprocess.Popen(
+        ["traefik", "--configfile", "./tests/config_files/traefik.toml"]
+    )
+    yield proc
+    proc.kill()
+    proc.wait()
 
 
 @pytest.fixture(scope="session", autouse=False)

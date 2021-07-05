@@ -90,6 +90,8 @@ def launch_backend():
     for proc in running_backends:
         proc.kill()
     for proc in running_backends:
+        proc.communicate()
+    for proc in running_backends:
         proc.wait()
 
 
@@ -145,7 +147,7 @@ async def wait_for_services(urls):
         ),
     ],
 )
-async def test_add_get_delete(
+async def _test_add_get_delete(
     request, proxy, launch_backend, routespec, existing_routes, event_loop
 ):
     default_target = "http://127.0.0.1:9000"
@@ -282,7 +284,7 @@ async def test_add_get_delete(
         await test_route_exist(spec, extra_backends[i])
 
 
-async def test_get_all_routes(proxy, launch_backend):
+async def _test_get_all_routes(proxy, launch_backend):
     routespecs = ["/proxy/path1", "/proxy/path2/", "/proxy/path3/"]
     targets = [
         "http://127.0.0.1:9900",
@@ -328,7 +330,7 @@ async def test_get_all_routes(proxy, launch_backend):
     assert routes == expected_output
 
 
-async def test_host_origin_headers(proxy, launch_backend):
+async def _test_host_origin_headers(proxy, launch_backend):
     routespec = "/user/username/"
     target = "http://127.0.0.1:9000"
     data = {}
@@ -372,7 +374,7 @@ async def test_host_origin_headers(proxy, launch_backend):
 
 
 @pytest.mark.parametrize("username", ["zoe", "50fia", "秀樹", "~TestJH", "has@"])
-async def test_check_routes(proxy, username):
+async def _test_check_routes(proxy, username):
     # fill out necessary attributes for check_routes
     proxy.app = MockApp()
     proxy.hub = proxy.app.hub

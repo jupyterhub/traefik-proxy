@@ -29,7 +29,8 @@ def test_roundtrip_routes():
     file = "test_roudtrip.toml"
     open(file, "a").close()
     traefik_utils.persist_routes(file, routes)
-    reloaded = traefik_utils.load_routes(file)
+    handler = traefik_utils.TraefikConfigFileHandler(file)
+    reloaded = handler.load()
     os.remove(file)
     assert reloaded == routes
 

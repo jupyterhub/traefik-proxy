@@ -10,30 +10,36 @@ import hashlib
 import warnings
 
 checksums_traefik = {
-    "https://github.com/containous/traefik/releases/download/v2.2.0/traefik_v2.2.0_linux_amd64.tar.gz":
-        "eddea0507ad715c723662e7c10fdab554eb64379748278cd2d09403063e3e32f",
-    "https://github.com/containous/traefik/releases/download/v2.2.0/traefik_v2.2.0_darwin_amd64.tar.gz":
-        "8bfa2393b265ef01aca12be94d67080961299968bd602f3708480eed273b95e0",
-    "https://github.com/containous/traefik/releases/download/v2.2.0/traefik_v2.2.0_windows_amd64.zip":
-        "9a794e395b7eba8d44118c4a1fb358fbf14abff3f5f5d264f46b1d6c243b9a5e",
+    "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_linux_arm64.tar.gz": "0931fdd9c855fcafd38eba7568a1d287200fad5afd1aef7d112fb3a48d822fcc",
+    "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_linux_amd64.tar.gz": "de8d56f6777c5098834d4f8d9ed419b7353a3afe913393a55b6fd14779564129",
+    "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_darwin_amd64.tar.gz": "7d946baa422acfcf166e19779052c005722db03de3ab4d7aff586c4b4873a0f3",
+    "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_windows_amd64.zip": "4203443cb1e91d76f81d1e2a41fb70e66452d951b1ffd8964218a7bc211c377d",
+    "https://github.com/traefik/traefik/releases/download/v2.3.7/traefik_v2.3.7_linux_amd64.tar.gz": "a357d40bc9b81ae76070a2bc0334dfd15e77143f41415a93f83bb53af1756909",
+    "https://github.com/traefik/traefik/releases/download/v2.3.7/traefik_v2.3.7_darwin_amd64.tar.gz": "c84fc21b8ee34bba8a66f0f9e71c6c2ea69684ac6330916551f1f111826b9bb3",
+    "https://github.com/traefik/traefik/releases/download/v2.3.7/traefik_v2.3.7_windows_amd64.zip": "eb54b1c9c752a6eaf48d28ff8409c17379a29b9d58390107411762ab6e4edfb4",
+    "https://github.com/traefik/traefik/releases/download/v2.2.11/traefik_v2.2.11_linux_amd64.tar.gz": "b677386423403c63fb9ac9667d39591be587a1a4928afc2e59449c78343bad9c",
+    "https://github.com/traefik/traefik/releases/download/v2.2.11/traefik_v2.2.11_darwin_amd64.tar.gz": "efb1c2bc23e16a9083e5a210594186d026cdec0b522a6b4754ceff43b07d8031",
+    "https://github.com/traefik/traefik/releases/download/v2.2.11/traefik_v2.2.11_windows_amd64.zip": "ee867133e00b2d8395c239d8fed04a26b362e650b371dc0b653f0ee9d52471e6",
 }
 
 checksums_etcd = {
-    "https://github.com/etcd-io/etcd/releases/download/v3.4.7/etcd-v3.4.7-linux-amd64.tar.gz":
-        "4ad86e663b63feb4855e1f3a647e719d6d79cf6306410c52b7f280fa56f8eb6b",
-    "https://github.com/etcd-io/etcd/releases/download/v3.4.7/etcd-v3.4.7-darwin-amd64.zip":
-        "ffe3237fcb70b7ce91c16518c2f62f3fa9ff74ddc10f7b6ca83a3b5b29ade19a",
-    "https://github.com/etcd-io/etcd/releases/download/v3.4.7/etcd-v3.4.7-windows-amd64.zip":
-        "3863ea59bcb407113524b51406810e33d58daff11ca10d1192f289185ae94ffe",
+    "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-arm64.tar.gz": "fcc522275300cf90d42377106d47a2e384d1d2083af205cbb7833a79ef5a49d1",
+    "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-amd64.tar.gz": "3bd00836ea328db89ecba3ed2155293934c0d09e64b53d6c9dfc0a256e724b81",
+    "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-darwin-amd64.tar.gz": "c596709069193bffc639a22558bdea4d801128e635909ea01a6fd5b5c85da729",
+    "https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz": "1620a59150ec0a0124a65540e23891243feb2d9a628092fb1edcc23974724a45",
+    "https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-darwin-amd64.tar.gz": "fac4091c7ba6f032830fad7809a115909d0f0cae5cbf5b34044540def743577b",
+    "https://github.com/etcd-io/etcd/releases/download/v3.2.25/etcd-v3.2.25-linux-amd64.tar.gz": "8a509ffb1443088d501f19e339a0d9c0058ce20599752c3baef83c1c68790ef7",
+    "https://github.com/etcd-io/etcd/releases/download/v3.2.25/etcd-v3.2.25-darwin-amd64.tar.gz": "9950684a01d7431bc12c3dba014f222d55a862c6f8af64c09c42d7a59ed6790d",
 }
 
 checksums_consul = {
-    "https://releases.hashicorp.com/consul/1.7.2/consul_1.7.2_linux_amd64.zip":
-        "5ab689cad175c08a226a5c41d16392bc7dd30ceaaf90788411542a756773e698",
-    "https://releases.hashicorp.com/consul/1.7.2/consul_1.7.2_darwin_amd64.zip":
-        "c474f00b022cae38acae2d19b2a707a4fcb08dfdd22875efeefdf052ce19c90b",
-    "https://releases.hashicorp.com/consul/1.7.2/consul_1.7.2_windows_amd64.zip":
-        "e9b9355f77f80b2c0940888cb0d27c44a5879c31e379ef21ffcfd36c91d202c1",
+    "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_linux_amd64.zip": "da3919197ef33c4205bb7df3cc5992ccaae01d46753a72fe029778d7f52fb610",
+    "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_linux_arm64.zip": "012c552aff502f907416c9a119d2dfed88b92e981f9b160eb4fe292676afdaeb",
+    "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_darwin.zip": "c168240d52f67c71b30ef51b3594673cad77d0dbbf38c412b2ee30b39ef30843",
+    "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip": "a8568ca7b6797030b2c32615b4786d4cc75ce7aee2ed9025996fe92b07b31f7e",
+    "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_darwin_amd64.zip": "4bc205e06b2921f998cb6ddbe70de57f8e558e226e44aba3f337f2f245678b85",
+    "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_linux_amd64.zip": "1399064050019db05d3378f757e058ec4426a917dd2d240336b51532065880b6",
+    "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_darwin_amd64.zip": "b4033ea6871fe6136ee5d940c834be2248463c3ec248dc22370e6d5360931325",
 }
 
 
@@ -58,14 +64,8 @@ def install_traefik(prefix, plat, traefik_version):
     traefik_archive = "traefik_v" + traefik_version + "_" + plat + "." + traefik_archive_extension
     traefik_archive_path = os.path.join(prefix, traefik_archive)
 
-    traefik_archive = "traefik_v" + traefik_version + "_" + plat + "." + traefik_archive_extension
-    traefik_archive_path = os.path.join(prefix, traefik_archive)
-
-    traefik_archive = "traefik_v" + traefik_version + "_" + plat + "." + traefik_archive_extension
-    traefik_archive_path = os.path.join(prefix, traefik_archive)
-
     traefik_url = (
-        "https://github.com/containous/traefik/releases"
+        "https://github.com/traefik/traefik/releases"
         f"/download/v{traefik_version}/{traefik_archive}"
     )
 
@@ -73,7 +73,7 @@ def install_traefik(prefix, plat, traefik_version):
         print(f"Traefik already exists")
         if traefik_url not in checksums_traefik:
             warnings.warn(
-                f"Traefik {traefik_version} not supported !",
+                f"Traefik {traefik_version} not tested !",
                 stacklevel=2,
             )
             os.chmod(traefik_bin, 0o755)
@@ -89,28 +89,27 @@ def install_traefik(prefix, plat, traefik_version):
                 os.remove(traefik_archive_path)
                 os.remove(traefik_bin)
 
-    if traefik_url in checksums_traefik:
-        print(f"Downloading traefik {traefik_version}...")
-        urlretrieve(traefik_url, traefik_archive_path)
+    print(f"Downloading traefik {traefik_version} from {traefik_url}...")
+    urlretrieve(traefik_url, traefik_archive_path)
 
+    if traefik_url in checksums_traefik:
         if checksum_file(traefik_archive_path) != checksums_traefik[traefik_url]:
             raise IOError("Checksum failed")
-
-        print("Extracting the archive...")
-        if traefik_archive_extension == "tar.gz":
-            with tarfile.open(traefik_archive_path, "r") as tar_ref:
-                tar_ref.extract("traefik", prefix)
-        else:
-            with zipfile.ZipFile(traefik_archive_path, "r") as zip_ref:
-                zip_ref.extract("traefik.exe", prefix)
-
-        os.chmod(traefik_bin, 0o755)
     else:
         warnings.warn(
-            f"Traefik {traefik_version} not supported !",
+            f"Traefik {traefik_version} not tested !",
             stacklevel=2,
         )
 
+    print("Extracting the archive...")
+    if traefik_archive_extension == "tar.gz":
+        with tarfile.open(traefik_archive_path, "r") as tar_ref:
+            tar_ref.extract("traefik", prefix)
+    else:
+        with zipfile.ZipFile(traefik_archive_path, "r") as zip_ref:
+            zip_ref.extract("traefik.exe", prefix)
+
+    os.chmod(traefik_bin, 0o755)
     print("--- Done ---")
 
 
@@ -137,8 +136,8 @@ def install_etcd(prefix, plat, etcd_version):
         print(f"Etcd and etcdctl already exist")
         if etcd_url not in checksums_etcd:
             warnings.warn(
-                f"Etcd {etcd_version} not supported !",
-                stacklevel=2,
+                f"Etcd {etcd_version} not supported ! Or, at least, we don't "
+                f"recognise {etcd_url} in our checksums", stacklevel=2,
             )
             os.chmod(etcd_bin, 0o755)
             os.chmod(etcdctl_bin, 0o755)
@@ -188,7 +187,8 @@ def install_etcd(prefix, plat, etcd_version):
         shutil.rmtree(etcd_binaries)
     else:
         warnings.warn(
-            f"Etcd {etcd_version} not supported !",
+            f"Etcd {etcd_version} not supported ! Or, at least, we don't "
+            f"recognise {etcd_url} in our checksums",
             stacklevel=2
         )
 
@@ -215,7 +215,8 @@ def install_consul(prefix, plat, consul_version):
         print(f"Consul already exists")
         if consul_url not in checksums_consul:
             warnings.warn(
-                f"Consul {consul_version} not supported !",
+                f"Consul {consul_version} not supported ! Or, at least we don't have "
+                f"it {consul_url} in our checksums",
                 stacklevel=2,
             )
             os.chmod(consul_bin, 0o755)
@@ -250,7 +251,8 @@ def install_consul(prefix, plat, consul_version):
         shutil.rmtree(consul_binaries)
     else:
         warnings.warn(
-            f"Consul {consul_version} not supported !",
+            f"Consul {consul_version} not supported ! Or, at least we don't have "
+            f"it {consul_url} in our checksums",
             stacklevel=2,
         )
 
@@ -348,7 +350,7 @@ def main():
     parser.add_argument(
         "--etcd-version",
         dest="etcd_version",
-        default="3.4.7",
+        default="3.4.15",
         help=textwrap.dedent(
             """\
             The version of etcd to download.
