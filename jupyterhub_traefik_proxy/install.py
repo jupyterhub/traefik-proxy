@@ -69,31 +69,12 @@ def install_traefik(prefix, plat, traefik_version):
         f"/download/v{traefik_version}/{traefik_archive}"
     )
 
-    if os.path.exists(traefik_bin):
-        print(f"Traefik already exists")
-        if traefik_url not in checksums_traefik:
-            warnings.warn(
-                f"Couldn't verify checksum for traefik-v{traefik_version}-{plat}",
-                stacklevel=2,
-            )
-            os.chmod(traefik_bin, 0o755)
-            print("--- Done ---")
-            return
-        else:
-            checksum = checksum_file(traefik_bin)
-            if checksum == checksums_traefik[traefik_url]:
-                os.chmod(traefik_bin, 0o755)
-                print("--- Done ---")
-                return
-            else:
-                print(f"checksum mismatch on {traefik_bin}")
-                os.remove(traefik_bin)
-
-    print(f"Downloading traefik {traefik_version}...")
-    urlretrieve(traefik_url, traefik_bin)
+    if not os.path.exists(traefik_archive_path):
+        print(f"Downloading traefik {traefik_archive}...")
+        urlretrieve(traefik_url, traefik_archive_path)
 
     if traefik_url in checksums_traefik:
-        checksum = checksum_file(traefik_bin)
+        checksum = checksum_file(traefik_archive_path)
         if checksum != checksums_traefik[traefik_url]:
             raise IOError("Checksum failed")
     else:
@@ -101,6 +82,14 @@ def install_traefik(prefix, plat, traefik_version):
             f"Couldn't verify checksum for traefik-v{traefik_version}-{plat}",
             stacklevel=2,
         )
+
+    print("Extracting the archive...")
+    if traefik_archive_extension == "tar.gz":
+        with tarfile.open(traefik_archive_path, "r") as tar_ref:
+            tar_ref.extract("traefik", prefix)
+    else:
+        with zipfile.ZipFile(traefik_archive_path, "r") as zip_ref:
+            zip_ref.extract("traefik.exe", prefix)
 
     os.chmod(traefik_bin, 0o755)
 
@@ -266,9 +255,16 @@ def main():
             """\
             Checksums available for:
             - traefik:
-                - v2.2.0-linux-amd64
-                - v2.2.0-darwin-amd64
-                - v2.2.0-windows-amd64
+                - v2.4.8-linux-arm64
+                - v2.4.8-linux-amd64
+                - v2.4.8-darwin-amd64
+                - v2.4.8-windows-amd64
+                - v2.3.7-linux-amd64
+                - v2.3.7-darwin-amd64
+                - v2.3.7-windows-amd64
+                - v2.2.11-linux-amd64
+                - v2.2.11-darwin-amd64
+                - v2.2.11-windows-amd64
             - etcd:
                 - v3.4.7-linux-amd64
                 - v3.4.7-darwin-amd64
