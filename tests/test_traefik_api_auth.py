@@ -14,10 +14,6 @@ pytestmark = pytest.mark.asyncio
     params=[
         "toml_proxy",
         "yaml_proxy",
-        #"no_auth_etcd_proxy",
-        #"auth_etcd_proxy",
-        #"no_auth_consul_proxy",
-        #"auth_consul_proxy",
     ]
 )
 def proxy(request):
