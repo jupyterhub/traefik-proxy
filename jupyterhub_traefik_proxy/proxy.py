@@ -195,7 +195,8 @@ class TraefikProxy(Proxy):
         self.log.debug(f"Succesfully received data from {path}: {resp.body}")
         return resp
 
-    async def _wait_for_static_config(self):
+    async def _wait_for_static_config(self, provider=None):
+        # TODO: Remove provider argument after refactoring kv_proxy and subclasses
         async def _check_traefik_static_conf_ready():
             """Check if traefik loaded its static configuration yet"""
             try:
@@ -230,8 +231,13 @@ class TraefikProxy(Proxy):
         finally:
             self.traefik_process.wait()
 
-    def _start_traefik(self):
-        if self.provider_name not in ("file", "etcd", "consul"):
+    def _launch_traefik(self, config_type=None):
+        # Keep the _launch_traefik API backwards-compatible, while otherwise
+        # getting the provider from self.provider_name
+        # TODO: Make the breaking change!
+        if config_type is None:
+            config_type = self.provider_name
+        if config_type not in ("file", "etcdv3", "consul"):
             raise ValueError(
                 "Configuration mode not supported \n.\
                 The proxy can only be configured through fileprovider, etcd and consul"

@@ -69,52 +69,47 @@ def install_traefik(prefix, plat, traefik_version):
         f"/download/v{traefik_version}/{traefik_archive}"
     )
 
-    if os.path.exists(traefik_bin) and os.path.exists(traefik_archive_path):
+    if os.path.exists(traefik_bin):
         print(f"Traefik already exists")
         if traefik_url not in checksums_traefik:
             warnings.warn(
-                f"Traefik {traefik_version} not tested !",
+                f"Couldn't verify checksum for traefik-v{traefik_version}-{plat}",
                 stacklevel=2,
             )
             os.chmod(traefik_bin, 0o755)
             print("--- Done ---")
             return
         else:
-            if checksum_file(traefik_archive_path) == checksums_traefik[traefik_url]:
+            checksum = checksum_file(traefik_bin)
+            if checksum == checksums_traefik[traefik_url]:
                 os.chmod(traefik_bin, 0o755)
                 print("--- Done ---")
                 return
             else:
-                print(f"checksum mismatch on {traefik_archive_path}")
-                os.remove(traefik_archive_path)
+                print(f"checksum mismatch on {traefik_bin}")
                 os.remove(traefik_bin)
 
-    print(f"Downloading traefik {traefik_version} from {traefik_url}...")
-    urlretrieve(traefik_url, traefik_archive_path)
+    print(f"Downloading traefik {traefik_version}...")
+    urlretrieve(traefik_url, traefik_bin)
 
     if traefik_url in checksums_traefik:
-        if checksum_file(traefik_archive_path) != checksums_traefik[traefik_url]:
+        checksum = checksum_file(traefik_bin)
+        if checksum != checksums_traefik[traefik_url]:
             raise IOError("Checksum failed")
     else:
         warnings.warn(
-            f"Traefik {traefik_version} not tested !",
+            f"Couldn't verify checksum for traefik-v{traefik_version}-{plat}",
             stacklevel=2,
         )
 
-    print("Extracting the archive...")
-    if traefik_archive_extension == "tar.gz":
-        with tarfile.open(traefik_archive_path, "r") as tar_ref:
-            tar_ref.extract("traefik", prefix)
-    else:
-        with zipfile.ZipFile(traefik_archive_path, "r") as zip_ref:
-            zip_ref.extract("traefik.exe", prefix)
-
     os.chmod(traefik_bin, 0o755)
+
     print("--- Done ---")
 
 
 def install_etcd(prefix, plat, etcd_version):
     etcd_downloaded_dir_name = f"etcd-v{etcd_version}-{plat}"
+    etcd_archive_extension = ".tar.gz"
     if "linux" in plat:
         etcd_archive_extension = "tar.gz"
     else:
@@ -136,61 +131,61 @@ def install_etcd(prefix, plat, etcd_version):
         print(f"Etcd and etcdctl already exist")
         if etcd_url not in checksums_etcd:
             warnings.warn(
-                f"Etcd {etcd_version} not supported ! Or, at least, we don't "
-                f"recognise {etcd_url} in our checksums", stacklevel=2,
+                f"Couldn't verify checksum for etcd-v{etcd_version}-{plat}",
+                stacklevel=2,
             )
             os.chmod(etcd_bin, 0o755)
             os.chmod(etcdctl_bin, 0o755)
             print("--- Done ---")
             return
         else:
-            if checksum_file(etcd_downloaded_archive) == checksums_etcd[etcd_url]:
+            checksum_etcd_archive = checksum_file(etcd_downloaded_archive)
+            if checksum_etcd_archive == checksums_etcd[etcd_url]:
                 os.chmod(etcd_bin, 0o755)
                 os.chmod(etcdctl_bin, 0o755)
                 print("--- Done ---")
                 return
             else:
-                print(f"checksum mismatch on {etcd_downloaded_archive}")
+                print(f"checksum mismatch on etcd")
                 os.remove(etcd_bin)
                 os.remove(etcdctl_bin)
                 os.remove(etcd_downloaded_archive)
 
+    if not os.path.exists(etcd_downloaded_archive):
+        print(f"Downloading {etcd_downloaded_dir_name} archive...")
+        urlretrieve(etcd_url, etcd_downloaded_archive)
+    else:
+        print(f"Archive {etcd_downloaded_dir_name} already exists")
+
+    if etcd_archive_extension == "zip":
+        with zipfile.ZipFile(etcd_downloaded_archive, "r") as zip_ref:
+            zip_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
+            zip_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
+    else:
+        with (tarfile.open(etcd_downloaded_archive, "r")) as tar_ref:
+            print("Extracting the archive...")
+            tar_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
+            tar_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
+
+    shutil.copy(os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcd"), etcd_bin)
+    shutil.copy(
+        os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcdctl"), etcdctl_bin
+    )
+
     if etcd_url in checksums_etcd:
-        if not os.path.exists(etcd_downloaded_archive):
-            print(f"Downloading {etcd_downloaded_dir_name} archive...")
-            urlretrieve(etcd_url, etcd_downloaded_archive)
-        else:
-            print(f"Archive {etcd_downloaded_dir_name} already exists")
-
-        if checksum_file(etcd_downloaded_archive) != checksums_etcd[etcd_url]:
+        checksum_etcd_archive = checksum_file(etcd_downloaded_archive)
+        if checksum_etcd_archive != checksums_etcd[etcd_url]:
             raise IOError("Checksum failed")
-
-        print("Extracting the archive...")
-
-        if etcd_archive_extension == "zip":
-            with zipfile.ZipFile(etcd_downloaded_archive, "r") as zip_ref:
-                zip_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
-                zip_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
-        else:
-            with (tarfile.open(etcd_downloaded_archive, "r")) as tar_ref:
-                tar_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
-                tar_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
-
-        shutil.copy(os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcd"), etcd_bin)
-        shutil.copy(
-            os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcdctl"), etcdctl_bin)
-
-        os.chmod(etcd_bin, 0o755)
-        os.chmod(etcdctl_bin, 0o755)
-
-        # Cleanup
-        shutil.rmtree(etcd_binaries)
     else:
         warnings.warn(
-            f"Etcd {etcd_version} not supported ! Or, at least, we don't "
-            f"recognise {etcd_url} in our checksums",
-            stacklevel=2
+            f"Couldn't verify checksum for etcd-v{etcd_version}-{plat}", stacklevel=2
         )
+
+    os.chmod(etcd_bin, 0o755)
+    os.chmod(etcdctl_bin, 0o755)
+
+    # Cleanup
+    shutil.rmtree(etcd_binaries)
 
     print("--- Done ---")
 
@@ -198,12 +193,14 @@ def install_etcd(prefix, plat, etcd_version):
 def install_consul(prefix, plat, consul_version):
     plat = plat.replace("-", "_")
     consul_downloaded_dir_name = f"consul_v{consul_version}_{plat}"
+    consul_archive_extension = ".tar.gz"
     consul_archive_extension = "zip"
 
     consul_downloaded_archive = os.path.join(
         prefix, consul_downloaded_dir_name + "." + consul_archive_extension
     )
     consul_binaries = os.path.join(prefix, "consul_binaries")
+
     consul_bin = os.path.join(prefix, "consul")
 
     consul_url = (
@@ -215,46 +212,48 @@ def install_consul(prefix, plat, consul_version):
         print(f"Consul already exists")
         if consul_url not in checksums_consul:
             warnings.warn(
-                f"Consul {consul_version} not supported ! Or, at least we don't have "
-                f"it {consul_url} in our checksums",
+                f"Couldn't verify checksum for consul_v{consul_version}_{plat}",
                 stacklevel=2,
             )
             os.chmod(consul_bin, 0o755)
             print("--- Done ---")
             return
         else:
-            if checksum_file(consul_downloaded_archive) == checksums_consul[consul_url]:
+            checksum_consul_archive = checksum_file(consul_downloaded_archive)
+            if checksum_consul_archive == checksums_consul[consul_url]:
                 os.chmod(consul_bin, 0o755)
                 print("--- Done ---")
                 return
             else:
-                print(f"checksum mismatch on {consul_downloaded_archive}")
+                print(f"checksum mismatch on consul")
                 os.remove(consul_bin)
                 os.remove(consul_downloaded_archive)
 
+    if not os.path.exists(consul_downloaded_archive):
+        print(f"Downloading {consul_downloaded_dir_name} archive...")
+        urlretrieve(consul_url, consul_downloaded_archive)
+    else:
+        print(f"Archive {consul_downloaded_dir_name} already exists")
+
+    with zipfile.ZipFile(consul_downloaded_archive, "r") as zip_ref:
+        zip_ref.extract("consul", consul_binaries)
+
+    shutil.copy(os.path.join(consul_binaries, "consul"), consul_bin)
+
     if consul_url in checksums_consul:
-        if not os.path.exists(consul_downloaded_archive):
-            print(f"Downloading {consul_downloaded_dir_name} archive...")
-            urlretrieve(consul_url, consul_downloaded_archive)
-        else:
-            print(f"Archive {consul_downloaded_dir_name} already exists")
-
-        if checksum_file(consul_downloaded_archive) != checksums_consul[consul_url]:
+        checksum_consul_archive = checksum_file(consul_downloaded_archive)
+        if checksum_consul_archive != checksums_consul[consul_url]:
             raise IOError("Checksum failed")
-
-        with zipfile.ZipFile(consul_downloaded_archive, "r") as zip_ref:
-            zip_ref.extract("consul", consul_binaries)
-
-        shutil.copy(os.path.join(consul_binaries, "consul"), consul_bin)
-        os.chmod(consul_bin, 0o755)
-        # Cleanup
-        shutil.rmtree(consul_binaries)
     else:
         warnings.warn(
-            f"Consul {consul_version} not supported ! Or, at least we don't have "
-            f"it {consul_url} in our checksums",
+            f"Couldn't verify checksum for consul_v{consul_version}_{plat}",
             stacklevel=2,
         )
+
+    os.chmod(consul_bin, 0o755)
+
+    # Cleanup
+    shutil.rmtree(consul_binaries)
 
     print("--- Done ---")
 

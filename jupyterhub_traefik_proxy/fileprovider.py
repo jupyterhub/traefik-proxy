@@ -93,6 +93,17 @@ class TraefikFileProviderProxy(TraefikProxy):
         }
         await super()._setup_traefik_static_config()
 
+    def _start_traefik(self):
+        self.log.info("Starting traefik...")
+        try:
+            self._launch_traefik()
+        except FileNotFoundError as e:
+            self.log.error(
+                "Failed to find traefik \n"
+                "The proxy can be downloaded from https://github.com/containous/traefik/releases/download."
+            )
+            raise
+
     def _clean_resources(self):
         try:
             if self.should_start:
