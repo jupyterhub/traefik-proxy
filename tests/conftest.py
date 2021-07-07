@@ -71,7 +71,7 @@ def external_toml_proxy():
     traefik_process.wait()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session", autouse=False)
 def etcd():
     etcd_proc = subprocess.Popen("etcd", stdout=None, stderr=None)
     yield etcd_proc
@@ -81,7 +81,7 @@ def etcd():
     shutil.rmtree(os.getcwd() + "/default.etcd/")
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="function", autouse=False)
 def clean_etcd():
     subprocess.run(["etcdctl", "del", '""', "--from-key=true"])
 
