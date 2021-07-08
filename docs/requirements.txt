@@ -1,3 +1,6 @@
 myst-parser
 pydata-sphinx-theme
 sphinx-copybutton
+# Temporary fix of sphinx compatibility issue.
+# Revert back to released autodoc-traits when 0.1.0 released.
+https://github.com/jupyterhub/autodoc-traits/archive/d22282c1c18c6865436e06d8b329c06fe12a07f8.zip

@@ -26,15 +26,3 @@ Module: :mod:`jupyterhub_traefik_proxy`
 
 .. autoconfigurable:: TKvProxy
     :members:
-
-:class:`TraefikEtcdProxy`
--------------------------
-
-.. autoconfigurable:: TraefikEtcdProxy
-    :members:
-
-:class:`TraefikConsulProxy`
----------------------------
-
-.. autoconfigurable:: TraefikConsulProxy
-    :members:

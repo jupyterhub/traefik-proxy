@@ -35,7 +35,6 @@ jobs:
       #       steps as if would used `export MY_ENV=my-value`.
       - name: Configure environment variables
         run: |
-          echo "ETCDCTL_API=3" >> $GITHUB_ENV
           echo "PATH=$PWD/bin:$PATH" >> $GITHUB_ENV
       - uses: actions/checkout@v2
       # NOTE: actions/setup-python@v2 make use of a cache within the GitHub base
@@ -57,7 +56,7 @@ jobs:
         run: |
           pip install --upgrade setuptools pip
           pip install -r dev-requirements.txt --upgrade .
-          python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=./bin
+          python -m jupyterhub_traefik_proxy.install --traefik --output=./bin
           pip freeze
       - name: Run tests
         run: |
