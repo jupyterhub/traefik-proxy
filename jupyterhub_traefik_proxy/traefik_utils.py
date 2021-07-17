@@ -13,7 +13,7 @@ from collections import namedtuple
 class KVStorePrefix(Unicode):
     def validate(self, obj, value):
         u = super().validate(obj, value)
-        # We'll join the prefix with e.g. prefix.join(pathspec),
+        # We'll join the prefix with e.g. "/".join(pathspec),
         # therefore always strip the trailing "/" from any prefix
         if u.endswith("/"):
             u = u.rstrip("/")
@@ -29,12 +29,11 @@ def generate_rule(routespec):
     routespec = unquote(routespec)
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
-        rule = "PathPrefix(`{0}`)".format(routespec)
+        rule = f"PathPrefix(`{routespec}`)"
     else:
         # Host-based routing, e.g. host.tld/proxy/path/
         host, path_prefix = routespec.split("/", 1)
-        path_prefix = "/" + path_prefix
-        rule = "Host(`{0}`) && PathPrefix(`{1}`)".format(host, path_prefix)
+        rule = f"Host(`{host}`) && PathPrefix(`/{path_prefix}`)"
     return rule
 
 

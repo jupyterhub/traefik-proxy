@@ -299,16 +299,15 @@ class TraefikProxy(Proxy):
         self.log.info("Setting up traefik's dynamic config...")
         self._generate_htpassword()
         api_url = urlparse(self.traefik_api_url)
-        api_path = api_url.path if api_url.path else '/api'
-        api_credentials = "{0}:{1}".format(
-            self.traefik_api_username,
-            self.traefik_api_hashed_password
-        )
+        api_path = api_url.path if api_url.path else "/api"
+        api_credentials = f"{self.traefik_api_username}:" \
+                          f"{self.traefik_api_hashed_password}"
         self.dynamic_config.update({
             "http": {
                 "routers": {
                     "route_api": {
-                        "rule": f"Host(`{api_url.hostname}`) && (PathPrefix(`{api_path}`) || PathPrefix(`/dashboard`))",
+                        "rule": f"Host(`{api_url.hostname}`) && " \
+                                f"(PathPrefix(`{api_path}`) || PathPrefix(`/dashboard`))",
                         "entryPoints": ["enter_api"],
                         "service": "api@internal",
                         "middlewares": ["auth_api"]
