@@ -321,7 +321,7 @@ def main():
     parser.add_argument(
         "--traefik-version",
         dest="traefik_version",
-        default="2.2.0",
+        default="2.4.8",
         help=textwrap.dedent(
             """\
             The version of traefik to download.
@@ -369,7 +369,7 @@ def main():
     parser.add_argument(
         "--consul-version",
         dest="consul_version",
-        default="1.7.2",
+        default="1.9.4",
         help=textwrap.dedent(
             """\
             The version of consul to download.
