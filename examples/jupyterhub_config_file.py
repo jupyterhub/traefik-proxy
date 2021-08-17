@@ -9,9 +9,9 @@ requires jupyterhub 1.0.dev
 """
 
 c.JupyterHub.proxy_class = "traefik_file"
-c.TraefikFileProviderProxy.traefik_api_username = "admin"
-c.TraefikFileProviderProxy.traefik_api_password = "admin"
-c.TraefikFileProviderProxy.traefik_log_level = "INFO"
+c.TraefikFileProxy.traefik_api_username = "admin"
+c.TraefikFileProxy.traefik_api_password = "admin"
+c.TraefikFileProxy.traefik_log_level = "INFO"
 
 # use dummy and simple auth/spawner for testing
 c.JupyterHub.authenticator_class = "dummy"

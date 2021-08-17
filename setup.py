@@ -73,7 +73,7 @@ setup(
     cmdclass=cmdclass,
     entry_points={
         "jupyterhub.proxies": [
-            "traefik_file = jupyterhub_traefik_proxy:TraefikFileProviderProxy",
+            "traefik_file = jupyterhub_traefik_proxy:TraefikFileProxy",
         ]
     },
 )

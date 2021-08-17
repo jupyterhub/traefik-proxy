@@ -2,7 +2,7 @@
 
 from .proxy import TraefikProxy  # noqa
 from .kv_proxy import TKvProxy  # noqa
-from .fileprovider import TraefikFileProviderProxy
+from .fileprovider import TraefikFileProxy
 
 from ._version import get_versions
 

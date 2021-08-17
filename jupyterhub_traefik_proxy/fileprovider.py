@@ -31,7 +31,7 @@ from jupyterhub.proxy import Proxy
 from jupyterhub_traefik_proxy import TraefikProxy
 
 
-class TraefikFileProviderProxy(TraefikProxy):
+class TraefikFileProxy(TraefikProxy):
     """JupyterHub Proxy implementation using traefik and toml or yaml config file"""
 
     mutex = Any()
@@ -189,7 +189,7 @@ class TraefikFileProviderProxy(TraefikProxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
-        self.log.debug(f"\tTraefikFileProviderProxy.add_route: Adding {routespec} for {target}")
+        self.log.debug(f"\tTraefikFileProxy.add_route: Adding {routespec} for {target}")
         traefik_routespec = self._routespec_to_traefik_path(routespec)
         service_alias = traefik_utils.generate_alias(traefik_routespec, "service")
         router_alias = traefik_utils.generate_alias(traefik_routespec, "router")

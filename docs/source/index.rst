@@ -20,7 +20,7 @@ Moreover it offers *HTTPS* support through a straight-forward `ACME (Let's Encry
 There are three versions for the proxy, depending on how traefik stores the routes:
 
 * *for* **smaller**, *single-node deployments*:
-   * TraefikFileProviderProxy
+   * TraefikFileProxy
 * *for* **distributed** *setups*:
    * TraefikEtcdProxy
    * TraefikConsulProxy

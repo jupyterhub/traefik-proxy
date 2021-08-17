@@ -9,7 +9,7 @@ import time
 import pytest
 from _pytest.mark import Mark
 
-from jupyterhub_traefik_proxy import TraefikFileProviderProxy
+from jupyterhub_traefik_proxy import TraefikFileProxy
 
 
 # Define a "slow" test marker so that we can run the slow tests at the end
@@ -38,11 +38,11 @@ def pytest_configure(config):
 @pytest.fixture
 # There must be a way to parameterise this to run on both yaml and toml files?
 async def toml_proxy():
-    """Fixture returning a configured TraefikFileProviderProxy"""
+    """Fixture returning a configured TraefikFileProxy"""
     dynamic_config_file = os.path.join(
         os.getcwd(), "tests", "config_files", "dynamic_config", "rules.toml"
     )
-    proxy = TraefikFileProviderProxy(
+    proxy = TraefikFileProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
@@ -62,7 +62,7 @@ async def yaml_proxy():
     dynamic_config_file = os.path.join(
         os.getcwd(), "tests", "config_files", "dynamic_config", "rules.yaml"
     )
-    proxy = TraefikFileProviderProxy(
+    proxy = TraefikFileProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
@@ -82,7 +82,7 @@ async def external_toml_proxy(launch_traefik_file):
     dynamic_config_file = os.path.join(
         os.getcwd(), "tests", "config_files", "dynamic_config", "rules.toml"
     )
-    proxy = TraefikFileProviderProxy(
+    proxy = TraefikFileProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
@@ -100,7 +100,7 @@ async def external_yaml_proxy(launch_traefik_file):
     dynamic_config_file = os.path.join(
         os.getcwd(), "tests", "config_files", "dynamic_config", "rules.yaml"
     )
-    proxy = TraefikFileProviderProxy(
+    proxy = TraefikFileProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="api_admin",
