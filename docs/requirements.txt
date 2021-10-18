@@ -1,3 +1,7 @@
+# autodoc_traits requires sphinx <4 until next release is made
+# See https://github.com/jupyterhub/autodoc-traits/issues/6
+sphinx>=2,<4
 myst-parser
 pydata-sphinx-theme
 sphinx-copybutton
+autodoc-traits
