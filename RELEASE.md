@@ -22,7 +22,7 @@ For you to follow along according to these instructions, you need:
    git clean -xfd
    ```
 
-1. Update [changelog.rst](docs/source/changelog.md) and add it to
+1. Update [changelog.md](docs/source/changelog.md) and add it to
    the working tree.
    
    ```shell
