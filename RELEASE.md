@@ -1,13 +1,13 @@
 # How to make a release
 
 `traefik-proxy` is a package [available on
-PyPI](https://pypi.org/project/jupyterhub-traefik-proxy/).
-The PyPI release is done automatically by TravisCI when a tag
-is pushed.
+PyPI](https://pypi.org/project/jupyterhub-traefik-proxy/). These are
+instructions on how to make a release on PyPI.
 
-For you to follow along according to these instructions, you need
-to have push rights to the [traefik-proxy GitHub
-repository](https://github.com/jupyterhub/traefik-proxy).
+For you to follow along according to these instructions, you need:
+
+- To have push rights to the [jupyterhub-traefik-proxy GitHub
+  repository](https://github.com/jupyterhub/traefik-proxy).
 
 ## Steps to make a release
 
@@ -22,11 +22,11 @@ repository](https://github.com/jupyterhub/traefik-proxy).
    git clean -xfd
    ```
 
-1. Update [changelog.rst](docs/source/changelog.rst) and add it to
+1. Update [changelog.rst](docs/source/changelog.md) and add it to
    the working tree.
    
    ```shell
-   git add traefik-proxy/docs/source/changelog.rst
+   git add traefik-proxy/docs/source/changelog.md
    ```
 
    Tip: Identifying the changes can be made easier with the help of the
