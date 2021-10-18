@@ -4,6 +4,23 @@ For detailed changes from the prior release, click on the version number
 and its link will bring up a GitHub listing of changes. Use `git log` on
 the command line for details.
 
+### [0.3.0](https://github.com/jupyterhub/traefik-proxy/compare/0.2.0...0.3.0) 2021-10-18
+
+#### Enhancements made
+
+- Support ARM in binary package installs [#129](https://github.com/jupyterhub/traefik-proxy/pull/129) ([@yuvipanda](https://github.com/yuvipanda))
+
+#### Bugs fixed
+
+- Fix handling default server routes in TraefikTomlProxy [#131](https://github.com/jupyterhub/traefik-proxy/pull/131) ([@dolfinus](https://github.com/dolfinus))
+- Make etcd3 & python-consul2 soft dependencies [#127](https://github.com/jupyterhub/traefik-proxy/pull/127) ([@yuvipanda](https://github.com/yuvipanda))
+
+#### Contributors to this release
+
+([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2021-02-24&to=2021-10-18&type=c))
+
+[@alexleach](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aalexleach+updated%3A2021-02-24..2021-10-18&type=Issues) | [@consideRatio](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2021-02-24..2021-10-18&type=Issues) | [@dolfinus](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adolfinus+updated%3A2021-02-24..2021-10-18&type=Issues) | [@GeorgianaElena](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AGeorgianaElena+updated%3A2021-02-24..2021-10-18&type=Issues) | [@yuvipanda](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Ayuvipanda+updated%3A2021-02-24..2021-10-18&type=Issues)
+
 ## [0.2.0](https://github.com/jupyterhub/traefik-proxy/compare/0.1.6...0.2.0) 2021-02-24
 
 ### Bugs fixed
