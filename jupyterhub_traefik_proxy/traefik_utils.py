@@ -10,21 +10,6 @@ from contextlib import contextmanager
 from collections import namedtuple
 
 
-class KVStorePrefix(Unicode):
-    def validate(self, obj, value):
-        u = super().validate(obj, value)
-        # We'll join the prefix with e.g. "/".join(pathspec),
-        # therefore always strip the trailing "/" from any prefix
-        if u.endswith("/"):
-            u = u.rstrip("/")
-
-        proxy_class = type(obj).__name__
-        if "Consul" in proxy_class and u.startswith("/"):
-            u = u[1:]
-
-        return u
-
-
 def generate_rule(routespec):
     routespec = unquote(routespec)
     if routespec.startswith("/"):
@@ -138,8 +123,4 @@ class TraefikConfigFileHandler(object):
         :func:`atomic_writing`"""
         with atomic_writing(self.file_path) as f:
             self._dump(data, f)
-
-def persist_static_conf(file_path, static_conf_dict):
-    handler = TraefikConfigFileHandler(file_path)
-    handler.dump(static_conf_dict)
 
