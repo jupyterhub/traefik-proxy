@@ -76,44 +76,6 @@ def generate_router_rule_entry(proxy, router_alias, separator="/"):
 
     return router_rule_entry
 
-
-def generate_route_keys(proxy, routespec, separator="/"):
-    service_alias = generate_alias(routespec, "service")
-    router_alias = generate_alias(routespec, "router")
-
-    RouteKeys = namedtuple(
-        "RouteKeys",
-        [
-            "service_alias",
-            "service_url_path",
-            "router_alias",
-            "router_service_path",
-            "router_rule_path",
-        ],
-    )
-
-    if separator != ".":
-        service_url_path = generate_service_entry(proxy, service_alias, url=True)
-        router_rule_path = generate_router_rule_entry(proxy, router_alias)
-        router_service_path = generate_router_service_entry(proxy, router_alias)
-    else:
-        service_url_path = generate_service_entry(
-            proxy, service_alias, separator=separator
-        )
-        router_rule_path = generate_router_rule_entry(
-            proxy, router_alias, separator=separator
-        )
-        router_service_path = ""
-
-    return RouteKeys(
-        service_alias,
-        service_url_path,
-        router_alias,
-        router_service_path,
-        router_rule_path,
-    )
-
-
 # atomic writing adapted from jupyter/notebook 5.7
 # unlike atomic writing there, which writes the canonical path
 # and only use the temp file for recovery,
