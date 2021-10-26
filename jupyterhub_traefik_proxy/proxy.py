@@ -21,7 +21,6 @@ Route Specification:
 import json
 from os.path import abspath, dirname, join
 from subprocess import Popen, TimeoutExpired
-import asyncio.subprocess
 from urllib.parse import urlparse
 
 from traitlets import Any, Bool, Dict, Integer, Unicode, default

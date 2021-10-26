@@ -18,16 +18,13 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-import json
 import os
 import asyncio
-import string
 import escapism
 
 from traitlets import Any, default, Unicode, observe
 
 from . import traefik_utils
-from jupyterhub.proxy import Proxy
 from jupyterhub_traefik_proxy import TraefikProxy
 
 

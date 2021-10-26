@@ -1,13 +1,11 @@
 import os
 import string
 from tempfile import NamedTemporaryFile
-from traitlets import Unicode
 from urllib.parse import unquote
 
 import escapism
 
 from contextlib import contextmanager
-from collections import namedtuple
 
 
 def generate_rule(routespec):
