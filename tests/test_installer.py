@@ -21,29 +21,9 @@ def assert_deps_dir_empty(deps_dir):
     assert not os.listdir(deps_dir)
 
 
-def assert_only_traefik_existence(deps_dir):
+def assert_traefik_existence(deps_dir):
     traefik_bin = os.path.join(deps_dir, "traefik")
-    etcd_bin = os.path.join(deps_dir, "etcd")
-    etcdctl_bin = os.path.join(deps_dir, "etcdctl")
-    consul_bin = os.path.join(deps_dir, "consul")
-
     assert os.path.exists(traefik_bin)
-    assert not os.path.exists(etcd_bin)
-    assert not os.path.exists(etcdctl_bin)
-    assert not os.path.exists(consul_bin)
-
-
-def assert_binaries_existence(deps_dir):
-    traefik_bin = os.path.join(deps_dir, "traefik")
-    etcd_bin = os.path.join(deps_dir, "etcd")
-    etcdctl_bin = os.path.join(deps_dir, "etcdctl")
-    consul_bin = os.path.join(deps_dir, "consul")
-
-    assert os.path.exists(traefik_bin)
-    assert os.path.exists(etcd_bin)
-    assert os.path.exists(etcdctl_bin)
-    assert os.path.exists(consul_bin)
-
 
 def test_default_conf():
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,7 +39,7 @@ def test_install_only_traefik_default_version():
 
     try:
         subprocess.run([sys.executable, "-m", installer_module, "--traefik"])
-        assert_only_traefik_existence(default_deps_dir)
+        assert_traefik_existence(default_deps_dir)
     finally:
         cleanup(default_deps_dir)
 
@@ -70,9 +50,9 @@ def test_install_all_binaries_default_version():
 
     try:
         subprocess.run(
-            [sys.executable, "-m", installer_module, "--traefik", "--etcd", "--consul"]
+            [sys.executable, "-m", installer_module, "--traefik"]
         )
-        assert_binaries_existence(default_deps_dir)
+        assert_traefik_existence(default_deps_dir)
     finally:
         cleanup(default_deps_dir)
 
@@ -84,7 +64,7 @@ def test_output_arg_new_dir(tmpdir):
     )
 
     assert os.path.exists(deps_dir)
-    assert_only_traefik_existence(deps_dir)
+    assert_traefik_existence(deps_dir)
 
 
 def test_output_arg_existing_dir(tmpdir):
@@ -92,7 +72,7 @@ def test_output_arg_existing_dir(tmpdir):
     subprocess.run(
         [sys.executable, "-m", installer_module, "--traefik", f"--output={deps_dir}"]
     )
-    assert_only_traefik_existence(deps_dir)
+    assert_traefik_existence(deps_dir)
 
 
 def test_version(tmpdir):
@@ -105,15 +85,11 @@ def test_version(tmpdir):
             f"--output={deps_dir}",
             "--traefik",
             "--traefik-version=2.4.8",
-            "--etcd",
-            "--etcd-version=3.2.25",
-            "--consul",
-            "--consul-version=1.5.0",
         ]
     )
 
     assert os.path.exists(deps_dir)
-    assert_binaries_existence(deps_dir)
+    assert_traefik_existence(deps_dir)
 
 
 def test_linux_arm_platform(tmpdir):
@@ -130,7 +106,7 @@ def test_linux_arm_platform(tmpdir):
     )
 
     assert os.path.exists(deps_dir)
-    assert_only_traefik_existence(deps_dir)
+    assert_traefik_existence(deps_dir)
 
 
 def test_linux_amd64_platform(tmpdir):
@@ -147,7 +123,7 @@ def test_linux_amd64_platform(tmpdir):
     )
 
     assert os.path.exists(deps_dir)
-    assert_only_traefik_existence(deps_dir)
+    assert_traefik_existence(deps_dir)
 
 
 def test_mac_platform(tmpdir):
@@ -164,7 +140,7 @@ def test_mac_platform(tmpdir):
     )
 
     assert os.path.exists(deps_dir)
-    assert_only_traefik_existence(deps_dir)
+    assert_traefik_existence(deps_dir)
 
 
 def test_warning(tmpdir):
@@ -181,5 +157,5 @@ def test_warning(tmpdir):
         stderr=subprocess.STDOUT,
     )
     assert os.path.exists(deps_dir)
-    assert_only_traefik_existence(deps_dir)
+    assert_traefik_existence(deps_dir)
     assert output.decode().count("UserWarning") == 1
