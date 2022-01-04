@@ -24,7 +24,7 @@ from subprocess import Popen
 from urllib.parse import urlparse
 
 from traitlets import Any, Bool, Dict, Integer, Unicode, default
-from tornado.httpclient import AsyncHTTPClient
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 
 from jupyterhub.utils import exponential_backoff, url_path_join, new_token
 from jupyterhub.proxy import Proxy
@@ -120,7 +120,9 @@ class TraefikProxy(Proxy):
             resp = await self._traefik_api_request(path)
             data = json.loads(resp.body)
         except Exception:
-            self.log.exception("Error checking traefik api for %s %s", kind, routespec)
+            self.log.exception("Error checking traefik api for %s %s. "
+                               "Verify that 'traefik_api_*' configuration parameters are correct.", 
+                               kind, routespec)
             return False
 
         if expected not in data:
