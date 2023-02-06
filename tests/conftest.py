@@ -326,8 +326,8 @@ def configure_and_launch_traefik(kv_store, password=""):
 
 
 def enable_auth_in_etcd(password):
-    subprocess.call(["etcdctl", "user", "add", "root:" + password])
-    subprocess.call(["etcdctl", "user", "grant-role", "root", "root"])
+    subprocess.check_call(["etcdctl", "user", "add", "root:" + password])
+    subprocess.check_call(["etcdctl", "user", "grant-role", "root", "root"])
     assert (
         subprocess.check_output(["etcdctl", "auth", "enable"])
         .decode(sys.stdout.encoding)
@@ -337,7 +337,8 @@ def enable_auth_in_etcd(password):
 
 
 def disable_auth_in_etcd(password):
-    subprocess.call(["etcdctl", "user", "remove", "root"])
-    subprocess.check_output(
+    assert (subprocess.check_output(
         ["etcdctl", "--user", "root:" + password, "auth", "disable"]
-    ).decode(sys.stdout.encoding).strip() == "Authentication Disabled"
+    ).decode(sys.stdout.encoding).strip() == "Authentication Disabled")
+
+    subprocess.check_call(["etcdctl", "user", "delete", "root"])
