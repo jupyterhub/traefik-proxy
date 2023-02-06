@@ -69,7 +69,7 @@
 ## Enabling traefik-proxy in JupyterHub
 
 
-[TraefikTomlProxy](https://github.com/jupyterhub/traefik-proxy/blob/master/jupyterhub_traefik_proxy/toml.py), [TraefikEtcdProxy](https://github.com/jupyterhub/traefik-proxy/blob/master/jupyterhub_traefik_proxy/etcd.py) and [TraefikConsulProxy](https://github.com/jupyterhub/traefik-proxy/blob/master/jupyterhub_traefik_proxy/consul.py)  are custom proxy implementations that subclass [Proxy](https://github.com/jupyterhub/jupyterhub/blob/master/jupyterhub/proxy.py) and can register in JupyterHub config using `c.JupyterHub.proxy_class` entrypoint.
+[TraefikTomlProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/toml.py), [TraefikEtcdProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/etcd.py) and [TraefikConsulProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/consul.py)  are custom proxy implementations that subclass [Proxy](https://github.com/jupyterhub/jupyterhub/blob/HEAD/jupyterhub/proxy.py) and can register in JupyterHub config using `c.JupyterHub.proxy_class` entrypoint.
 
 On startup, JupyterHub will look by default for a configuration file, *jupyterhub_config.py*, in the current working directory. If the configuration file is not in the current working directory,
 you can load a specific config file and start JupyterHub using:
@@ -78,7 +78,7 @@ you can load a specific config file and start JupyterHub using:
 $ jupyterhub -f /path/to/jupyterhub_config.py
 ```
 
-There is an example configuration file [here](https://github.com/jupyterhub/traefik-proxy/blob/master/examples/jupyterhub_config.py) that configures JupyterHub to run with *TraefikEtcdProxy* as the proxy and uses dummyauthenticator and simplespawner to enable testing without administrative privileges.
+There is an example configuration file [here](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/examples/jupyterhub_config.py) that configures JupyterHub to run with *TraefikEtcdProxy* as the proxy and uses dummyauthenticator and simplespawner to enable testing without administrative privileges.
 
 In *jupyterhub_config.py*:
 
