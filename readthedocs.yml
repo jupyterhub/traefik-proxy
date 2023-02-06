@@ -1,3 +1,6 @@
+# Configuration on how ReadTheDocs (RTD) builds our documentation
+# ref: https://readthedocs.org/projects/jupyterhub-traefik-proxy
+# ref: https://docs.readthedocs.io/en/stable/config-file/v2.html
 version: 2
 
 sphinx:
