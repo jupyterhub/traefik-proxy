@@ -40,7 +40,9 @@ jobs:
           - "3.8"
           - "3.9"
           - "3.10"
-          - "3.11"
+          # 3.11 tests don't work because etcd needs grpcio 1.44,
+          # which doesn't support 3.11
+          # - "3.11"
     steps:
       # NOTE: In GitHub workflows, environment variables are set by writing
       #       assignment statements to a file. They will be set in the following
