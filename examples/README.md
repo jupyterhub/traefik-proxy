@@ -2,7 +2,7 @@
 
 Steps to follow when using a configuration example:
 
-1. install jupyterhub master, e.g.:
+1. install jupyterhub, e.g.:
     ```
     $ python3 -m pip install jupyterhub
     ```
