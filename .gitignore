@@ -1,3 +1,11 @@
+# our own .gitignore
+
+/dependencies
+*.etcd
+/traefik.toml
+
+## Below: imported standard Python gitignore
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

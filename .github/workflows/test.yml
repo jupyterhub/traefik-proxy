@@ -23,6 +23,10 @@ on:
       - "pre-commit-ci-update-config"
   workflow_dispatch:
 
+env:
+  ETCDCTL_API: "3"
+  PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+
 jobs:
   # Run "pytest tests" for various Python versions
   pytest:
@@ -35,13 +39,16 @@ jobs:
           - "3.7"
           - "3.8"
           - "3.9"
+          - "3.10"
+          # 3.11 tests don't work because etcd needs grpcio 1.44,
+          # which doesn't support 3.11
+          # - "3.11"
     steps:
       # NOTE: In GitHub workflows, environment variables are set by writing
       #       assignment statements to a file. They will be set in the following
       #       steps as if would used `export MY_ENV=my-value`.
       - name: Configure environment variables
         run: |
-          echo "ETCDCTL_API=3" >> $GITHUB_ENV
           echo "PATH=$PWD/bin:$PATH" >> $GITHUB_ENV
 
       - uses: actions/checkout@v2
@@ -72,7 +79,7 @@ jobs:
       - name: Run tests
         run: |
           # Using the "--slow-last" flag, should run the slow tests last
-          pytest -v tests --slow-last --color=yes --cov=jupyterhub_traefik_proxy
+          pytest -v tests --maxfail 3 --slow-last --color=yes --cov=jupyterhub_traefik_proxy
 
       - name: Submit codecov report
         run: |
