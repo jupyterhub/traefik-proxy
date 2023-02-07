@@ -35,14 +35,16 @@ jobs:
       # Keep running even if one variation of the job fail
       fail-fast: false
       matrix:
-        python:
-          - "3.7"
-          - "3.8"
-          - "3.9"
-          - "3.10"
+        include:
+          - python: "3.7"
+          - python: "3.8"
+            backend: "etcd"
+          - python: "3.9"
+            backend: "consul"
+          - python: "3.10"
           # 3.11 tests don't work because etcd needs grpcio 1.44,
           # which doesn't support 3.11
-          # - "3.11"
+          # - python: "3.11"
     steps:
       # NOTE: In GitHub workflows, environment variables are set by writing
       #       assignment statements to a file. They will be set in the following
@@ -59,16 +61,6 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      # Test pkg build for python 3.8
-      - name: Install requirements and build package
-        if: matrix.python == '3.8'
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
-          pip freeze
-          python -m build --sdist --wheel .
-          ls -l dist
-
       - name: Install Python dependencies
         run: |
           pip install --upgrade setuptools pip
@@ -76,10 +68,20 @@ jobs:
           python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=./bin
           pip freeze
 
+      - name: Select tests
+        run: |
+          if [[ ! -z "${{ matrix.backend }}" ]]; then
+            # select backend subset
+            echo "PYTEST_ADDOPTS=-k ${{ matrix.backend }}" >> "${GITHUB_ENV}"
+          else
+            # default: select everything _but_ the etcd/consul backend tests
+            echo "PYTEST_ADDOPTS=-k 'not etcd and not consul'" >> "${GITHUB_ENV}"
+          fi
+
       - name: Run tests
         run: |
           # Using the "--slow-last" flag, should run the slow tests last
-          pytest -v tests --maxfail 3 --slow-last --color=yes --cov=jupyterhub_traefik_proxy
+          pytest -v --durations 10 --maxfail 3 --slow-last --color=yes --cov=jupyterhub_traefik_proxy tests
 
       - name: Submit codecov report
         run: |
