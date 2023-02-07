@@ -23,7 +23,7 @@ import json
 import os
 
 from traitlets import Any, Unicode, default
-from collections import MutableMapping
+from collections.abc import MutableMapping
 
 from . import traefik_utils
 from .proxy import TraefikProxy
