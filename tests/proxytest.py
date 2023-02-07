@@ -1,5 +1,7 @@
 """Tests for the base traefik proxy"""
 
+import asyncio
+import inspect
 import copy
 import utils
 import subprocess
@@ -233,20 +235,26 @@ async def test_add_get_delete(
     )
 
     # Create existing routes
+    futures = []
     for i, spec in enumerate(existing_routes):
-        try:
-            await proxy.add_route(spec, extra_backends[i].geturl(), copy.copy(data))
-        except Exception as e:
-            raise type(e)(f"{e}\nProblem adding Route {spec}")
+        f = proxy.add_route(spec, extra_backends[i].geturl(), copy.copy(data))
+        futures.append(f)
+
+    if futures:
+        await asyncio.gather(*futures)
 
     def finalizer():
         async def cleanup():
-            """ Cleanup """
+            """Cleanup"""
+            futures = []
             for spec in existing_routes:
                 try:
-                    await proxy.delete_route(spec)
+                    f = proxy.delete_route(spec)
+                    futures.append(f)
                 except Exception:
                     pass
+            if futures:
+                await asyncio.gather(*futures)
 
         event_loop.run_until_complete(cleanup())
 
@@ -327,13 +335,17 @@ async def test_get_all_routes(proxy, launch_backend):
 
     await wait_for_services([proxy.public_url] + targets)
 
+    futures = []
     for routespec, target, data in zip(routespecs, targets, datas):
-        await proxy.add_route(routespec, target, copy.copy(data))
+        f = proxy.add_route(routespec, target, copy.copy(data))
+        futures.append(f)
+    if futures:
+        await asyncio.gather(*futures)
 
     routes = await proxy.get_all_routes()
     try:
         for route_key in routes.keys():
-            del( routes[route_key]["data"]["last_activity"] ) # CHP
+            del routes[route_key]["data"]["last_activity"]  # CHP
     except KeyError:
         pass
 
@@ -399,7 +411,9 @@ async def test_check_routes(proxy, username):
 
     users[username] = test_user = MockUser(username)
     spawner = test_user.spawners[""]
-    spawner.start()
+    f = spawner.start()
+    if inspect.isawaitable(f):
+        await f
     assert spawner.ready
     assert spawner.active
     await proxy.add_user(test_user, "")
