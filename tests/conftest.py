@@ -1,11 +1,14 @@
 """General pytest fixtures"""
 
+import asyncio
 import logging
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
 import time
+from tempfile import TemporaryDirectory
 
 import pytest
 from _pytest.mark import Mark
@@ -18,6 +21,9 @@ from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
 from jupyterhub.utils import exponential_backoff
 
 from consul.aio import Consul
+
+HERE = Path(__file__).parent.resolve()
+config_files = HERE / "config_files"
 
 class Config:
     """Namespace for repeated variables.
@@ -35,8 +41,10 @@ class Config:
     etcd_password = "secret"
     etcd_user = "root"
 
-    # Consol auth login credentials
+    # Consul auth login credentials
     consul_token = "secret"
+    consul_port = 8500
+    consul_auth_port = 8501
 
     # Traefik api auth login credentials
     traefik_api_user = "api_admin"
@@ -77,6 +85,7 @@ async def no_auth_consul_proxy(request, launch_consul):
     """
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
+        kv_url=f"http://127.0.0.1:{Config.consul_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
@@ -95,6 +104,7 @@ async def auth_consul_proxy(launch_consul_acl):
     """
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
+        kv_url=f"http://127.0.0.1:{Config.consul_auth_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         kv_password=Config.consul_token,
@@ -233,6 +243,7 @@ async def external_file_proxy_toml(launch_traefik_file):
 async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_consul):
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
+        kv_url=f"http://127.0.0.1:{Config.consul_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
@@ -244,8 +255,10 @@ async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_
 
 @pytest.fixture
 async def auth_external_consul_proxy(launch_consul_acl, configure_consul_auth, launch_traefik_consul_auth):
+    print("creating proxy")
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
+        kv_url=f"http://127.0.0.1:{Config.consul_auth_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         kv_password=Config.consul_token,
@@ -328,8 +341,8 @@ def launch_traefik_consul():
 @pytest.fixture
 def launch_traefik_consul_auth():
     extra_args = (
-        "--providers.consul.username=root",
-        "--providers.consul.password=" + Config.consul_token
+        "--providers.consul.token=" + Config.consul_token,
+        f"--providers.consul.endpoints=http://127.0.0.1:{Config.consul_auth_port}",
     )
     traefik_env = os.environ.copy()
     traefik_env.update({"CONSUL_HTTP_TOKEN": Config.consul_token})
@@ -351,6 +364,7 @@ def _launch_traefik(*extra_args, env=None):
     traefik_launch_command = (
         "traefik",
     ) + extra_args
+    print("launching", traefik_launch_command)
     proc = subprocess.Popen(traefik_launch_command, env=env)
     return proc
 
@@ -447,34 +461,60 @@ def clean_etcd():
 # Consul Launchers and configurers #
 ####################################
 
-@pytest.fixture
-async def launch_consul():
-    consul_proc = subprocess.Popen(
-        ["consul", "agent", "-dev"]
-    )
-    await _wait_for_consul()
-    yield consul_proc
-    shutdown_consul(consul_proc)
+
+@pytest.fixture(scope="module")
+def launch_consul():
+    with TemporaryDirectory() as consul_path:
+        print(f"Launching consul in {consul_path}")
+        consul_proc = subprocess.Popen(
+            [
+                "consul",
+                "agent",
+                "-dev",
+                f"-http-port={Config.consul_port}",
+            ],
+            cwd=consul_path,
+        )
+        asyncio.run(
+            _wait_for_consul(token=Config.consul_token, port=Config.consul_port)
+        )
+        yield consul_proc
+        shutdown_consul(consul_proc)
 
 
-@pytest.fixture
-async def launch_consul_acl():
-    consul_proc = subprocess.Popen([
-            "consul",
-            "agent",
-            "-advertise=127.0.0.1",
-            "-config-file=./tests/config_files/consul_config.json",
-            "-bootstrap-expect=1",
-        ]
-    )
-
-    await _wait_for_consul(token=Config.consul_token)
-    yield consul_proc
-    shutdown_consul(consul_proc, secret=Config.consul_token)
-    shutil.rmtree(os.getcwd() + "/consul.data")
 
 
-async def _wait_for_consul(token=None):
+@pytest.fixture(scope="module")
+def launch_consul_acl():
+    with TemporaryDirectory() as consul_path:
+        consul_proc = subprocess.Popen(
+            [
+                "consul",
+                "agent",
+                "-dev",
+                # the only one we care about
+                f"-http-port={Config.consul_auth_port}",
+                # the rest of these are to avoid conflicts
+                # https://developer.hashicorp.com/consul/docs/install/ports
+                "-dns-port=8610",
+                "-server-port=8310",
+                "-grpc-port=8512",
+                "-grpc-tls-port=8513",
+                "-serf-lan-port=8311",
+                "-serf-wan-port=8312",
+                f"-config-file={config_files / 'consul_config.json'}",
+                "-bootstrap-expect=1",
+            ],
+            cwd=consul_path,
+        )
+        asyncio.run(
+            _wait_for_consul(token=Config.consul_token, port=Config.consul_auth_port)
+        )
+        yield consul_proc
+        shutdown_consul(consul_proc, secret=Config.consul_token, port=Config.consul_auth_port)
+
+
+async def _wait_for_consul(token=None, **kwargs):
     """Consul takes ages to shutdown and start. Make sure it's running before
     we continue with configuring it or running tests against it.
 
@@ -483,7 +523,7 @@ async def _wait_for_consul(token=None):
     """
     async def _check_consul():
         try:
-            cli = Consul(token=token)
+            cli = Consul(token=token, **kwargs)
             index, data = await cli.kv.get('getting_any_nonexistent_key_will_do')
         except Exception as e:
             print(f"Consul not up: {e}")
@@ -508,46 +548,49 @@ def configure_consul():
 @pytest.fixture
 def configure_consul_auth():
     """Load an initial config into the consul KV store, using authentication"""
-    yield _config_consul(secret=Config.consul_token)
+    yield _config_consul(secret=Config.consul_token, port=Config.consul_auth_port)
 
 
-def _config_consul(secret=None):
+def _config_consul(secret=None, port=8500):
     proc_env = None
     if secret is not None:
         proc_env = os.environ.copy()
         proc_env.update({"CONSUL_HTTP_TOKEN": secret})
 
     consul_import_cmd = [
-        "consul", "kv", "import",
-        "@tests/config_files/traefik_consul_config.json"
+        "consul",
+        "kv",
+        "import",
+        f"-http-addr=http://127.0.0.1:{port}",
+        "@tests/config_files/traefik_consul_config.json",
     ]
 
     """
     Try storing the static config to the kv store.
     Stop if the kv store isn't ready in 60s.
     """
-    timeout = time.time() + 60
+    timeout = time.perf_counter() + 60
     while True:
-        if time.time() > timeout:
+        if time.perf_counter() > timeout:
             raise Exception("KV not ready! 60s timeout expired!")
         try:
             # Put static config from file in kv store.
             proc = subprocess.check_call(consul_import_cmd, env=proc_env)
             break
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
+            print("Error setting up consul")
             time.sleep(3)
 
 #########################################################################
 # Teardown functions                                                    #
 #########################################################################
 
-def shutdown_consul(consul_proc, secret=None):
-    # For some reason, without running `consul leave`, subsequent consul tests fail
+def shutdown_consul(consul_proc, secret=None, port=8500):
     consul_env = None
     if secret is not None:
         consul_env = os.environ.copy()
         consul_env.update({"CONSUL_HTTP_TOKEN" : secret})
-    subprocess.call(["consul", "leave"], env=consul_env)
+    subprocess.call(["consul", "leave", f"-http-addr=http://127.0.0.1:{port}"], env=consul_env)
     terminate_process(consul_proc, timeout=30)
 
 def shutdown_etcd(etcd_proc):
