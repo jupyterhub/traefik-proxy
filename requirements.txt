@@ -2,7 +2,4 @@ aiohttp
 escapism
 jupyterhub>=0.9
 passlib
-# toml is now optional, as can use yaml configuration files instead now...
 toml
-# ruamel.yaml is required by jupyterhub...
-ruamel.yaml

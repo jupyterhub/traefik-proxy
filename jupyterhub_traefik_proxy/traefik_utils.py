@@ -140,7 +140,10 @@ class TraefikConfigFileHandler(object):
     def __init__(self, file_path):
         file_ext = file_path.rsplit('.', 1)[-1]
         if file_ext == 'yaml':
-            from ruamel.yaml import YAML
+            try:
+                from ruamel.yaml import YAML
+            except ImportError:
+                raise ImportError("jupyterhub-traefik-proxy requires ruamel.yaml to use YAML config files")
             config_handler = YAML(typ="safe")
         elif file_ext == 'toml':
             import toml as config_handler
@@ -168,4 +171,3 @@ class TraefikConfigFileHandler(object):
         :func:`atomic_writing`"""
         with atomic_writing(self.file_path) as f:
             self._dump(data, f)
-
