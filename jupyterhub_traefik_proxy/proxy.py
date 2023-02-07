@@ -56,7 +56,6 @@ class TraefikProxy(Proxy):
     )
 
     traefik_log_level = Unicode(config=True, help="""traefik's log level""")
-    log_level = Unicode(config=True, help="""The Proxy's log level""")
 
     traefik_api_password = Unicode(
         config=True, help="""The password for traefik api login"""
@@ -74,7 +73,7 @@ class TraefikProxy(Proxy):
     def get_is_https(self):
         # Check if we set https
         return urlparse(self.public_url).scheme == "https"
-        
+
     # FIXME: How best to enable TLS on routers assigned to only select
     # entrypoints defined here?
     traefik_entrypoint = Unicode(
@@ -115,26 +114,6 @@ class TraefikProxy(Proxy):
                 return entrypoint["name"]
         entrypoints = [entrypoint["address"] for entrypoint in json_data]
         raise ValueError(f"No traefik entrypoint ports ({entrypoints}) match public_url: {self.public_url}!")
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if self.log_level:
-            self._set_log_level()
-
-    def _set_log_level(self):
-        import sys, logging
-        # Check we don't already have a StreamHandler
-        # and add one if necessary
-        addHandler = True
-        for handler in self.log.handlers:
-            if isinstance(handler, logging.StreamHandler):
-                addHandler = False
-        level = self.log_level
-        if addHandler:
-            self.log.setLevel(level)
-            handler = logging.StreamHandler(sys.stdout)
-            handler.setLevel(level)
-            self.log.addHandler(handler)
 
     @default("traefik_api_password")
     def _warn_empty_password(self):
@@ -303,10 +282,10 @@ class TraefikProxy(Proxy):
     async def _setup_traefik_static_config(self):
         """When should_start=True, we are in control of traefik's static configuration
         file. This sets up the entrypoints and api handler in self.static_config, and
-        then saves it to :attrib:`self.static_config_file`. 
+        then saves it to :attrib:`self.static_config_file`.
 
         Subclasses should specify any traefik providers themselves, in
-        :attrib:`self.static_config["providers"]` 
+        :attrib:`self.static_config["providers"]`
         """
         self.log.info("Setting up traefik's static config...")
 
