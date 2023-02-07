@@ -1,5 +1,6 @@
 """General pytest fixtures"""
 
+import logging
 import os
 import shutil
 import subprocess
@@ -8,6 +9,7 @@ import time
 
 import pytest
 from _pytest.mark import Mark
+from traitlets.log import get_logger
 
 from jupyterhub_traefik_proxy.etcd import TraefikEtcdProxy
 from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
@@ -79,8 +81,6 @@ async def no_auth_consul_proxy(request, launch_consul):
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
         should_start=True,
-        log_level='DEBUG',
-        traefik_log_level="DEBUG"
     )
     await proxy.start()
     yield proxy
@@ -100,7 +100,6 @@ async def auth_consul_proxy(launch_consul_acl):
         kv_password=Config.consul_token,
         check_route_timeout=45,
         should_start=True,
-        log_level='DEBUG'
     )
     await proxy.start()
     yield proxy
@@ -119,7 +118,6 @@ async def no_auth_etcd_proxy(launch_etcd, wait_for_etcd):
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
         should_start=True,
-        log_level='DEBUG'
     )
     await proxy.start()
     yield proxy
@@ -140,7 +138,6 @@ async def auth_etcd_proxy(launch_etcd_auth):
         kv_password=Config.etcd_password,
         check_route_timeout=45,
         should_start=True,
-        log_level='DEBUG'
     )
     await proxy.start()
     yield proxy
@@ -150,6 +147,16 @@ async def auth_etcd_proxy(launch_etcd_auth):
 @pytest.fixture(params=["no_auth_etcd_proxy", "auth_etcd_proxy"])
 def etcd_proxy(request):
     return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(autouse=True)
+def traitlets_log():
+    """Setup traitlets logger at debug-level
+
+    This is the logger used by all Proxy instances (via LoggingConfigurable)
+    """
+    log = get_logger()
+    log.setLevel(logging.DEBUG)
 
 
 # There must be a way to parameterise this to run on both yaml and toml files?
@@ -191,7 +198,7 @@ def _file_proxy(dynamic_config_file, **kwargs):
         traefik_api_username=Config.traefik_api_user,
         dynamic_config_file = dynamic_config_file,
         check_route_timeout=60,
-        log_level='DEBUG',
+        log_level=10,
         **kwargs
     )
 
@@ -230,7 +237,6 @@ async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
         should_start=False,
-        log_level="DEBUG"
     )
     await proxy._wait_for_static_config()
     yield proxy
@@ -245,7 +251,6 @@ async def auth_external_consul_proxy(launch_consul_acl, configure_consul_auth, l
         kv_password=Config.consul_token,
         check_route_timeout=45,
         should_start=False,
-        log_level="DEBUG"
     )
     await proxy._wait_for_static_config()
     yield proxy
@@ -259,7 +264,6 @@ async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
         should_start=False,
-        log_level="DEBUG"
     )
     await proxy._wait_for_static_config()
     yield proxy
@@ -276,7 +280,6 @@ async def auth_external_etcd_proxy(launch_etcd_auth, configure_etcd_auth, launch
         kv_username="root",
         check_route_timeout=45,
         should_start=False,
-        log_level="DEBUG"
     )
     await proxy._wait_for_static_config()
     yield proxy
@@ -426,7 +429,7 @@ def wait_for_etcd():
     """
     import etcd3
     assert (
-        "is healthy" in 
+        "is healthy" in
         subprocess.check_output(
             ["etcdctl", "endpoint", "health"],
             env=Config.etcdctl_env,
@@ -570,4 +573,3 @@ def terminate_process(proc, timeout=5):
         proc.communicate()
     finally:
         proc.wait()
-
