@@ -41,14 +41,14 @@ with examples for the three different implementations.
 ## Running tests
 
 There are some tests that use *etcdctl* command line client for etcd. Make sure
- to set environment variable `ETCDCTL_API=3` before running the tests, so that
- the v3 API to be used, e.g.:
+to set environment variable `ETCDCTL_API=3` before running the tests, so that
+the v3 API to be used, e.g.:
 
- ```
- $ export ETCDCTL_API=3
- ```
+```
+$ export ETCDCTL_API=3
+```
 
- You can then run the all the test suite from the *traefik-proxy* directory with:
+You can then run the all the test suite from the *traefik-proxy* directory with:
 
 ```
 $ pytest -v ./tests
