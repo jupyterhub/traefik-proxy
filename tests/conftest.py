@@ -341,7 +341,6 @@ def launch_traefik_consul():
 @pytest.fixture
 def launch_traefik_consul_auth():
     extra_args = (
-        "--providers.consul.token=" + Config.consul_token,
         f"--providers.consul.endpoints=http://127.0.0.1:{Config.consul_auth_port}",
     )
     traefik_env = os.environ.copy()
