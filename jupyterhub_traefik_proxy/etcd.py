@@ -19,16 +19,14 @@ Route Specification:
 # Distributed under the terms of the Modified BSD License.
 
 from concurrent.futures import ThreadPoolExecutor
-import json
-import os
+import escapism
 from urllib.parse import urlparse
 
 from tornado.concurrent import run_on_executor
 from traitlets import Any, default, Unicode
 
 from jupyterhub.utils import maybe_future
-from . import traefik_utils
-from jupyterhub_traefik_proxy import TKvProxy
+from .kv_proxy import TKvProxy
 
 
 class TraefikEtcdProxy(TKvProxy):
@@ -36,7 +34,9 @@ class TraefikEtcdProxy(TKvProxy):
 
     executor = Any()
 
-    kv_name = "etcdv3"
+    @default("provider_name")
+    def _provider_name(self):
+        return "etcd"
 
     etcd_client_ca_cert = Unicode(
         config=True,
@@ -76,31 +76,23 @@ class TraefikEtcdProxy(TKvProxy):
             import etcd3
         except ImportError:
             raise ImportError("Please install etcd3 package to use traefik-proxy with etcd3")
+        kwargs = {
+            'host': etcd_service.hostname,
+            'port': etcd_service.port,
+            'ca_cert': self.etcd_client_ca_cert,
+            'cert_cert': self.etcd_client_cert_crt,
+            'cert_key': self.etcd_client_cert_key,
+        }
         if self.kv_password:
-            return etcd3.client(
-                host=str(etcd_service.hostname),
-                port=etcd_service.port,
-                user=self.kv_username,
-                password=self.kv_password,
-                ca_cert=self.etcd_client_ca_cert,
-                cert_cert=self.etcd_client_cert_crt,
-                cert_key=self.etcd_client_cert_key,
-            )
-        return etcd3.client(
-            host=str(etcd_service.hostname),
-            port=etcd_service.port,
-            ca_cert=self.etcd_client_ca_cert,
-            cert_cert=self.etcd_client_cert_crt,
-            cert_key=self.etcd_client_cert_key,
-        )
+            kwargs.update({
+                'user': self.kv_username,
+                'password': self.kv_password
+            })
+        return etcd3.client(**kwargs)
 
-    @default("kv_traefik_prefix")
-    def _default_kv_traefik_prefix(self):
-        return "/traefik/"
-
-    @default("kv_jupyterhub_prefix")
-    def _default_kv_jupyterhub_prefix(self):
-        return "/jupyterhub/"
+    def _clean_resources(self):
+        super()._clean_resources()
+        self.kv_client.close()
 
     @run_on_executor
     def _etcd_transaction(self, success_actions):
@@ -120,30 +112,56 @@ class TraefikEtcdProxy(TKvProxy):
         return routes
 
     def _define_kv_specific_static_config(self):
-        self.static_config["etcd"] = {
-            "username": self.kv_username,
-            "password": self.kv_password,
-            "endpoint": str(urlparse(self.kv_url).hostname)
-            + ":"
-            + str(urlparse(self.kv_url).port),
-            "prefix": self.kv_traefik_prefix,
-            "useapiv3": True,
-            "watch": True,
-        }
+        self.log.debug("Setting up the etcd provider in the static config")
+        url = urlparse(self.kv_url)
+        self.static_config.update({"providers" : {
+            "etcd" : {
+                "endpoints": [url.netloc],
+                "rootKey": self.kv_traefik_prefix,
+            }
+        } })
+        if self.kv_username and self.kv_password:
+            self.static_config["providers"]["etcd"].update({
+                "username": self.kv_username,
+                "password": self.kv_password
+            })
 
     async def _kv_atomic_add_route_parts(
         self, jupyterhub_routespec, target, data, route_keys, rule
     ):
+        # e.g. jupyterhub_target = 'jupyter/targets/{http://foobar.com}'
+        # where {http://foobar.com} is escaped
+        jupyterhub_target = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
+        )
+        put = self.kv_client.transactions.put
         success = [
-            self.kv_client.transactions.put(jupyterhub_routespec, target),
-            self.kv_client.transactions.put(target, data),
-            self.kv_client.transactions.put(route_keys.backend_url_path, target),
-            self.kv_client.transactions.put(route_keys.backend_weight_path, "1"),
-            self.kv_client.transactions.put(
-                route_keys.frontend_backend_path, route_keys.backend_alias
-            ),
-            self.kv_client.transactions.put(route_keys.frontend_rule_path, rule),
+            # e.g. jupyter/routers/router-1 = {target}
+            put(jupyterhub_routespec, target),
+            # e.g. jupyter/targets/{escaped_target} = {data}
+            put(jupyterhub_target, data),
+            # e.g. http/services/service-1/loadBalancer/servers/server1 = target
+            put(route_keys.service_url_path, target),
+            # e.g. http/routers/router-1/service = service-1
+            put(route_keys.router_service_path, route_keys.service_alias),
+            # e.g. http/routers/router-1/rule = {rule}
+            put(route_keys.router_rule_path, rule),
         ]
+        # Optionally enable TLS on this router
+        if self.is_https:
+            tls_path = self.kv_separator.join(
+                ["traefik", "http", "routers", route_keys.router_alias, "tls"]
+            )
+            success.append(put(tls_path, ""))
+
+        # Specify the entrypoint that jupyterhub's router should bind to
+        ep_path = self.kv_separator.join(
+            ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
+        )
+        if not self.traefik_entrypoint:
+            self.traefik_entrypoint = await self._get_traefik_entrypoint()
+        success.append(put(ep_path, self.traefik_entrypoint))
+                
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response
 
@@ -151,26 +169,37 @@ class TraefikEtcdProxy(TKvProxy):
         value = await maybe_future(self._etcd_get(jupyterhub_routespec))
         if value is None:
             self.log.warning(
-                "Route %s doesn't exist. Nothing to delete", jupyterhub_routespec
+                f"Route {jupyterhub_routespec} doesn't exist. Nothing to delete"
             )
             return True, None
 
-        target = value.decode()
+        jupyterhub_target = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "targets", escapism.escape(value.decode())]
+        )
 
+        delete = self.kv_client.transactions.delete
         success = [
-            self.kv_client.transactions.delete(jupyterhub_routespec),
-            self.kv_client.transactions.delete(target),
-            self.kv_client.transactions.delete(route_keys.backend_url_path),
-            self.kv_client.transactions.delete(route_keys.backend_weight_path),
-            self.kv_client.transactions.delete(route_keys.frontend_backend_path),
-            self.kv_client.transactions.delete(route_keys.frontend_rule_path),
+            delete(jupyterhub_routespec),
+            delete(jupyterhub_target),
+            delete(route_keys.service_url_path),
+            delete(route_keys.router_service_path),
+            delete(route_keys.router_rule_path),
+            delete(self.kv_separator.join(
+                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
+            ))
         ]
+        # If it was enabled, delete TLS on the router too
+        if self.is_https:
+            success.append(delete(self.kv_separator.join(
+                ["traefik", "http", "routers", route_keys.router_alias, "tls"]
+            )))
+
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response
 
     async def _kv_get_target(self, jupyterhub_routespec):
         value = await maybe_future(self._etcd_get(jupyterhub_routespec))
-        if value == None:
+        if value is None:
             return None
         return value.decode()
 
@@ -182,15 +211,30 @@ class TraefikEtcdProxy(TKvProxy):
 
     async def _kv_get_route_parts(self, kv_entry):
         key = kv_entry[1].key.decode()
-        value = kv_entry[0]
+        value = kv_entry[0].decode()
 
-        # Strip the "/jupyterhub" prefix from the routespec
-        routespec = key.replace(self.kv_jupyterhub_prefix, "")
-        target = value.decode()
-        data = await self._kv_get_data(target)
+        # Strip the "/jupyterhub/routes/" prefix from the routespec and unescape it
+        sep = self.kv_separator
+        route_prefix = sep.join([self.kv_jupyterhub_prefix, "routes" + sep])
+        target_prefix = sep.join([self.kv_jupyterhub_prefix, "targets"])
+        routespec = escapism.unescape(key.replace(route_prefix, "", 1))
+        etcd_target = sep.join([target_prefix, escapism.escape(value)])
+        target = escapism.unescape(etcd_target.replace(target_prefix + sep, "", 1))
+        data = await self._kv_get_data(etcd_target)
 
         return routespec, target, data
 
     async def _kv_get_jupyterhub_prefixed_entries(self):
-        routes = await maybe_future(self._etcd_get_prefix(self.kv_jupyterhub_prefix))
+        sep = self.kv_separator
+        routespecs_prefix = sep.join([self.kv_jupyterhub_prefix, "routes" + sep])
+        routes = await maybe_future(self._etcd_get_prefix(routespecs_prefix))
         return routes
+
+    async def persist_dynamic_config(self):
+        data = self.flatten_dict_for_kv(self.dynamic_config, prefix=self.kv_traefik_prefix)
+        transactions = []
+        for k, v in data.items():
+            transactions.append(self.kv_client.transactions.put(k, v))
+        status, response = await maybe_future(self._etcd_transaction(transactions))
+        return status, response
+

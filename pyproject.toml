@@ -11,5 +11,6 @@ exclude = '''
 | _version\.py
 | versioneer\.py
 | docs/source/conf.py
+| docs/sphinxext/autodoc_traits.py
 )
 '''

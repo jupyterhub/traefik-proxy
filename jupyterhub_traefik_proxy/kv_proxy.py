@@ -18,13 +18,15 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
+import escapism
 import json
 import os
 
-from traitlets import Any, Unicode
+from traitlets import Any, Unicode, default
+from collections.abc import MutableMapping
 
 from . import traefik_utils
-from jupyterhub_traefik_proxy import TraefikProxy
+from .proxy import TraefikProxy
 
 
 class TKvProxy(TraefikProxy):
@@ -36,8 +38,6 @@ class TKvProxy(TraefikProxy):
 
     kv_client = Any()
     # Key-value store client
-
-    kv_name = Unicode(config=False, help="""The name of the key value store""")
 
     kv_username = Unicode(
         config=True, help="""The username for key value store login"""
@@ -59,6 +59,23 @@ class TKvProxy(TraefikProxy):
         help="""The key value store key prefix for traefik dynamic configuration""",
     )
 
+    kv_separator = Unicode(
+        config=True,
+        help="""The separator used for the path in the KV store"""
+    )
+
+    @default("kv_traefik_prefix")
+    def _default_kv_traefik_prefix(self):
+        return "traefik"
+
+    @default("kv_jupyterhub_prefix")
+    def _default_kv_jupyterhub_prefix(self):
+        return "jupyterhub"
+
+    @default("kv_separator")
+    def _default_kv_separator(self):
+        return "/"
+
     def _define_kv_specific_static_config(self):
         """Define the traefik static configuration that configures
         traefik's communication with the key-value store.
@@ -68,8 +85,8 @@ class TKvProxy(TraefikProxy):
         **Subclasses must define this method**
         if the proxy is to be started by the Hub.
 
-        In order to be picked up by the proxy, the static configuration
-        must be stored into `proxy.static_config` dict under the `kv_name` key.
+        In order to be picked up by the proxy, the static configuration must be
+        stored into `proxy.static_config` dict under the `provider_name` key.
         """
         raise NotImplementedError()
 
@@ -87,12 +104,12 @@ class TKvProxy(TraefikProxy):
         are expected to have the following structure:
         [ key: jupyterhub_routespec            , value: target ]
         [ key: target                          , value: data   ]
-        [ key: route_keys.backend_url_path     , value: target ]
-        [ key: route_keys.frontend_rule_path   , value: rule   ]
-        [ key: route_keys.frontend_backend_path, value:
-                                       route_keys.backend_alias]
-        [ key: route_keys.backend_weight_path  , value: w(int) ]
-            (where `w` is the weight of the backend to be used during load balancing)
+        [ key: route_keys.service_url_path     , value: target ]
+        [ key: route_keys.router_rule_path   , value: rule   ]
+        [ key: route_keys.router_service_path, value:
+                                       route_keys.service_alias]
+        [ key: route_keys.service_weight_path  , value: w(int) ]
+            (where `w` is the weight of the service to be used during load balancing)
 
         Returns:
             result (tuple):
@@ -113,10 +130,10 @@ class TKvProxy(TraefikProxy):
         The keys associated with a route are:
             jupyterhub_routespec,
             target,
-            route_keys.backend_url_path,
-            route_keys.frontend_rule_path,
-            route_keys.frontend_backend_path,
-            route_keys.backend_weight_path,
+            route_keys.service_url_path,
+            route_keys.router_rule_path,
+            route_keys.router_service_path,
+            route_keys.service_weight_path,
 
         Returns:
             result (tuple):
@@ -152,8 +169,8 @@ class TKvProxy(TraefikProxy):
         from the key-value store given a `kv_entry`.
 
         A `kv_entry` is a key-value store entry where the key starts with
-        `proxy.jupyterhub_prefix`. It is expected that only the routespecs
-        will be prefixed with `proxy.jupyterhub_prefix` when added to the kv store.
+        `proxy.kv_jupyterhub_prefix`. It is expected that only the routespecs
+        will be prefixed with `proxy.kv_jupyterhub_prefix` when added to the kv store.
 
         **Subclasses must define this method**
 
@@ -168,15 +185,15 @@ class TKvProxy(TraefikProxy):
 
     async def _kv_get_jupyterhub_prefixed_entries(self):
         """Retrive from the kv store all the key-value pairs where the key starts with
-        `proxy.jupyterhub_prefix`.
-        It is expected that only the routespecs will be prefixed with `proxy.jupyterhub_prefix`
+        `proxy.kv_jupyterhub_prefix`.
+        It is expected that only the routespecs will be prefixed with `proxy.kv_jupyterhub_prefix`
         when added to the kv store.
 
         **Subclasses must define this method**
 
         Returns:
             'routes': A list of key-value store entries where the keys start
-                with `proxy.jupyterhub_prefix`.
+                with `proxy.kv_jupyterhub_prefix`.
         """
 
         raise NotImplementedError()
@@ -184,42 +201,25 @@ class TKvProxy(TraefikProxy):
     def _clean_resources(self):
         try:
             if self.should_start:
-                os.remove(self.toml_static_config_file)
+                os.remove(self.static_config_file)
         except:
             self.log.error("Failed to remove traefik's configuration files")
             raise
 
-    def _start_traefik(self):
-        self.log.info("Starting traefik...")
-        try:
-            self._launch_traefik(config_type=self.kv_name)
-        except FileNotFoundError as e:
-            self.log.error(
-                "Failed to find traefik \n"
-                "The proxy can be downloaded from https://github.com/containous/traefik/releases/download."
-            )
-            raise
-
     async def _setup_traefik_static_config(self):
-        await super()._setup_traefik_static_config()
         self._define_kv_specific_static_config()
-        try:
-            traefik_utils.persist_static_conf(
-                self.toml_static_config_file, self.static_config
-            )
-        except IOError:
-            self.log.exception("Couldn't set up traefik's static config.")
-            raise
-        except:
-            self.log.error("Couldn't set up traefik's static config. Unexpected error:")
-            raise
+        await super()._setup_traefik_static_config()
+
+    async def _setup_traefik_dynamic_config(self):
+        await super()._setup_traefik_dynamic_config()
+        await self.persist_dynamic_config()
 
     async def start(self):
         """Start the proxy.
         Will be called during startup if should_start is True.
         """
         await super().start()
-        await self._wait_for_static_config(provider=self.kv_name)
+        await self._wait_for_static_config()
 
     async def stop(self):
         """Stop the proxy.
@@ -241,14 +241,14 @@ class TKvProxy(TraefikProxy):
         Will raise an appropriate Exception (FIXME: find what?) if the route could
         not be added.
 
-        This proxy implementation prefixes the routespec with `proxy.jupyterhub_prefix` when
+        This proxy implementation prefixes the routespec with `proxy.kv_jupyterhub_prefix` when
         adding it to the kv store in orde to associate the fact that the route came from JupyterHub.
         Everything traefik related is prefixed with `proxy.traefik_prefix`.
         """
-        self.log.info("Adding route for %s to %s.", routespec, target)
+        self.log.debug("Adding route for %s to %s.", routespec, target)
 
-        routespec = self._routespec_to_traefik_path(routespec)
-        route_keys = traefik_utils.generate_route_keys(self, routespec)
+        routespec = self.validate_routespec(routespec)
+        route_keys = traefik_utils.generate_route_keys(self, routespec, separator=self.kv_separator)
 
         # Store the data dict passed in by JupyterHub
         data = json.dumps(data)
@@ -256,7 +256,9 @@ class TKvProxy(TraefikProxy):
         rule = traefik_utils.generate_rule(routespec)
 
         # To be able to delete the route when only routespec is provided
-        jupyterhub_routespec = self.kv_jupyterhub_prefix + routespec
+        jupyterhub_routespec = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
+        )
 
         status, response = await self._kv_atomic_add_route_parts(
             jupyterhub_routespec, target, data, route_keys, rule
@@ -273,12 +275,12 @@ class TKvProxy(TraefikProxy):
                 raise
         if status:
             self.log.info(
-                "Added backend %s with the alias %s.", target, route_keys.backend_alias
+                "Added service %s with the alias %s.", target, route_keys.service_alias
             )
             self.log.info(
-                "Added frontend %s for backend %s with the following routing rule %s.",
-                route_keys.frontend_alias,
-                route_keys.backend_alias,
+                "Added router %s for service %s with the following routing rule %s.",
+                route_keys.router_alias,
+                route_keys.service_alias,
                 routespec,
             )
         else:
@@ -286,15 +288,17 @@ class TKvProxy(TraefikProxy):
                 "Couldn't add route for %s. Response: %s", routespec, response
             )
 
-        await self._wait_for_route(routespec, provider=self.kv_name)
+        await self._wait_for_route(routespec)
 
     async def delete_route(self, routespec):
         """Delete a route and all the traefik related info associated given a routespec,
         (if it exists).
         """
-        routespec = self._routespec_to_traefik_path(routespec)
-        jupyterhub_routespec = self.kv_jupyterhub_prefix + routespec
-        route_keys = traefik_utils.generate_route_keys(self, routespec)
+        routespec = self.validate_routespec(routespec)
+        jupyterhub_routespec = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
+        )
+        route_keys = traefik_utils.generate_route_keys(self, routespec, separator=self.kv_separator)
 
         status, response = await self._kv_atomic_delete_route_parts(
             jupyterhub_routespec, route_keys
@@ -324,7 +328,7 @@ class TKvProxy(TraefikProxy):
 
         for kv_entry in routes:
             traefik_routespec, target, data = await self._kv_get_route_parts(kv_entry)
-            routespec = self._routespec_from_traefik_path(traefik_routespec)
+            routespec = self.validate_routespec(traefik_routespec)
             all_routes[routespec] = {
                 "routespec": routespec,
                 "target": target,
@@ -354,16 +358,74 @@ class TKvProxy(TraefikProxy):
             None: if there are no routes matching the given routespec
         """
         routespec = self.validate_routespec(routespec)
-        traefik_routespec = self._routespec_to_traefik_path(routespec)
-        jupyterhub_routespec = self.kv_jupyterhub_prefix + traefik_routespec
+        jupyterhub_routespec = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
+        )
 
         target = await self._kv_get_target(jupyterhub_routespec)
         if target is None:
             return None
-        data = await self._kv_get_data(target)
+        traefik_target = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
+        )
+        data = await self._kv_get_data(traefik_target)
 
         return {
             "routespec": routespec,
             "target": target,
             "data": None if data is None else json.loads(data),
         }
+
+    def flatten_dict_for_kv(self, data, prefix='traefik'):
+        """Flatten a dictionary of `data` for storage in the KV store,
+        prefixing each key with `prefix` and joining each key with
+        :attr:`TKvProxy.kv_separator`.
+
+        If the final value is a :class:`list`, then the provided bottom-level key
+        shall be appended with an incrementing numeric number, in the style
+        that is used by traefik's KV store, e.g.
+
+        .. code-block::
+
+            flatten_dict_for_kv({
+                'x' : {
+                    'y' : {
+                        'z': 'a'
+                    }
+                }, {
+                    'foo': 'bar'
+                },
+                'baz': [ 'a', 'b', 'c' ]
+            })
+
+        :return: The flattened dictionary
+        :rtype: dict
+
+        e.g.
+
+        .. code-block::
+
+            {
+                 'traefik/x/y/z' : 'a',
+                 'traefik/x/foo': 'bar',
+                 'traefik/baz/0': 'a',
+                 'traefik/baz/1': 'b',
+                 'traefik/baz/2': 'c',
+            }
+
+        Inspired by `this answer on StackOverflow <https://stackoverflow.com/a/6027615>`_
+        """
+        sep = self.kv_separator
+        items = {}
+        for k, v in data.items():
+            new_key = prefix + sep + k if prefix else k
+            if isinstance(v, MutableMapping):
+                items.update(self.flatten_dict_for_kv(v, prefix=new_key))
+            elif isinstance(v, str):
+                items.update({new_key: v})
+            elif isinstance(v, list):
+                for n, item in enumerate(v):
+                    items.update({ f"{new_key}{sep}{n}" : item })
+            else:
+                raise ValueError(f"Cannot upload {v} of type {type(v)} to etcd store")
+        return items

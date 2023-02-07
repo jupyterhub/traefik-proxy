@@ -20,6 +20,9 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
 import websockets
 
 
+import pprint
+pp = pprint.PrettyPrinter(indent=2)
+
 class MockApp:
     def __init__(self):
         self.hub = Hub(routespec="/")
@@ -73,6 +76,13 @@ class MockUser(User):
     def _new_spawner(self, spawner_name, **kwargs):
         return MockSpawner(spawner_name, user=self, **kwargs)
 
+def assert_equal(value, expected):
+    try:
+        assert value == expected
+    except AssertionError:
+        pp.pprint({'value': value})
+        pp.pprint({"expected": expected})
+        raise
 
 @pytest.fixture
 def launch_backend():
@@ -81,14 +91,16 @@ def launch_backend():
 
     def _launch_backend(port, proto="http"):
         backend = subprocess.Popen(
-            [sys.executable, dummy_server_path, str(port), proto], stdout=None
+            [sys.executable, dummy_server_path, str(port), proto]
         )
         running_backends.append(backend)
 
     yield _launch_backend
 
     for proc in running_backends:
-        proc.kill()
+        proc.terminate()
+    for proc in running_backends:
+        proc.communicate()
     for proc in running_backends:
         proc.wait()
 
@@ -189,11 +201,13 @@ async def test_add_get_delete(
 
         if not expect_value_error(spec):
             try:
-                del route["data"]["last_activity"]  # CHP
+                del( route["data"]["last_activity"] )  # CHP
+            except TypeError as e:
+                raise TypeError(f"{e}\nRoute got:{route}")
             except KeyError:
                 pass
 
-            assert route == expected_output(spec, backend.geturl())
+            assert_equal(route, expected_output(spec, backend.geturl()))
 
             # Test the actual routing
             responding_backend1 = await utils.get_responding_backend_port(
@@ -202,10 +216,8 @@ async def test_add_get_delete(
             responding_backend2 = await utils.get_responding_backend_port(
                 proxy_url, normalize_spec(spec) + "something"
             )
-            assert (
-                responding_backend1 == backend.port
-                and responding_backend2 == backend.port
-            )
+            assert_equal(responding_backend1, backend.port)
+            assert_equal(responding_backend2, backend.port)
 
     for i, spec in enumerate(existing_routes, start=1):
         backend = default_backend._replace(
@@ -224,8 +236,8 @@ async def test_add_get_delete(
     for i, spec in enumerate(existing_routes):
         try:
             await proxy.add_route(spec, extra_backends[i].geturl(), copy.copy(data))
-        except Exception:
-            pass
+        except Exception as e:
+            raise type(e)(f"{e}\nProblem adding Route {spec}")
 
     def finalizer():
         async def cleanup():
@@ -256,7 +268,7 @@ async def test_add_get_delete(
 
     # Test that deleted route does not exist anymore
     if not expect_value_error(routespec):
-        assert route == None
+        assert_equal(route, None)
 
         async def _wait_for_deletion():
             deleted = 0
@@ -321,11 +333,11 @@ async def test_get_all_routes(proxy, launch_backend):
     routes = await proxy.get_all_routes()
     try:
         for route_key in routes.keys():
-            del routes[route_key]["data"]["last_activity"]  # CHP
+            del( routes[route_key]["data"]["last_activity"] ) # CHP
     except KeyError:
         pass
 
-    assert routes == expected_output
+    assert_equal(routes, expected_output)
 
 
 async def test_host_origin_headers(proxy, launch_backend):
@@ -364,11 +376,12 @@ async def test_host_origin_headers(proxy, launch_backend):
         req_url,
         method="GET",
         headers={"Host": expected_host_header, "Origin": expected_origin_header},
+        validate_cert=False
     )
     resp = await AsyncHTTPClient().fetch(req)
 
-    assert resp.headers["Host"] == expected_host_header
-    assert resp.headers["Origin"] == expected_origin_header
+    assert_equal(resp.headers["Host"], expected_host_header)
+    assert_equal(resp.headers["Origin"], expected_origin_header)
 
 
 @pytest.mark.parametrize("username", ["zoe", "50fia", "秀樹", "~TestJH", "has@"])
@@ -382,7 +395,7 @@ async def test_check_routes(proxy, username):
     # run initial check first, to ensure that `/` is in the routes
     await proxy.check_routes(users, services)
     routes = await proxy.get_all_routes()
-    assert sorted(routes) == ["/"]
+    assert_equal(sorted(routes), ["/"])
 
     users[username] = test_user = MockUser(username)
     spawner = test_user.spawners[""]
@@ -410,10 +423,11 @@ async def test_check_routes(proxy, username):
     assert test_user.proxy_spec in after
 
     # check that before and after state are the same
-    assert before == after
+    assert_equal(before, after)
 
 
 async def test_websockets(proxy, launch_backend):
+    import ssl
     routespec = "/user/username/"
     target = "http://127.0.0.1:9000"
     data = {}
@@ -424,14 +438,14 @@ async def test_websockets(proxy, launch_backend):
     launch_backend(default_backend_port, "ws")
 
     await exponential_backoff(
-        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
+        utils.check_host_up, "Traefik not reacheable", ip="127.0.0.1", port=traefik_port
     )
 
     # Check if default backend is reacheable
     await exponential_backoff(
         utils.check_host_up,
         "Backend not reacheable",
-        ip="localhost",
+        ip="127.0.0.1",
         port=default_backend_port,
     )
     # Add route to default_backend
@@ -441,9 +455,16 @@ async def test_websockets(proxy, launch_backend):
     if proxy.public_url.endswith("/"):
         public_url = proxy.public_url[:-1]
 
-    req_url = "ws://" + urlparse(proxy.public_url).netloc + routespec
+    if proxy.is_https:
+        kwargs = {'ssl': ssl._create_unverified_context()}
+        scheme = "wss://"
+    else:
+        kwargs = {}
+        scheme = "ws://"
+    req_url = scheme + urlparse(proxy.public_url).netloc + routespec
 
-    async with websockets.connect(req_url) as websocket:
+    # Don't validate the ssl certificate, it's self-signed by traefik
+    async with websockets.connect(req_url, **kwargs) as websocket:
         port = await websocket.recv()
 
     assert port == str(default_backend_port)

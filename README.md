@@ -19,7 +19,7 @@ depending on how traefik store its routing configuration.
 
 For **smaller**, single-node deployments:
 
-* TraefikTomlProxy
+* TraefikFileProviderProxy
 
 For **distributed** setups:
 
@@ -27,17 +27,19 @@ For **distributed** setups:
 * TraefikConsulProxy
 
 ## Installation
+
 The [documentation](https://jupyterhub-traefik-proxy.readthedocs.io) contains a
 [complete installation
 guide](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/install.html)
 with examples for the three different implementations.
 
-* [For TraefikTomlProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/toml.html#example-setup)
+* [For TraefikFileProviderProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/file.html#example-setup)
 * [For TraefikEtcdProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup)
 * [For TraefikConsulProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/consul.html#example-setup)
 
 
 ## Running tests
+
 There are some tests that use *etcdctl* command line client for etcd. Make sure
 to set environment variable `ETCDCTL_API=3` before running the tests, so that
 the v3 API to be used, e.g.:

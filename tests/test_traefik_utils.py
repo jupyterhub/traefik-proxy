@@ -26,11 +26,12 @@ def test_roundtrip_routes():
         },
     }
 
-    file = "test_roudtrip.toml"
-    open(file, "a").close()
-    traefik_utils.persist_routes(file, routes)
-    reloaded = traefik_utils.load_routes(file)
-    os.remove(file)
+    file_name = "test_roudtrip.toml"
+    config_handler = traefik_utils.TraefikConfigFileHandler(file_name)
+    config_handler.atomic_dump(routes)
+    reloader = traefik_utils.TraefikConfigFileHandler(file_name)
+    reloaded = reloader.load()
+    os.remove(file_name)
     assert reloaded == routes
 
 

@@ -69,7 +69,7 @@
 ## Enabling traefik-proxy in JupyterHub
 
 
-[TraefikTomlProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/toml.py), [TraefikEtcdProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/etcd.py) and [TraefikConsulProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/consul.py)  are custom proxy implementations that subclass [Proxy](https://github.com/jupyterhub/jupyterhub/blob/HEAD/jupyterhub/proxy.py) and can register in JupyterHub config using `c.JupyterHub.proxy_class` entrypoint.
+[TraefikFileProviderProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/fileprovider.py), [TraefikEtcdProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/etcd.py) and [TraefikConsulProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/consul.py)  are custom proxy implementations that subclass [Proxy](https://github.com/jupyterhub/jupyterhub/blob/HEAD/jupyterhub/proxy.py) and can register in JupyterHub config using `c.JupyterHub.proxy_class` entrypoint.
 
 On startup, JupyterHub will look by default for a configuration file, *jupyterhub_config.py*, in the current working directory. If the configuration file is not in the current working directory,
 you can load a specific config file and start JupyterHub using:
@@ -83,8 +83,8 @@ There is an example configuration file [here](https://github.com/jupyterhub/trae
 In *jupyterhub_config.py*:
 
 ```
-c.JupyterHub.proxy_class = "traefik_toml"
-# will configure JupyterHub to run with TraefikTomlProxy
+c.JupyterHub.proxy_class = "traefik_file"
+# will configure JupyterHub to run with TraefikFileProviderProxy
 ```
 
 ```
@@ -110,9 +110,9 @@ c.JupyterHub.proxy_class = "traefik_consul"
     The port on which traefik-proxy's api will run, as well as the username and password used for authenticating, can be passed to the proxy through `jupyterhub_config.py`, e.g.:
 
     ```
-    c.TraefikTomlProxy.traefik_api_url = "http://127.0.0.1:8099"
-    c.TraefikTomlProxy.traefik_api_password = "admin"
-    c.TraefikTomlProxy.traefik_api_username = "admin"
+    c.TraefikFileProviderProxy.traefik_api_url = "http://127.0.0.1:8099"
+    c.TraefikFileProviderProxy.traefik_api_password = "admin"
+    c.TraefikFileProviderProxy.traefik_api_username = "admin"
     ```
     Check out TraefikProxy's **API Reference** for more configuration options.
     <br/><br/>

@@ -5,7 +5,6 @@ from traitlets import Unicode
 from urllib.parse import unquote
 
 import escapism
-import toml
 
 from contextlib import contextmanager
 from collections import namedtuple
@@ -14,8 +13,8 @@ from collections import namedtuple
 class KVStorePrefix(Unicode):
     def validate(self, obj, value):
         u = super().validate(obj, value)
-        if not u.endswith("/"):
-            u = u + "/"
+        if u.endswith("/"):
+            u = u.rstrip("/")
 
         proxy_class = type(obj).__name__
         if "Consul" in proxy_class and u.startswith("/"):
@@ -28,12 +27,11 @@ def generate_rule(routespec):
     routespec = unquote(routespec)
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
-        rule = "PathPrefix:" + routespec
+        rule = f"PathPrefix(`{routespec}`)"
     else:
         # Host-based routing, e.g. host.tld/proxy/path/
         host, path_prefix = routespec.split("/", 1)
-        path_prefix = "/" + path_prefix
-        rule = "Host:" + host + ";PathPrefix:" + path_prefix
+        rule = f"Host(`{host}`) && PathPrefix(`/{path_prefix}`)"
     return rule
 
 
@@ -42,75 +40,69 @@ def generate_alias(routespec, server_type=""):
     return server_type + "_" + escapism.escape(routespec, safe=safe)
 
 
-def generate_backend_entry(
-    proxy, backend_alias, separator="/", url=False, weight=False
-):
-    backend_entry = ""
-    if separator == "/":
-        backend_entry = proxy.kv_traefik_prefix
-    backend_entry += separator.join(["backends", backend_alias, "servers", "server1"])
-    if url:
-        backend_entry += separator + "url"
-    elif weight:
-        backend_entry += separator + "weight"
-
-    return backend_entry
-
-
-def generate_frontend_backend_entry(proxy, frontend_alias):
-    return proxy.kv_traefik_prefix + "frontends/" + frontend_alias + "/backend"
-
-
-def generate_frontend_rule_entry(proxy, frontend_alias, separator="/"):
-    frontend_rule_entry = separator.join(
-        ["frontends", frontend_alias, "routes", "test"]
+def generate_service_entry( proxy, service_alias, separator="/", url=False):
+    service_entry = separator.join(
+        ["http", "services", service_alias, "loadBalancer", "servers", "server1"]
     )
     if separator == "/":
-        frontend_rule_entry = (
-            proxy.kv_traefik_prefix + frontend_rule_entry + separator + "rule"
+        service_entry = proxy.kv_traefik_prefix + separator + service_entry
+    if url:
+        service_entry += separator + "url"
+    return service_entry
+
+
+def generate_router_service_entry(proxy, router_alias):
+    return "/".join(
+        [proxy.kv_traefik_prefix, "http", "routers", router_alias, "service"]
+    )
+
+
+def generate_router_rule_entry(proxy, router_alias, separator="/"):
+    router_rule_entry = separator.join(
+        ["http", "routers", router_alias]
+    )
+    if separator == "/":
+        router_rule_entry = separator.join(
+            [proxy.kv_traefik_prefix, router_rule_entry, "rule"]
         )
 
-    return frontend_rule_entry
+    return router_rule_entry
 
 
 def generate_route_keys(proxy, routespec, separator="/"):
-    backend_alias = generate_alias(routespec, "backend")
-    frontend_alias = generate_alias(routespec, "frontend")
+    service_alias = generate_alias(routespec, "service")
+    router_alias = generate_alias(routespec, "router")
 
     RouteKeys = namedtuple(
         "RouteKeys",
         [
-            "backend_alias",
-            "backend_url_path",
-            "backend_weight_path",
-            "frontend_alias",
-            "frontend_backend_path",
-            "frontend_rule_path",
+            "service_alias",
+            "service_url_path",
+            "router_alias",
+            "router_service_path",
+            "router_rule_path",
         ],
     )
 
     if separator != ".":
-        backend_url_path = generate_backend_entry(proxy, backend_alias, url=True)
-        frontend_rule_path = generate_frontend_rule_entry(proxy, frontend_alias)
-        backend_weight_path = generate_backend_entry(proxy, backend_alias, weight=True)
-        frontend_backend_path = generate_frontend_backend_entry(proxy, frontend_alias)
+        service_url_path = generate_service_entry(proxy, service_alias, url=True)
+        router_rule_path = generate_router_rule_entry(proxy, router_alias)
+        router_service_path = generate_router_service_entry(proxy, router_alias)
     else:
-        backend_url_path = generate_backend_entry(
-            proxy, backend_alias, separator=separator
+        service_url_path = generate_service_entry(
+            proxy, service_alias, separator=separator
         )
-        frontend_rule_path = generate_frontend_rule_entry(
-            proxy, frontend_alias, separator=separator
+        router_rule_path = generate_router_rule_entry(
+            proxy, router_alias, separator=separator
         )
-        backend_weight_path = ""
-        frontend_backend_path = ""
+        router_service_path = ""
 
     return RouteKeys(
-        backend_alias,
-        backend_url_path,
-        backend_weight_path,
-        frontend_alias,
-        frontend_backend_path,
-        frontend_rule_path,
+        service_alias,
+        service_url_path,
+        router_alias,
+        router_service_path,
+        router_rule_path,
     )
 
 
@@ -142,20 +134,40 @@ def atomic_writing(path):
             # already deleted by os.replace above
             pass
 
+class TraefikConfigFileHandler(object):
+    """Handles reading and writing Traefik config files. Can operate
+    on both toml and yaml files"""
+    def __init__(self, file_path):
+        file_ext = file_path.rsplit('.', 1)[-1]
+        if file_ext == 'yaml':
+            try:
+                from ruamel.yaml import YAML
+            except ImportError:
+                raise ImportError("jupyterhub-traefik-proxy requires ruamel.yaml to use YAML config files")
+            config_handler = YAML(typ="safe")
+        elif file_ext == 'toml':
+            import toml as config_handler
+        else:
+            raise TypeError("type should be either 'toml' or 'yaml'")
 
-def persist_static_conf(file, static_conf_dict):
-    with open(file, "w") as f:
-        toml.dump(static_conf_dict, f)
+        self.file_path = file_path
+        # Redefined to either yaml.dump or toml.dump
+        self._dump = config_handler.dump
+        #self._dumps = config_handler.dumps
+        # Redefined by __init__, to either yaml.load or toml.load
+        self._load = config_handler.load
 
+    def load(self):
+        """Depending on self.file_path, call either yaml.load or toml.load"""
+        with open(self.file_path, "r") as fd:
+            return self._load(fd)
 
-def persist_routes(file, routes_dict):
-    with atomic_writing(file) as config_fd:
-        toml.dump(routes_dict, config_fd)
+    def dump(self, data):
+        with open(self.file_path, "w") as f:
+            self._dump(data, f)
 
-
-def load_routes(file):
-    try:
-        with open(file, "r") as config_fd:
-            return toml.load(config_fd)
-    except:
-        raise
+    def atomic_dump(self, data):
+        """Save data to self.file_path after opening self.file_path with
+        :func:`atomic_writing`"""
+        with atomic_writing(self.file_path) as f:
+            self._dump(data, f)

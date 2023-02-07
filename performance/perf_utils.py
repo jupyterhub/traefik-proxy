@@ -10,7 +10,7 @@ from jupyterhub.tests.mocking import MockHub
 from jupyterhub.proxy import ConfigurableHTTPProxy
 from jupyterhub_traefik_proxy import TraefikConsulProxy
 from jupyterhub_traefik_proxy import TraefikEtcdProxy
-from jupyterhub_traefik_proxy import TraefikTomlProxy
+from jupyterhub_traefik_proxy import TraefikFileProviderProxy
 
 
 def configure_argument_parser():
@@ -73,12 +73,12 @@ def configure_argument_parser():
     parser.add_argument(
         "--proxy",
         dest="proxy_class",
-        default="TomlProxy",
+        default="FileProxy",
         help=textwrap.dedent(
             """\
             Proxy class to analyze.
             Available proxies:
-            -TomlProxy
+            -FileProxy
             -EtcdProxy
             -ConsulProxy
             -CHP
@@ -216,9 +216,9 @@ async def no_auth_etcd_proxy():
     return proxy
 
 
-async def toml_proxy():
-    """Function returning a configured TraefikTomlProxy"""
-    proxy = TraefikTomlProxy(
+async def file_proxy():
+    """Function returning a configured TraefikFileProviderProxy"""
+    proxy = TraefikFileProviderProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="admin",
@@ -248,8 +248,8 @@ async def configurable_http_proxy():
 
 
 async def get_proxy(proxy_class):
-    if proxy_class == "TomlProxy":
-        proxy = await toml_proxy()
+    if proxy_class == "FileProxy":
+        proxy = await file_proxy()
     elif proxy_class == "EtcdProxy":
         proxy = await no_auth_etcd_proxy()
     elif proxy_class == "ConsulProxy":

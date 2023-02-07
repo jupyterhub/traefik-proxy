@@ -1,23 +1,20 @@
-defaultentrypoints = [ "http",]
-debug = true
-logLevel = "ERROR"
+[log]
+ level = "debug"
 
 [api]
-dashboard = true
-entrypoint = "auth_api"
+ dashboard = true
 
 [wss]
-protocol = "http"
+ protocol = "http"
 
-[file]
-filename = "./tests/config_files/rules.toml"
-watch = true
+[providers.file]
+ directory = "./tests/config_files/dynamic_config"
+ watch = true
 
-[entryPoints.http]
-address = "127.0.0.1:8000"
+[entryPoints]
+ [entryPoints.my_web_ep]
+  address = "127.0.0.1:8000"
 
-[entryPoints.auth_api]
-address = "127.0.0.1:8099"
+ [entryPoints.enter_api]
+  address = "127.0.0.1:8099"
 
-[entryPoints.auth_api.auth.basic]
-users = [ "api_admin:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]

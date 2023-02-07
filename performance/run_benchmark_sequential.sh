@@ -1,8 +1,8 @@
 #!/bin/sh
 #CHP methods performance
 python3 -m performance.check_perf --measure=methods --proxy=CHP --iterations=2 --routes_number=500 --sequential --output=./results/chp_methods_sequential.csv
-# TomlProxy methods performance - run with throttle = 0s
-python3 -m performance.check_perf --measure=methods --proxy=TomlProxy --iterations=2 --routes_number=500 --sequential --output=./results/toml_methods_sequential.csv
+# FileProxy methods performance - run with throttle = 0s
+python3 -m performance.check_perf --measure=methods --proxy=FileProxy --iterations=2 --routes_number=500 --sequential --output=./results/toml_methods_sequential.csv
 # EtcdProxy methods performance - run with throttle = 0s
 #start etcd:
 etcd &> /dev/null &
