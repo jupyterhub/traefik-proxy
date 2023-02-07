@@ -88,7 +88,8 @@ class TraefikConsulProxy(TKvProxy):
             provider_config["consul"].update({"username": self.kv_username})
 
         if self.kv_password:
-            provider_config["consul"].update({"password": self.kv_password})
+            key = "password" if self.kv_username else "token"
+            provider_config["consul"].update({key: self.kv_password})
 
         # FIXME: Same with the tls info
         if self.consul_client_ca_cert:
@@ -97,7 +98,7 @@ class TraefikConsulProxy(TKvProxy):
             }
 
         self.static_config.update({"providers": provider_config})
-            
+
     def _start_traefik(self):
         os.environ["CONSUL_HTTP_TOKEN"] = self.kv_password
         super()._start_traefik()
