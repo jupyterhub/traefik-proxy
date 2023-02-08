@@ -585,11 +585,6 @@ def _config_consul(secret=None, port=8500):
 #########################################################################
 
 def shutdown_consul(consul_proc, secret=None, port=8500):
-    consul_env = None
-    if secret is not None:
-        consul_env = os.environ.copy()
-        consul_env.update({"CONSUL_HTTP_TOKEN" : secret})
-    subprocess.call(["consul", "leave", f"-http-addr=http://127.0.0.1:{port}"], env=consul_env)
     terminate_process(consul_proc, timeout=30)
 
 def shutdown_etcd(etcd_proc):
