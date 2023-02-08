@@ -33,9 +33,10 @@ checksums_etcd = {
 }
 
 checksums_consul = {
-    "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_linux_amd64.zip": "da3919197ef33c4205bb7df3cc5992ccaae01d46753a72fe029778d7f52fb610",
-    "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_linux_arm64.zip": "012c552aff502f907416c9a119d2dfed88b92e981f9b160eb4fe292676afdaeb",
-    "https://releases.hashicorp.com/consul/1.9.4/consul_1.9.4_darwin.zip": "c168240d52f67c71b30ef51b3594673cad77d0dbbf38c412b2ee30b39ef30843",
+    "https://releases.hashicorp.com/consul/1.14.4/consul_1.14.4_darwin_amd64.zip": "694b8edc470838d8a73df08d6c616d25b54724abad410fa27c83697b372a2cfc",
+    "https://releases.hashicorp.com/consul/1.14.4/consul_1.14.4_darwin_arm64.zip": "330ddff6d6cc16ce091b8f25a4abd0f1984d88f10e272efcec52e01aaaa1b3b0",
+    "https://releases.hashicorp.com/consul/1.14.4/consul_1.14.4_linux_arm64.zip": "9baf47a75c95945824da0629bc0b3f7b1ca55015e8c9ce7579d9a431a90b721c",
+    "https://releases.hashicorp.com/consul/1.14.4/consul_1.14.4_linux_amd64.zip": "eafb7c853ce9cc1536bffa99325f8df365ff70a3b83c037836e63964a8adfd7a",
     "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip": "a8568ca7b6797030b2c32615b4786d4cc75ce7aee2ed9025996fe92b07b31f7e",
     "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_darwin_amd64.zip": "4bc205e06b2921f998cb6ddbe70de57f8e558e226e44aba3f337f2f245678b85",
     "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_linux_amd64.zip": "1399064050019db05d3378f757e058ec4426a917dd2d240336b51532065880b6",
@@ -133,11 +134,11 @@ def install_etcd(prefix, plat, etcd_version):
     )
 
     if os.path.exists(etcd_bin) and os.path.exists(etcdctl_bin):
-        print(f"Etcd and etcdctl already exist")
+        print("Etcd and etcdctl already exist")
         if etcd_url not in checksums_etcd:
             warnings.warn(
-                f"Etcd {etcd_version} not supported ! Or, at least, we don't "
-                f"recognise {etcd_url} in our checksums", stacklevel=2,
+                f"Etcd {etcd_version} at {etcd_url} checksum cannot be verified",
+                stacklevel=2,
             )
             os.chmod(etcd_bin, 0o755)
             os.chmod(etcdctl_bin, 0o755)
@@ -168,8 +169,7 @@ def install_etcd(prefix, plat, etcd_version):
             raise IOError("Checksum failed")
     else:
         warnings.warn(
-            f"Etcd {etcd_version} not supported ! Or, at least, we don't "
-            f"recognise {etcd_url} in our checksums",
+            f"Skipping checksum verification of unknown etcd {etcd_version}",
             stacklevel=2
         )
 
@@ -216,8 +216,7 @@ def install_consul(prefix, plat, consul_version):
         print(f"Consul already exists")
         if consul_url not in checksums_consul:
             warnings.warn(
-                f"Consul {consul_version} not supported ! Or, at least we don't have "
-                f"it {consul_url} in our checksums",
+                f"Skipping checksum verification of unknown consul {consul_version}",
                 stacklevel=2,
             )
             os.chmod(consul_bin, 0o755)
@@ -252,8 +251,7 @@ def install_consul(prefix, plat, consul_version):
         shutil.rmtree(consul_binaries)
     else:
         warnings.warn(
-            f"Consul {consul_version} not supported ! Or, at least we don't have "
-            f"it {consul_url} in our checksums",
+            f"Consul {consul_version} at {consul_url} checksum cannot be verified",
             stacklevel=2,
         )
 
@@ -286,9 +284,10 @@ def main():
                 - v3.2.26-linux-amd64
                 - v3.2.26-darwin-amd64
             - consul:
-                - v1.9.4_darwin
-                - v1.9.4_linux_amd64
-                - v1.9.4_linux_arm64
+                - v1.14.4_darwin_amd64
+                - v1.14.4_darwin_arm64
+                - v1.14.4_linux_amd64
+                - v1.14.4_linux_arm64
                 - v1.6.1_linux_amd64
                 - v1.6.1_darwin_amd64
                 - v1.5.0_linux_amd64
@@ -389,7 +388,7 @@ def main():
     parser.add_argument(
         "--consul-version",
         dest="consul_version",
-        default="1.9.4",
+        default="1.14.4",
         help=textwrap.dedent(
             """\
             The version of consul to download.

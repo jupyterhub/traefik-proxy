@@ -80,15 +80,6 @@ class TraefikConsulProxy(TKvProxy):
                 ]
             }
         }
-        # Q: Why weren't these in the Traefik v1 implementation?
-        # A: Although defined in the traefik docs, they appear to
-        # do nothing, and CONSUL_HTTP_TOKEN needs to be used instead.
-        # Ref: https://github.com/traefik/traefik/issues/767#issuecomment-270096663
-        if self.kv_username:
-            provider_config["consul"].update({"username": self.kv_username})
-
-        if self.kv_password:
-            provider_config["consul"].update({"password": self.kv_password})
 
         # FIXME: Same with the tls info
         if self.consul_client_ca_cert:
@@ -97,15 +88,19 @@ class TraefikConsulProxy(TKvProxy):
             }
 
         self.static_config.update({"providers": provider_config})
-            
+
     def _start_traefik(self):
-        os.environ["CONSUL_HTTP_TOKEN"] = self.kv_password
+        if self.kv_password:
+            if self.kv_username:
+                self.traefik_env.setdefault(
+                    "CONSUL_HTTP_AUTH", f"{self.kv_username}:{self.kv_password}"
+                )
+            else:
+                self.traefik_env.setdefault("CONSUL_HTTP_TOKEN", self.kv_password)
         super()._start_traefik()
 
     def _stop_traefik(self):
         super()._stop_traefik()
-        if "CONSUL_HTTP_TOKEN" in os.environ:
-            os.environ.pop("CONSUL_HTTP_TOKEN")
 
     async def persist_dynamic_config(self):
         data = self.flatten_dict_for_kv(

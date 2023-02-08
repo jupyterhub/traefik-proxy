@@ -19,7 +19,8 @@ Route Specification:
 # Distributed under the terms of the Modified BSD License.
 
 import json
-from os.path import abspath, dirname, join
+import os
+from os.path import abspath
 from subprocess import Popen, TimeoutExpired
 from urllib.parse import urlparse
 
@@ -59,6 +60,14 @@ class TraefikProxy(Proxy):
 
     traefik_api_password = Unicode(
         config=True, help="""The password for traefik api login"""
+    )
+
+    traefik_env = Dict(
+        config=True,
+        help="""Environment variables to set for the traefik process.
+
+        Only has an effect when traefik is a subprocess (should_start=True).
+        """,
     )
 
     provider_name = Unicode(
@@ -265,10 +274,13 @@ class TraefikProxy(Proxy):
                 "Configuration mode not supported \n.\
                 The proxy can only be configured through fileprovider, etcd and consul"
             )
+        env = os.environ.copy()
+        env.update(self.traefik_env)
         try:
-            self.traefik_process = Popen([
-                "traefik", "--configfile", abspath(self.static_config_file)
-            ])
+            self.traefik_process = Popen(
+                ["traefik", "--configfile", abspath(self.static_config_file)],
+                env=env,
+            )
         except FileNotFoundError as e:
             self.log.error(
                 "Failed to find traefik \n"

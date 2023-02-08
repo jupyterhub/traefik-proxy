@@ -1,9 +1,8 @@
 import socket
 import json
-
-from jupyterhub.utils import exponential_backoff
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
 from urllib.parse import urlparse
+
+from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
 
 _ports = {"default_backend": 9000, "first_backend": 9090, "second_backend": 9099}
 
@@ -30,6 +29,26 @@ async def check_host_up(ip, port):
     """Check if the service opened the connection on the
     designated port"""
     return is_open(ip, port)
+
+
+async def check_host_up_http(url):
+    """Check if an HTTP endpoint is ready
+
+    A socket listening may not be enough
+    """
+    u = urlparse(url)
+    # first, check the scket
+    socket_open = is_open(u.hostname, u.port or 80)
+    if not socket_open:
+        return False
+    req = HTTPRequest(url, validate_cert=False)
+    try:
+        resp = await AsyncHTTPClient().fetch(req)
+    except HTTPClientError as e:
+        if e.code >= 599:
+            # connection error
+            return False
+    return True
 
 
 async def get_responding_backend_port(traefik_url, path):

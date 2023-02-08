@@ -1,5 +1,7 @@
 """Tests for the base traefik proxy"""
 
+import asyncio
+import inspect
 import copy
 import utils
 import subprocess
@@ -216,8 +218,8 @@ async def test_add_get_delete(
             responding_backend2 = await utils.get_responding_backend_port(
                 proxy_url, normalize_spec(spec) + "something"
             )
-            assert_equal(responding_backend1, backend.port)
-            assert_equal(responding_backend2, backend.port)
+            assert responding_backend1 == backend.port
+            assert responding_backend2 == backend.port
 
     for i, spec in enumerate(existing_routes, start=1):
         backend = default_backend._replace(
@@ -233,20 +235,26 @@ async def test_add_get_delete(
     )
 
     # Create existing routes
+    futures = []
     for i, spec in enumerate(existing_routes):
-        try:
-            await proxy.add_route(spec, extra_backends[i].geturl(), copy.copy(data))
-        except Exception as e:
-            raise type(e)(f"{e}\nProblem adding Route {spec}")
+        f = proxy.add_route(spec, extra_backends[i].geturl(), copy.copy(data))
+        futures.append(f)
+
+    if futures:
+        await asyncio.gather(*futures)
 
     def finalizer():
         async def cleanup():
-            """ Cleanup """
+            """Cleanup"""
+            futures = []
             for spec in existing_routes:
                 try:
-                    await proxy.delete_route(spec)
+                    f = proxy.delete_route(spec)
+                    futures.append(f)
                 except Exception:
                     pass
+            if futures:
+                await asyncio.gather(*futures)
 
         event_loop.run_until_complete(cleanup())
 
@@ -327,13 +335,17 @@ async def test_get_all_routes(proxy, launch_backend):
 
     await wait_for_services([proxy.public_url] + targets)
 
+    futures = []
     for routespec, target, data in zip(routespecs, targets, datas):
-        await proxy.add_route(routespec, target, copy.copy(data))
+        f = proxy.add_route(routespec, target, copy.copy(data))
+        futures.append(f)
+    if futures:
+        await asyncio.gather(*futures)
 
     routes = await proxy.get_all_routes()
     try:
         for route_key in routes.keys():
-            del( routes[route_key]["data"]["last_activity"] ) # CHP
+            del routes[route_key]["data"]["last_activity"]  # CHP
     except KeyError:
         pass
 
@@ -350,24 +362,24 @@ async def test_host_origin_headers(proxy, launch_backend):
     default_backend_port = 9000
     launch_backend(default_backend_port)
 
+    # wait for traefik to be reachable
     await exponential_backoff(
-        utils.check_host_up, "Traefik not reacheable", ip="localhost", port=traefik_port
+        utils.check_host_up_http,
+        "Traefik not reacheable",
+        url=f"http://localhost:{traefik_port}/",
     )
 
-    # Check if default backend is reacheable
+    # wait for backend to be reachable
     await exponential_backoff(
-        utils.check_host_up,
+        utils.check_host_up_http,
         "Backends not reacheable",
-        ip="localhost",
-        port=default_backend_port,
+        url=f"http://localhost:{default_backend_port}/",
     )
+
     # Add route to default_backend
     await proxy.add_route(routespec, target, data)
 
-    if proxy.public_url.endswith("/"):
-        req_url = proxy.public_url[:-1] + routespec
-    else:
-        req_url = proxy.public_url + routespec
+    req_url = proxy.public_url.rstrip("/") + routespec
 
     expected_host_header = traefik_host + ":" + str(traefik_port)
     expected_origin_header = proxy.public_url + routespec
@@ -380,8 +392,8 @@ async def test_host_origin_headers(proxy, launch_backend):
     )
     resp = await AsyncHTTPClient().fetch(req)
 
-    assert_equal(resp.headers["Host"], expected_host_header)
-    assert_equal(resp.headers["Origin"], expected_origin_header)
+    assert resp.headers["Host"] == expected_host_header
+    assert resp.headers["Origin"] == expected_origin_header
 
 
 @pytest.mark.parametrize("username", ["zoe", "50fia", "秀樹", "~TestJH", "has@"])
@@ -395,11 +407,13 @@ async def test_check_routes(proxy, username):
     # run initial check first, to ensure that `/` is in the routes
     await proxy.check_routes(users, services)
     routes = await proxy.get_all_routes()
-    assert_equal(sorted(routes), ["/"])
+    assert sorted(routes) == ["/"]
 
     users[username] = test_user = MockUser(username)
     spawner = test_user.spawners[""]
-    spawner.start()
+    f = spawner.start()
+    if inspect.isawaitable(f):
+        await f
     assert spawner.ready
     assert spawner.active
     await proxy.add_user(test_user, "")
@@ -437,17 +451,20 @@ async def test_websockets(proxy, launch_backend):
     default_backend_port = 9000
     launch_backend(default_backend_port, "ws")
 
+    # wait for traefik to be reachable
     await exponential_backoff(
-        utils.check_host_up, "Traefik not reacheable", ip="127.0.0.1", port=traefik_port
+        utils.check_host_up_http,
+        "Traefik not reacheable",
+        url=f"http://localhost:{traefik_port}/",
     )
 
-    # Check if default backend is reacheable
+    # wait for backend to be reachable
     await exponential_backoff(
-        utils.check_host_up,
-        "Backend not reacheable",
-        ip="127.0.0.1",
-        port=default_backend_port,
+        utils.check_host_up_http,
+        "Backends not reacheable",
+        url=f"http://localhost:{default_backend_port}/",
     )
+
     # Add route to default_backend
     await proxy.add_route(routespec, target, data)
 
