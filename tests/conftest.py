@@ -25,12 +25,14 @@ from consul.aio import Consul
 HERE = Path(__file__).parent.resolve()
 config_files = HERE / "config_files"
 
+
 class Config:
     """Namespace for repeated variables.
 
     N.B. The user names and passwords are also stored in various configuration
     files, saved in ./tests/config_files, both in plain text, and in the case
     of the consul token, base64 encoded (so cannot be grep'ed)."""
+
     # Force etcdctl to run with the v3 API. This gives us access to various
     # commandss, e.g.  txn
     # Must be passed to the env parameter of any subprocess.Popen call that runs
@@ -198,19 +200,16 @@ async def file_proxy_yaml():
     await proxy.stop()
 
 def _file_proxy(dynamic_config_file, **kwargs):
-    ext = dynamic_config_file.rsplit('.', 1)[-1]
-    static_config_file = os.path.join(
-        os.getcwd(), f"traefik.{ext}"
-    )
     return TraefikFileProviderProxy(
         public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
-        dynamic_config_file = dynamic_config_file,
+        dynamic_config_file=dynamic_config_file,
         check_route_timeout=60,
         log_level=10,
-        **kwargs
+        **kwargs,
     )
+
 
 @pytest.fixture
 async def external_file_proxy_yaml(launch_traefik_file):
@@ -254,7 +253,9 @@ async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_
 
 
 @pytest.fixture
-async def auth_external_consul_proxy(launch_consul_acl, configure_consul_auth, launch_traefik_consul_auth):
+async def auth_external_consul_proxy(
+    launch_consul_acl, configure_consul_auth, launch_traefik_consul_auth
+):
     print("creating proxy")
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
@@ -284,7 +285,9 @@ async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
 
 
 @pytest.fixture
-async def auth_external_etcd_proxy(launch_etcd_auth, configure_etcd_auth, launch_traefik_etcd_auth):
+async def auth_external_etcd_proxy(
+    launch_etcd_auth, configure_etcd_auth, launch_traefik_etcd_auth
+):
     proxy = TraefikEtcdProxy(
         public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
@@ -338,6 +341,7 @@ def launch_traefik_consul():
     yield proc
     shutdown_traefik(proc)
 
+
 @pytest.fixture
 def launch_traefik_consul_auth():
     extra_args = (
@@ -349,23 +353,25 @@ def launch_traefik_consul_auth():
     yield proc
     shutdown_traefik(proc)
 
+
 def _launch_traefik_cli(*extra_args, env=None):
     default_args = (
         "--api",
         "--log.level=debug",
-        "--entrypoints.web.address=:8000",
-        "--entrypoints.enter_api.address=:8099"
+        # "--entrypoints.web.address=:8000",
+        "--entrypoints.websecure.address=:8000",
+        "--entrypoints.enter_api.address=:8099",
     )
     args = default_args + extra_args
     return _launch_traefik(*args, env=env)
 
+
 def _launch_traefik(*extra_args, env=None):
-    traefik_launch_command = (
-        "traefik",
-    ) + extra_args
+    traefik_launch_command = ("traefik",) + extra_args
     print("launching", traefik_launch_command)
     proc = subprocess.Popen(traefik_launch_command, env=env)
     return proc
+
 
 #########################################################################
 # Fixtures for configuring the traefik providers                        #
@@ -441,18 +447,17 @@ def wait_for_etcd():
     proxy classes.
     """
     import etcd3
-    assert (
-        "is healthy" in
-        subprocess.check_output(
-            ["etcdctl", "endpoint", "health"],
-            env=Config.etcdctl_env,
-            stderr=subprocess.STDOUT
-        ).decode(sys.stdout.encoding)
-    )
 
-#@pytest.fixture(scope="function", autouse=True)
+    assert "is healthy" in subprocess.check_output(
+        ["etcdctl", "endpoint", "health"],
+        env=Config.etcdctl_env,
+        stderr=subprocess.STDOUT,
+    ).decode(sys.stdout.encoding)
+
+
+# @pytest.fixture(scope="function", autouse=True)
 # Is this referenced anywhere??
-#@pytest.fixture
+# @pytest.fixture
 def clean_etcd():
     subprocess.run(["etcdctl", "del", '""', "--from-key=true"], env=Config.etcdctl_env)
 
@@ -479,8 +484,6 @@ def launch_consul():
         )
         yield consul_proc
         shutdown_consul(consul_proc)
-
-
 
 
 @pytest.fixture(scope="module")
@@ -510,7 +513,9 @@ def launch_consul_acl():
             _wait_for_consul(token=Config.consul_token, port=Config.consul_auth_port)
         )
         yield consul_proc
-        shutdown_consul(consul_proc, secret=Config.consul_token, port=Config.consul_auth_port)
+        shutdown_consul(
+            consul_proc, secret=Config.consul_token, port=Config.consul_auth_port
+        )
 
 
 async def _wait_for_consul(token=None, **kwargs):
@@ -520,15 +525,16 @@ async def _wait_for_consul(token=None, **kwargs):
     In production, consul would already be running, so don't put this in the
     proxy classes.
     """
+
     async def _check_consul():
         try:
             cli = Consul(token=token, **kwargs)
-            index, data = await cli.kv.get('getting_any_nonexistent_key_will_do')
+            index, data = await cli.kv.get("getting_any_nonexistent_key_will_do")
         except Exception as e:
             print(f"Consul not up: {e}")
             return False
 
-        print( "Consul is up!" )
+        print("Consul is up!")
         return True
 
     await exponential_backoff(
@@ -580,12 +586,15 @@ def _config_consul(secret=None, port=8500):
             print("Error setting up consul")
             time.sleep(3)
 
+
 #########################################################################
 # Teardown functions                                                    #
 #########################################################################
 
+
 def shutdown_consul(consul_proc, secret=None, port=8500):
     terminate_process(consul_proc, timeout=30)
+
 
 def shutdown_etcd(etcd_proc):
     clean_etcd()
