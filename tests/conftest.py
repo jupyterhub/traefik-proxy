@@ -23,7 +23,7 @@ from jupyterhub.utils import exponential_backoff
 from consul.aio import Consul
 
 HERE = Path(__file__).parent.resolve()
-config_files = HERE / "config_files"
+config_files = os.path.join(HERE, "config_files")
 
 
 class Config:
@@ -54,7 +54,7 @@ class Config:
 
     # The URL that should be proxied to jupyterhub
     # Putting here, can easily change between http and https
-    public_url = "https://localhost:8000"
+    public_url = "https://127.0.0.1:8000"
 
 # Define a "slow" test marker so that we can run the slow tests at the end
 # ref: https://docs.pytest.org/en/6.0.1/example/simple.html#control-skipping-of-tests-according-to-command-line-option
@@ -80,7 +80,7 @@ def pytest_configure(config):
 
 
 @pytest.fixture
-async def no_auth_consul_proxy(request, launch_consul):
+async def no_auth_consul_proxy(launch_consul):
     """
     Fixture returning a configured TraefikConsulProxy.
     Consul acl disabled.
@@ -106,7 +106,7 @@ async def auth_consul_proxy(launch_consul_acl):
     """
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        kv_url=f"http://127.0.0.1:{Config.consul_auth_port}",
+        kv_url=f"http://127.0.0.1:{Config.consul_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         kv_password=Config.consul_token,
@@ -119,7 +119,7 @@ async def auth_consul_proxy(launch_consul_acl):
 
 
 @pytest.fixture
-async def no_auth_etcd_proxy(launch_etcd, wait_for_etcd):
+async def no_auth_etcd_proxy(launch_etcd):
     """
     Fixture returning a configured TraefikEtcdProxy.
     No etcd authentication.
@@ -137,20 +137,33 @@ async def no_auth_etcd_proxy(launch_etcd, wait_for_etcd):
 
 
 @pytest.fixture
-async def auth_etcd_proxy(launch_etcd_auth):
+def auth_etcd_proxy(enable_auth_in_etcd, launch_etcd_proxy):
     """
     Fixture returning a configured TraefikEtcdProxy
     Etcd has credentials set up
     """
+    yield launch_etcd_proxy
+
+@pytest.fixture
+async def launch_etcd_proxy():
+    grpc_options = [
+        ("grpc.ssl_target_name_override", "localhost"),
+        ("grpc.default_authority", "localhost")
+    ]
     proxy = TraefikEtcdProxy(
         public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
+        kv_url="https://localhost:2379",
         kv_username="root",
         kv_password=Config.etcd_password,
+        etcd_client_ca_cert=f"{config_files}/fake-ca-cert.crt",
+        etcd_insecure_skip_verify=True,
         check_route_timeout=45,
         should_start=True,
+        grpc_options=grpc_options
     )
+
     await proxy.start()
     yield proxy
     await proxy.stop()
@@ -176,7 +189,7 @@ def traitlets_log():
 async def file_proxy_toml():
     """Fixture returning a configured TraefikFileProviderProxy"""
     dynamic_config_file = os.path.join(
-        os.getcwd(), "tests", "config_files", "dynamic_config", "rules.toml"
+        config_files, "dynamic_config", "rules.toml"
     )
     static_config_file = "traefik.toml"
     proxy = _file_proxy(dynamic_config_file,
@@ -189,7 +202,7 @@ async def file_proxy_toml():
 @pytest.fixture
 async def file_proxy_yaml():
     dynamic_config_file = os.path.join(
-        os.getcwd(), "tests", "config_files", "dynamic_config", "rules.yaml"
+        config_files, "dynamic_config", "rules.yaml"
     )
     static_config_file = "traefik.yaml"
     proxy = _file_proxy(dynamic_config_file,
@@ -206,7 +219,6 @@ def _file_proxy(dynamic_config_file, **kwargs):
         traefik_api_username=Config.traefik_api_user,
         dynamic_config_file=dynamic_config_file,
         check_route_timeout=60,
-        log_level=10,
         **kwargs,
     )
 
@@ -214,7 +226,7 @@ def _file_proxy(dynamic_config_file, **kwargs):
 @pytest.fixture
 async def external_file_proxy_yaml(launch_traefik_file):
     dynamic_config_file = os.path.join(
-        os.getcwd(), "tests", "config_files", "dynamic_config", "rules.yaml"
+        config_files, "dynamic_config", "rules.yaml"
     )
     proxy = _file_proxy(
         dynamic_config_file,
@@ -227,7 +239,7 @@ async def external_file_proxy_yaml(launch_traefik_file):
 @pytest.fixture
 async def external_file_proxy_toml(launch_traefik_file):
     dynamic_config_file = os.path.join(
-        os.getcwd(), "tests", "config_files", "dynamic_config", "rules.toml"
+        config_files, "dynamic_config", "rules.toml"
     )
     proxy = _file_proxy(
         dynamic_config_file,
@@ -286,20 +298,9 @@ async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
 
 @pytest.fixture
 async def auth_external_etcd_proxy(
-    launch_etcd_auth, configure_etcd_auth, launch_traefik_etcd_auth
+    enable_auth_in_etcd, launch_traefik_etcd_auth, launch_etcd_proxy
 ):
-    proxy = TraefikEtcdProxy(
-        public_url=Config.public_url,
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
-        kv_password=Config.etcd_password,
-        kv_username="root",
-        check_route_timeout=45,
-        should_start=False,
-    )
-    await proxy._wait_for_static_config()
-    yield proxy
-    proxy.kv_client.close()
+    yield launch_etcd_proxy
 
 
 #########################################################################
@@ -309,7 +310,7 @@ async def auth_external_etcd_proxy(
 
 @pytest.fixture
 def launch_traefik_file():
-    args = ("--configfile", "./tests/config_files/traefik.toml")
+    args = ("--configfile", os.path.join(config_files, "traefik.toml"))
     print(f"\nLAUNCHING TRAEFIK with args: {args}\n")
     proc = _launch_traefik(*args)
     yield proc
@@ -325,7 +326,7 @@ def launch_traefik_etcd():
 
 
 @pytest.fixture
-def launch_traefik_etcd_auth():
+def launch_traefik_etcd_auth(configure_etcd_auth):
     extra_args = (
         "--providers.etcd.username=" + Config.etcd_user,
         "--providers.etcd.password=" + Config.etcd_password
@@ -381,7 +382,7 @@ def _launch_traefik(*extra_args, env=None):
 ##################################
 
 @pytest.fixture
-def configure_etcd(wait_for_etcd):
+def configure_etcd():
     """Load traefik api rules into the etcd kv store"""
     yield _config_etcd()
 
@@ -396,20 +397,28 @@ def _config_etcd(*extra_args):
     data_store_cmd = ("etcdctl", "txn") + extra_args
     # Load a pre-baked dynamic configuration into the etcd store.
     # This essentially puts authentication on the traefik api handler.
-    with open('tests/config_files/traefik_etcd_txns.txt', 'r') as fd:
+    with open(os.path.join(config_files, "traefik_etcd_txns.txt"), "r") as fd:
         txns = fd.read()
     proc = subprocess.Popen(data_store_cmd, stdin=subprocess.PIPE, env=Config.etcdctl_env)
     proc.communicate(txns.encode())
     proc.wait()
 
 @pytest.fixture
-def enable_auth_in_etcd():
+def enable_auth_in_etcd(launch_etcd_auth):
     user = Config.etcd_user
     pw = Config.etcd_password
-    subprocess.call(["etcdctl", "user", "add", f"{user}:{pw}"], env=Config.etcdctl_env)
-    subprocess.call(["etcdctl", "user", "grant-role", "root", user], env=Config.etcdctl_env)
+    common_args = [
+        "--insecure-skip-tls-verify=true",
+        "--insecure-transport=false",
+        "--debug"
+        ]
+    subprocess.call(["etcdctl", "user", "add", f"{user}:{pw}"] + common_args,
+            env=Config.etcdctl_env)
+    subprocess.call(["etcdctl", "user", "grant-role", user, "root"] + common_args,
+            env=Config.etcdctl_env)
     assert (
-        subprocess.check_output(["etcdctl", "auth", "enable"], env=Config.etcdctl_env)
+        subprocess.check_output(["etcdctl", "auth", "enable"] + common_args,
+            env=Config.etcdctl_env)
         .decode(sys.stdout.encoding)
         .strip()
         == "Authentication Enabled"
@@ -418,27 +427,50 @@ def enable_auth_in_etcd():
 
     assert (
         subprocess.check_output(
-            ["etcdctl", "--user", f"{user}:{pw}", "auth", "disable"], env=Config.etcdctl_env
+            ["etcdctl", "--user", f"{user}:{pw}", "auth", "disable"] + common_args,
+            env=Config.etcdctl_env
         ).decode(sys.stdout.encoding)
         .strip() == "Authentication Disabled"
     )
-    subprocess.call(["etcdctl", "user", "revoke-role", "root", user], env=Config.etcdctl_env)
-    subprocess.call(["etcdctl", "user", "delete", user], env=Config.etcdctl_env)
+    subprocess.call(["etcdctl", "user", "revoke-role", "root", user] + common_args,
+            env=Config.etcdctl_env)
+    subprocess.call(["etcdctl", "user", "delete", user] + common_args,
+            env=Config.etcdctl_env)
 
 
 @pytest.fixture
-def launch_etcd_auth(launch_etcd, wait_for_etcd, enable_auth_in_etcd):
-    yield
-
-@pytest.fixture()
-def launch_etcd():
-    etcd_proc = subprocess.Popen(["etcd", "--log-level=debug"])
+async def launch_etcd_auth():
+    etcd_proc = subprocess.Popen(
+        ["etcd", "--log-level=debug", "--peer-auto-tls",
+        f"--cert-file={config_files}/test-cert.crt",
+        f"--key-file={config_files}/test-key.key",
+        "--initial-cluster=default=https://localhost:2380",
+        "--initial-advertise-peer-urls=https://localhost:2380",
+        "--listen-peer-urls=https://localhost:2380",
+        "--listen-client-urls=https://localhost:2379",
+        "--advertise-client-urls=https://localhost:2379",
+        "--log-level=debug"],
+        close_fds=True
+    )
+    await _wait_for_etcd(
+            "--insecure-skip-tls-verify=true",
+            "--insecure-transport=false",
+            "--debug")
     yield etcd_proc
-
     shutdown_etcd(etcd_proc)
 
 @pytest.fixture
-def wait_for_etcd():
+async def launch_etcd():
+    with TemporaryDirectory() as etcd_path:
+        etcd_proc = subprocess.Popen(
+            ["etcd", "--log-level=debug"],
+            cwd=etcd_path, close_fds=True
+        )
+        await _wait_for_etcd("--debug=true")
+        yield etcd_proc
+        shutdown_etcd(etcd_proc)
+
+async def _wait_for_etcd(*etcd_args):
     """Etcd may not be ready if we jump straight into the tests.
     Make sure it's running before we continue with configuring it or running
     tests against it.
@@ -446,10 +478,8 @@ def wait_for_etcd():
     In production, etcd would already be running, so don't put this in the
     proxy classes.
     """
-    import etcd3
-
     assert "is healthy" in subprocess.check_output(
-        ["etcdctl", "endpoint", "health"],
+        ["etcdctl", "endpoint", "health", *etcd_args],
         env=Config.etcdctl_env,
         stderr=subprocess.STDOUT,
     ).decode(sys.stdout.encoding)
@@ -504,10 +534,10 @@ def launch_consul_acl():
                 "-grpc-tls-port=8513",
                 "-serf-lan-port=8311",
                 "-serf-wan-port=8312",
-                f"-config-file={config_files / 'consul_config.json'}",
+                f"-config-file={config_files}/consul_config.json",
                 "-bootstrap-expect=1",
             ],
-            cwd=consul_path,
+            cwd=consul_path, close_fds=True
         )
         asyncio.run(
             _wait_for_consul(token=Config.consul_token, port=Config.consul_auth_port)
@@ -567,7 +597,7 @@ def _config_consul(secret=None, port=8500):
         "kv",
         "import",
         f"-http-addr=http://127.0.0.1:{port}",
-        "@tests/config_files/traefik_consul_config.json",
+        f"@{config_files}/traefik_consul_config.json",
     ]
 
     """
@@ -600,9 +630,8 @@ def shutdown_etcd(etcd_proc):
     clean_etcd()
     terminate_process(etcd_proc, timeout=20)
 
-    # There have been cases where default.etcd didn't exist...
-    # Not sure why, but guess it doesn't really matter, just
-    # check to be safe and remove it if there.
+    # Remove the default.etcd folder, so no settings left over
+    # from a completed run
     default_etcd = os.path.join(os.getcwd(), "default.etcd")
     if os.path.exists(default_etcd):
         shutil.rmtree(default_etcd)

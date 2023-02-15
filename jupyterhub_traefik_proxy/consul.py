@@ -139,68 +139,36 @@ class TraefikConsulProxy(TKvProxy):
             [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
         )
 
-        payload=[
-            {
-                "KV": {
-                    "Verb": "set",
-                    "Key": jupyterhub_routespec,
-                    "Value": base64.b64encode(target.encode()).decode(),
-                }
-            },
-            {
-                "KV": {
-                    "Verb": "set",
-                    "Key": jupyterhub_target,
-                    "Value": base64.b64encode(data.encode()).decode(),
-                }
-            },
-            {
-                "KV": {
-                    "Verb": "set",
-                    "Key": route_keys.service_url_path,
-                    "Value": base64.b64encode(target.encode()).decode(),
-                }
-            },
-            {
-                "KV": {
-                    "Verb": "set",
-                    "Key": route_keys.router_service_path,
-                    "Value": base64.b64encode(
-                        route_keys.service_alias.encode()
-                    ).decode(),
-                }
-            },
-            {
-                "KV": {
-                    "Verb": "set",
-                    "Key": route_keys.router_rule_path,
-                    "Value": base64.b64encode(rule.encode()).decode(),
-                }
-            }
-        ]
-
-        if self.is_https:
+        payload = []
+        def append_payload(key, value):
             payload.append({
                 "KV": {
                     "Verb": "set",
-                    "Key": self.kv_separator.join(
-                        ["traefik", "http", "routers", route_keys.router_alias, "tls"]
-                    ),
-                    "Value": base64.b64encode("true".encode()).decode()
+                    "Key": key,
+                    "Value": base64.b64encode(value.encode()).decode()
                 }
             })
+        append_payload(jupyterhub_routespec, target)
+        append_payload(jupyterhub_target, data)
+        append_payload(route_keys.service_url_path, target)
+        append_payload(route_keys.router_service_path, route_keys.service_alias)
+        append_payload(route_keys.router_rule_path, rule)
+
+        router_path = self.kv_separator.join(
+            ["traefik", "http", "routers", route_keys.router_alias]
+        )
+        if self.is_https:
+            tls_path = self.kv_separator.join([router_path, "tls"])
+            append_payload(tls_path, "true")
+            if self.traefik_cert_resolver:
+                tls_path = self.kv_separator.join([tls_path, "certResolver"])
+                append_payload(tls_path, self.traefik_cert_resolver)
+
         # Specify the router's entryPoint
         if not self.traefik_entrypoint:
             self.traefik_entrypoint = await self._get_traefik_entrypoint()
-        payload.append({
-            "KV": {
-                "Verb": "set",
-                "Key": self.kv_separator.join(
-                    ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
-                ),
-                "Value": base64.b64encode(self.traefik_entrypoint.encode()).decode()
-            }
-        })
+        entrypoint_path = self.kv_separator.join([router_path, "entryPoints", "0"])
+        append_payload(entrypoint_path, self.traefik_entrypoint)
 
         self.log.debug(f"Uploading route to KV store. Payload: {repr(payload)}")
         try:
@@ -238,12 +206,12 @@ class TraefikConsulProxy(TKvProxy):
             tls_path = self.kv_separator.join(
                 ["traefik", "http", "routers", route_keys.router_alias, "tls"]
             )
-            payload.append({"KV": {"Verb": "delete", "Key": tls_path}})
+            payload.append({"KV": {"Verb": "delete-tree", "Key": tls_path}})
 
         # delete any configured entrypoints
-        payload.append({"KV": {"Verb": "delete", "Key":
+        payload.append({"KV": {"Verb": "delete-tree", "Key":
             self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
+                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints"]
             )
         }})
 
