@@ -79,7 +79,6 @@ class TraefikProxy(Proxy):
     def __init__(self, **kwargs):
         # observe deprecated config names in oauthenticator
         for name, trait in self.class_traits().items():
-            deprecated_in = trait.metadata.get("deprecated_in")
             if trait.metadata.get("deprecated_in"):
                 self.observe(self._deprecated_trait, name)
         super().__init__(**kwargs)
