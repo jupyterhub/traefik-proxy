@@ -21,10 +21,9 @@ Route Specification:
 from urllib.parse import urlparse
 import base64
 import string
-import warnings
 
 import escapism
-from traitlets import default, observe, Any, Unicode
+from traitlets import default, Any, Unicode
 
 from .kv_proxy import TKvProxy
 
@@ -54,20 +53,26 @@ class TraefikConsulProxy(TKvProxy):
     consul_username = Unicode(
         "",
         config=True,
-        help="URL for the consul endpoint.",
+        help="Usrname for accessing consul.",
+    )
+    consul_password = Unicode(
+        "",
+        config=True,
+        help="Password or token for accessing consul.",
     )
 
-    kv_url = Unicode("DEPRECATED", config=True)
-    kv_username = Unicode("DEPRECATED", config=True)
-    kv_password = Unicode("DEPRECATED", config=True)
-
-    @observe("kv_url", "kv_username", "kv_password")
-    def _deprecated_config(self, change):
-        new_name = change.name.replace("kv_", "consul_")
-        warnings.warn(
-            f"TraefikConsulProxy.{change.name} is deprecated in 0.4. Use TraefikEtcdProxy.{new_name} = {change.new!r}"
-        )
-        setattr(self, new_name, change.new)
+    kv_url = Unicode("DEPRECATED", config=True).tag(
+        deprecated_in="0.4",
+        deprecated_for="consul_url",
+    )
+    kv_username = Unicode("DEPRECATED", config=True).tag(
+        deprecated_in="0.4",
+        deprecated_for="consul_username",
+    )
+    kv_password = Unicode("DEPRECATED", config=True).tag(
+        deprecated_in="0.4",
+        deprecated_for="consul_password",
+    )
 
     consul = Any()
 
@@ -81,7 +86,7 @@ class TraefikConsulProxy(TKvProxy):
         kwargs = {
             "host": consul_service.hostname,
             "port": consul_service.port,
-            "cert": self.consul_ca_cert,
+            "cert": self.consul_client_ca_cert,
         }
         if self.consul_password:
             kwargs.update({"token": self.consul_password})
@@ -96,8 +101,8 @@ class TraefikConsulProxy(TKvProxy):
         }
 
         # FIXME: Same with the tls info
-        if self.consul_ca_cert:
-            provider_config["consul"]["tls"] = {"ca": self.consul_ca_cert}
+        if self.consul_client_ca_cert:
+            provider_config["consul"]["tls"] = {"ca": self.consul_client_ca_cert}
 
         self.static_config.update({"providers": provider_config})
 

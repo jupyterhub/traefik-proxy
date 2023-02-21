@@ -20,11 +20,10 @@ Route Specification:
 
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
-import warnings
 
 import escapism
 from tornado.concurrent import run_on_executor
-from traitlets import Any, default, observe, Bool, List, Unicode
+from traitlets import Any, default, Bool, List, Unicode
 
 from .kv_proxy import TKvProxy
 
@@ -97,17 +96,18 @@ class TraefikEtcdProxy(TKvProxy):
         help="Password for accessing etcd.",
     )
 
-    kv_url = Unicode("DEPRECATED", config=True)
-    kv_username = Unicode("DEPRECATED", config=True)
-    kv_password = Unicode("DEPRECATED", config=True)
-
-    @observe("kv_url", "kv_username", "kv_password")
-    def _deprecated_config(self, change):
-        new_name = change.name.replace("kv_", "etcd_")
-        warnings.warn(
-            f"TraefikEtcdProxy.{change.name} is deprecated in 0.4. Use TraefikEtcdProxy.{new_name} = {change.new!r}"
-        )
-        setattr(self, new_name, change.new)
+    kv_url = Unicode("DEPRECATED", config=True).tag(
+        deprecated_in="0.4",
+        deprecated_for="etcd_url",
+    )
+    kv_username = Unicode("DEPRECATED", config=True).tag(
+        deprecated_in="0.4",
+        deprecated_for="etcd_username",
+    )
+    kv_password = Unicode("DEPRECATED", config=True).tag(
+        deprecated_in="0.4",
+        deprecated_for="etcd_password",
+    )
 
     etcd = Any()
 

@@ -24,7 +24,7 @@ from os.path import abspath
 from subprocess import Popen, TimeoutExpired
 from urllib.parse import urlparse
 
-from traitlets import Any, Bool, Dict, Integer, Unicode, default
+from traitlets import Any, Bool, Dict, Integer, Unicode, default, observe
 from tornado.httpclient import AsyncHTTPClient
 
 from jupyterhub.utils import exponential_backoff, url_path_join, new_token
@@ -40,6 +40,49 @@ class TraefikProxy(Proxy):
     static_config_file = Unicode(
         "traefik.toml", config=True, help="""traefik's static configuration file"""
     )
+
+    toml_static_config_file = Unicode(
+        config=True,
+        help="Deprecated. Use static_config_file",
+    ).tag(
+        deprecated_in="0.4",
+        deprecated_for="static_config_file",
+    )
+
+    def _deprecated_trait(self, change):
+        """observer for deprecated traits"""
+        trait = change.owner.traits()[change.name]
+        old_attr = change.name
+        new_attr = trait.metadata["deprecated_for"]
+        version = trait.metadata["deprecated_in"]
+        if "." in new_attr:
+            new_cls_attr = new_attr
+            new_attr = new_attr.rsplit(".", 1)[1]
+        else:
+            new_cls_attr = f"{self.__class__.__name__}.{new_attr}"
+
+        new_value = getattr(self, new_attr)
+        if new_value != change.new:
+            # only warn if different
+            # protects backward-compatible config from warnings
+            # if they set the same value under both names
+            message = "{cls}.{old} is deprecated in {cls} {version}, use {new} instead".format(
+                cls=self.__class__.__name__,
+                old=old_attr,
+                new=new_cls_attr,
+                version=version,
+            )
+            self.log.warning(message)
+
+            setattr(self, new_attr, change.new)
+
+    def __init__(self, **kwargs):
+        # observe deprecated config names in oauthenticator
+        for name, trait in self.class_traits().items():
+            deprecated_in = trait.metadata.get("deprecated_in")
+            if trait.metadata.get("deprecated_in"):
+                self.observe(self._deprecated_trait, name)
+        super().__init__(**kwargs)
 
     static_config = Dict()
     dynamic_config = Dict()
@@ -71,7 +114,7 @@ class TraefikProxy(Proxy):
     )
 
     provider_name = Unicode(
-        config=True, help="""The provider name that Traefik expects, e.g. file, consul, etcd"""
+        help="""The provider name that Traefik expects, e.g. file, consul, etcd"""
     )
 
     is_https = Bool(
