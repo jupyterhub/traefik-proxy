@@ -105,26 +105,14 @@ class TraefikFileProviderProxy(TraefikProxy):
         routespec = self.validate_routespec(traefik_routespec)
         result = {"data": None, "target": None, "routespec": routespec}
 
-        def get_target_data(d, to_find):
-            if to_find == "url":
-                key = "target"
-            else:
-                key = to_find
-            if result[key] is not None:
-                return
-            for k, v in d.items():
-                if k == to_find:
-                    result[key] = v
-                if isinstance(v, dict):
-                    get_target_data(v, to_find)
-
         service_node = self.dynamic_config["http"]["services"].get(service_alias, None)
         if service_node is not None:
-            get_target_data(service_node, "url")
+            # Will this ever cause a KeyError?
+            result["target"] = service_node["loadBalancer"]["servers"][0]["url"]
 
         jupyter_routers = self.dynamic_config["jupyter"]["routers"].get(router_alias, None)
         if jupyter_routers is not None:
-            get_target_data(jupyter_routers, "data")
+            result["data"] = jupyter_routers["data"]
 
         if result["data"] is None and result["target"] is None:
             self.log.info(f"No route for {routespec} found!")
@@ -199,10 +187,14 @@ class TraefikFileProviderProxy(TraefikProxy):
 
             # Enable TLS on this router if globally enabled
             if self.is_https:
+                tls_config = {}
+                if self.traefik_cert_resolver:
+                    tls_config["certResolver"] = self.traefik_cert_resolver
+
                 self.dynamic_config["http"]["routers"][router_alias].update({
-                    "tls": {}
+                    "tls": tls_config
                 })
-                    
+
             # Add the data node to a separate top-level node, so traefik doesn't complain.
             self.dynamic_config["jupyter"]["routers"][router_alias] = {
                 "data": data
@@ -213,7 +205,7 @@ class TraefikFileProviderProxy(TraefikProxy):
 
             self.dynamic_config["http"]["services"][service_alias] = {
                 "loadBalancer": {
-                    "servers": {"server1": {"url": target} },
+                    "servers": [{"url": target}],
                     "passHostHeader": True
                 }
             }

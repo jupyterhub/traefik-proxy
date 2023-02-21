@@ -9,6 +9,4 @@ websockets
 # Adding them here prevents CI from failing
 etcd3
 python-consul2
-# pin grpcio for auth-without tls
-# https://github.com/grpc/grpc/issues/29643
-grpcio==1.44.0
+grpcio

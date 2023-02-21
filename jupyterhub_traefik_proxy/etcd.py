@@ -23,7 +23,7 @@ import escapism
 from urllib.parse import urlparse
 
 from tornado.concurrent import run_on_executor
-from traitlets import Any, default, Unicode
+from traitlets import Any, default, Bool, List, Unicode
 
 from jupyterhub.utils import maybe_future
 from .kv_proxy import TKvProxy
@@ -61,6 +61,21 @@ class TraefikEtcdProxy(TKvProxy):
             (etcd_client_cert_crt must also be specified)""",
     )
 
+    # The grpc client (used by the Python etcd library) doesn't allow untrusted
+    # etcd certificates, although traefik does allow them.
+    etcd_insecure_skip_verify = Bool(
+        False,
+        config=True,
+        help="""Traefik will by default validate SSL certificate of etcd backend""",
+    )
+
+    grpc_options = List(
+        config=True,
+        allow_none=True,
+        default_value=None,
+        help="""Any grpc options that need to be passed to the etcd client"""
+    )
+
     @default("executor")
     def _default_executor(self):
         return ThreadPoolExecutor(1)
@@ -82,6 +97,7 @@ class TraefikEtcdProxy(TKvProxy):
             'ca_cert': self.etcd_client_ca_cert,
             'cert_cert': self.etcd_client_cert_crt,
             'cert_key': self.etcd_client_cert_key,
+            'grpc_options': self.grpc_options
         }
         if self.kv_password:
             kwargs.update({
@@ -120,6 +136,14 @@ class TraefikEtcdProxy(TKvProxy):
                 "rootKey": self.kv_traefik_prefix,
             }
         } })
+        if url.scheme == "https":
+            # If etcd is running over TLS, then traefik needs to know
+            tls_conf = {}
+            if self.etcd_client_ca_cert is not None:
+                tls_conf["ca"] = self.etcd_client_ca_cert
+            tls_conf["insecureSkipVerify"] = self.etcd_insecure_skip_verify
+            self.static_config["providers"]["etcd"]["tls"] = tls_conf
+
         if self.kv_username and self.kv_password:
             self.static_config["providers"]["etcd"].update({
                 "username": self.kv_username,
@@ -148,15 +172,21 @@ class TraefikEtcdProxy(TKvProxy):
             put(route_keys.router_rule_path, rule),
         ]
         # Optionally enable TLS on this router
+        router_key = self.kv_separator.join(
+            ["traefik", "http", "routers", route_keys.router_alias]
+        )
         if self.is_https:
-            tls_path = self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "tls"]
-            )
-            success.append(put(tls_path, ""))
+            tls_path = self.kv_separator.join([router_key, "tls"])
+            tls_value = ""
+            if self.traefik_cert_resolver:
+                tls_path = self.kv_separator.join([tls_path, "certResolver"])
+                tls_value = self.traefik_cert_resolver
+            success.append(put(tls_path, tls_value))
+
 
         # Specify the entrypoint that jupyterhub's router should bind to
         ep_path = self.kv_separator.join(
-            ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
+            [router_key, "entryPoints", "0"]
         )
         if not self.traefik_entrypoint:
             self.traefik_entrypoint = await self._get_traefik_entrypoint()
@@ -177,6 +207,9 @@ class TraefikEtcdProxy(TKvProxy):
             [self.kv_jupyterhub_prefix, "targets", escapism.escape(value.decode())]
         )
 
+        router_path = self.kv_separator.join(
+            ["traefik", "http", "routers", route_keys.router_alias]
+        )
         delete = self.kv_client.transactions.delete
         success = [
             delete(jupyterhub_routespec),
@@ -185,14 +218,15 @@ class TraefikEtcdProxy(TKvProxy):
             delete(route_keys.router_service_path),
             delete(route_keys.router_rule_path),
             delete(self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints", "0"]
+                [router_path, "entryPoints", "0"]
             ))
         ]
         # If it was enabled, delete TLS on the router too
         if self.is_https:
-            success.append(delete(self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "tls"]
-            )))
+            tls_path = self.kv_separator.join([router_path, "tls"])
+            if self.traefik_cert_resolver:
+                tls_path = self.kv_separator.join([tls_path, "certResolver"])
+            success.append(delete(tls_path))
 
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response

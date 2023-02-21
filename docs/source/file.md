@@ -26,7 +26,7 @@ You can choose to:
 * use the TraefikFileProviderProxy object, in which case, you have to import the module, e.g.:
 
     ```python
-    from jupyterhub_traefik_proxy import TraefikFileProviderProxy
+    from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
     c.JupyterHub.proxy_class = TraefikFileProviderProxy
     ```
 
@@ -86,7 +86,7 @@ If TraefikFileProviderProxy is used as an externally managed service, then make 
 
 1. Let JupyterHub know that the proxy being used is TraefikFileProviderProxy, using the *proxy_class* configuration option:
     ```python
-    from jupyterhub_traefik_proxy import TraefikFileProviderProxy
+    from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
     c.JupyterHub.proxy_class = TraefikFileProviderProxy
     ```
 
@@ -95,9 +95,10 @@ If TraefikFileProviderProxy is used as an externally managed service, then make 
    JupyterHub configuration file, *jupyterhub_config.py* must specify at least:
    * That the proxy is externally managed
    * The traefik api credentials
-   * The dynamic configuration file, 
-     if different from *rules.toml* or if this file is located 
-     in another place than traefik's default search directories (etc/traefik/, $HOME/.traefik/, the working directory)
+   * The dynamic configuration file, if different from *rules.toml* or if this
+     file is located in a place other than traefik's default search directories
+     (etc/traefik/, $HOME/.traefik/, the working directory). traefik must also
+     be able to access the dynamic configuration file.
 
     Example configuration:
     ```python
@@ -110,6 +111,34 @@ If TraefikFileProviderProxy is used as an externally managed service, then make 
     # traefik api credentials
     c.TraefikFileProviderProxy.traefik_api_username = "abc"
     c.TraefikFileProviderProxy.traefik_api_password = "xxx"
+
+    # Validate the certificate on traefik's API? Default = True
+    # c.TraefikFileProviderProxy.traefik_api_validate_cert = True
+
+    # jupyterhub will configure traefik for itself, using this Host name
+    # (and optional path) on the router rule:-
+    c.JupyterHub.bind_url = 'https://hub.contoso.com'
+
+    # jupyterhub will also configure traefik's 'service' url, so this needs
+    # to be accessible from traefik. By default, jupyterhub will bind to
+    # 'localhost', but this will bind jupyterhub to its hostname
+    c.JupyterHub.hub_bind_url = 'http://:8000'
+
+    # jupyterhub will only allow path-based routing by default. To stop
+    # jupyterhub from serving all requests, i.e. it will add a global router
+    # rule of just PathPrefix(`/`) by default, we must configure jupyterhub as
+    # a subdomain host.
+    c.JupyterHub.subdomain_host = "https://hub.contoso.com"
+
+    # traefik can automatically request certificates from an ACME CA.
+    # JupyterHub needs to know the name of traefik's certificateResolver
+    c.TraefikFileProviderProxy.traefik_cert_resolver = "leresolver"
+
+    # For jupyterhub to let traefik manage certificates, 'ssl_cert' needs a
+    # value. (This gets around a validate rule on 'proxy.bind_url', which
+    # forces the protocol to 'http' unless there is a value in ssl_cert).
+    c.JupyterHub.ssl_cert = 'externally managed'
+
     ```
 
 3. Ensure **traefik.toml** / **traefik.yaml**

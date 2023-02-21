@@ -357,23 +357,24 @@ async def test_host_origin_headers(proxy, launch_backend):
     target = "http://127.0.0.1:9000"
     data = {}
 
-    traefik_port = urlparse(proxy.public_url).port
-    traefik_host = urlparse(proxy.public_url).hostname
-    default_backend_port = 9000
+    proxy_url = urlparse(proxy.public_url)
+    traefik_port = proxy_url.port
+    traefik_host = proxy_url.hostname
+    default_backend_port = urlparse(target).port
     launch_backend(default_backend_port)
 
     # wait for traefik to be reachable
     await exponential_backoff(
         utils.check_host_up_http,
         "Traefik not reacheable",
-        url=f"http://localhost:{traefik_port}/",
+        url=proxy_url.geturl(),
     )
 
     # wait for backend to be reachable
     await exponential_backoff(
         utils.check_host_up_http,
         "Backends not reacheable",
-        url=f"http://localhost:{default_backend_port}/",
+        url=target,
     )
 
     # Add route to default_backend
@@ -446,31 +447,28 @@ async def test_websockets(proxy, launch_backend):
     target = "http://127.0.0.1:9000"
     data = {}
 
-    traefik_port = urlparse(proxy.public_url).port
-    traefik_host = urlparse(proxy.public_url).hostname
-    default_backend_port = 9000
+    proxy_url = urlparse(proxy.public_url)
+    traefik_port = proxy_url.port
+    traefik_host = proxy_url.hostname
+    default_backend_port = urlparse(target).port
     launch_backend(default_backend_port, "ws")
 
     # wait for traefik to be reachable
     await exponential_backoff(
         utils.check_host_up_http,
-        "Traefik not reacheable",
-        url=f"http://localhost:{traefik_port}/",
+        "Traefik cannot be reached",
+        url=proxy_url.geturl(),
     )
 
     # wait for backend to be reachable
     await exponential_backoff(
         utils.check_host_up_http,
-        "Backends not reacheable",
-        url=f"http://localhost:{default_backend_port}/",
+        "Backends cannot be reached",
+        url=target,
     )
 
     # Add route to default_backend
     await proxy.add_route(routespec, target, data)
-
-    public_url = proxy.public_url
-    if proxy.public_url.endswith("/"):
-        public_url = proxy.public_url[:-1]
 
     if proxy.is_https:
         kwargs = {'ssl': ssl._create_unverified_context()}
@@ -478,9 +476,10 @@ async def test_websockets(proxy, launch_backend):
     else:
         kwargs = {}
         scheme = "ws://"
-    req_url = scheme + urlparse(proxy.public_url).netloc + routespec
+    req_url = scheme + proxy_url.netloc + routespec
 
     # Don't validate the ssl certificate, it's self-signed by traefik
+    print(f"Connecting with websockets to {req_url}")
     async with websockets.connect(req_url, **kwargs) as websocket:
         port = await websocket.recv()
 

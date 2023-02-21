@@ -83,6 +83,10 @@ class TraefikProxy(Proxy):
         # Check if we set https
         return urlparse(self.public_url).scheme == "https"
 
+    traefik_cert_resolver = Unicode(
+        config=True, help="""The traefik certificate Resolver to use for requesting certificates"""
+    )
+
     # FIXME: How best to enable TLS on routers assigned to only select
     # entrypoints defined here?
     traefik_entrypoint = Unicode(
