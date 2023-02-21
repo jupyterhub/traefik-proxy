@@ -1,9 +1,9 @@
 import sys
 import os
+import platform
 from urllib.request import urlretrieve
 import tarfile
 import zipfile
-import shutil
 import argparse
 import textwrap
 import hashlib
@@ -22,25 +22,8 @@ checksums_traefik = {
     "https://github.com/traefik/traefik/releases/download/v2.2.11/traefik_v2.2.11_windows_amd64.zip": "ee867133e00b2d8395c239d8fed04a26b362e650b371dc0b653f0ee9d52471e6",
 }
 
-checksums_etcd = {
-    "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-arm64.tar.gz": "fcc522275300cf90d42377106d47a2e384d1d2083af205cbb7833a79ef5a49d1",
-    "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-amd64.tar.gz": "3bd00836ea328db89ecba3ed2155293934c0d09e64b53d6c9dfc0a256e724b81",
-    "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-darwin-amd64.tar.gz": "c596709069193bffc639a22558bdea4d801128e635909ea01a6fd5b5c85da729",
-    "https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz": "1620a59150ec0a0124a65540e23891243feb2d9a628092fb1edcc23974724a45",
-    "https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-darwin-amd64.tar.gz": "fac4091c7ba6f032830fad7809a115909d0f0cae5cbf5b34044540def743577b",
-    "https://github.com/etcd-io/etcd/releases/download/v3.2.26/etcd-v3.2.26-linux-amd64.tar.gz": "127d4f2097c09d929beb9d3784590cc11102f4b4d4d4da7ad82d5c9e856afd38",
-    "https://github.com/etcd-io/etcd/releases/download/v3.2.26/etcd-v3.2.26-darwin-amd64.zip": "0393e650ffa3e61b1fd07c61f8c78af1556896c300c9814545ff0e91f52c3513",
-}
-
-checksums_consul = {
-    "https://releases.hashicorp.com/consul/1.14.4/consul_1.14.4_darwin_amd64.zip": "694b8edc470838d8a73df08d6c616d25b54724abad410fa27c83697b372a2cfc",
-    "https://releases.hashicorp.com/consul/1.14.4/consul_1.14.4_darwin_arm64.zip": "330ddff6d6cc16ce091b8f25a4abd0f1984d88f10e272efcec52e01aaaa1b3b0",
-    "https://releases.hashicorp.com/consul/1.14.4/consul_1.14.4_linux_arm64.zip": "9baf47a75c95945824da0629bc0b3f7b1ca55015e8c9ce7579d9a431a90b721c",
-    "https://releases.hashicorp.com/consul/1.14.4/consul_1.14.4_linux_amd64.zip": "eafb7c853ce9cc1536bffa99325f8df365ff70a3b83c037836e63964a8adfd7a",
-    "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip": "a8568ca7b6797030b2c32615b4786d4cc75ce7aee2ed9025996fe92b07b31f7e",
-    "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_darwin_amd64.zip": "4bc205e06b2921f998cb6ddbe70de57f8e558e226e44aba3f337f2f245678b85",
-    "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_linux_amd64.zip": "1399064050019db05d3378f757e058ec4426a917dd2d240336b51532065880b6",
-    "https://releases.hashicorp.com/consul/1.5.0/consul_1.5.0_darwin_amd64.zip": "b4033ea6871fe6136ee5d940c834be2248463c3ec248dc22370e6d5360931325",
+machine_map = {
+    "x86_64": "amd64",
 }
 
 
@@ -71,7 +54,7 @@ def install_traefik(prefix, plat, traefik_version):
     )
 
     if os.path.exists(traefik_bin) and os.path.exists(traefik_archive_path):
-        print(f"Traefik already exists")
+        print("Traefik already exists")
         if traefik_url not in checksums_traefik:
             warnings.warn(
                 f"Traefik {traefik_version} not tested !",
@@ -111,151 +94,10 @@ def install_traefik(prefix, plat, traefik_version):
             zip_ref.extract("traefik.exe", prefix)
 
     os.chmod(traefik_bin, 0o755)
+    os.unlink(traefik_archive_path)
     print("--- Done ---")
 
 
-def install_etcd(prefix, plat, etcd_version):
-    etcd_downloaded_dir_name = f"etcd-v{etcd_version}-{plat}"
-    if "linux" in plat:
-        etcd_archive_extension = "tar.gz"
-    else:
-        etcd_archive_extension = "zip"
-    etcd_downloaded_archive = os.path.join(
-        prefix, etcd_downloaded_dir_name + "." + etcd_archive_extension
-    )
-    etcd_binaries = os.path.join(prefix, "etcd_binaries")
-
-    etcd_bin = os.path.join(prefix, "etcd")
-    etcdctl_bin = os.path.join(prefix, "etcdctl")
-
-    etcd_url = (
-        "https://github.com/etcd-io/etcd/releases"
-        f"/download/v{etcd_version}/etcd-v{etcd_version}-{plat}.{etcd_archive_extension}"
-    )
-
-    if os.path.exists(etcd_bin) and os.path.exists(etcdctl_bin):
-        print("Etcd and etcdctl already exist")
-        if etcd_url not in checksums_etcd:
-            warnings.warn(
-                f"Etcd {etcd_version} at {etcd_url} checksum cannot be verified",
-                stacklevel=2,
-            )
-            os.chmod(etcd_bin, 0o755)
-            os.chmod(etcdctl_bin, 0o755)
-            print("--- Done ---")
-            return
-        else:
-            checksum_etcd_archive = checksum_file(etcd_downloaded_archive)
-            if checksum_etcd_archive == checksums_etcd[etcd_url]:
-                os.chmod(etcd_bin, 0o755)
-                os.chmod(etcdctl_bin, 0o755)
-                print("--- Done ---")
-                return
-            else:
-                print(f"checksum mismatch on {etcd_downloaded_archive}")
-                os.remove(etcd_bin)
-                os.remove(etcdctl_bin)
-                os.remove(etcd_downloaded_archive)
-
-    if not os.path.exists(etcd_downloaded_archive):
-        print(f"Downloading {etcd_downloaded_dir_name} archive...")
-        urlretrieve(etcd_url, etcd_downloaded_archive)
-    else:
-        print(f"Archive {etcd_downloaded_dir_name} already exists")
-
-    if etcd_url in checksums_etcd:
-        checksum_etcd_archive = checksum_file(etcd_downloaded_archive)
-        if checksum_etcd_archive != checksums_etcd[etcd_url]:
-            raise IOError("Checksum failed")
-    else:
-        warnings.warn(
-            f"Skipping checksum verification of unknown etcd {etcd_version}",
-            stacklevel=2
-        )
-
-    print("Extracting the archive...")
-    if etcd_archive_extension == "zip":
-        with zipfile.ZipFile(etcd_downloaded_archive, "r") as zip_ref:
-            zip_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
-            zip_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
-    else:
-        with (tarfile.open(etcd_downloaded_archive, "r")) as tar_ref:
-            tar_ref.extract(etcd_downloaded_dir_name + "/etcd", etcd_binaries)
-            tar_ref.extract(etcd_downloaded_dir_name + "/etcdctl", etcd_binaries)
-
-    shutil.copy(os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcd"), etcd_bin)
-    shutil.copy(
-        os.path.join(etcd_binaries, etcd_downloaded_dir_name, "etcdctl"), etcdctl_bin)
-
-    os.chmod(etcd_bin, 0o755)
-    os.chmod(etcdctl_bin, 0o755)
-
-    # Cleanup
-    shutil.rmtree(etcd_binaries)
-
-    print("--- Done ---")
-
-
-def install_consul(prefix, plat, consul_version):
-    plat = plat.replace("-", "_")
-    consul_downloaded_dir_name = f"consul_v{consul_version}_{plat}"
-    consul_archive_extension = "zip"
-
-    consul_downloaded_archive = os.path.join(
-        prefix, consul_downloaded_dir_name + "." + consul_archive_extension
-    )
-    consul_binaries = os.path.join(prefix, "consul_binaries")
-    consul_bin = os.path.join(prefix, "consul")
-
-    consul_url = (
-        "https://releases.hashicorp.com/consul/"
-        f"{consul_version}/consul_{consul_version}_{plat}.{consul_archive_extension}"
-    )
-
-    if os.path.exists(consul_bin):
-        print(f"Consul already exists")
-        if consul_url not in checksums_consul:
-            warnings.warn(
-                f"Skipping checksum verification of unknown consul {consul_version}",
-                stacklevel=2,
-            )
-            os.chmod(consul_bin, 0o755)
-            print("--- Done ---")
-            return
-        else:
-            if checksum_file(consul_downloaded_archive) == checksums_consul[consul_url]:
-                os.chmod(consul_bin, 0o755)
-                print("--- Done ---")
-                return
-            else:
-                print(f"checksum mismatch on {consul_downloaded_archive}")
-                os.remove(consul_bin)
-                os.remove(consul_downloaded_archive)
-
-    if consul_url in checksums_consul:
-        if not os.path.exists(consul_downloaded_archive):
-            print(f"Downloading {consul_downloaded_dir_name} archive...")
-            urlretrieve(consul_url, consul_downloaded_archive)
-        else:
-            print(f"Archive {consul_downloaded_dir_name} already exists")
-
-        if checksum_file(consul_downloaded_archive) != checksums_consul[consul_url]:
-            raise IOError("Checksum failed")
-
-        with zipfile.ZipFile(consul_downloaded_archive, "r") as zip_ref:
-            zip_ref.extract("consul", consul_binaries)
-
-        shutil.copy(os.path.join(consul_binaries, "consul"), consul_bin)
-        os.chmod(consul_bin, 0o755)
-        # Cleanup
-        shutil.rmtree(consul_binaries)
-    else:
-        warnings.warn(
-            f"Consul {consul_version} at {consul_url} checksum cannot be verified",
-            stacklevel=2,
-        )
-
-    print("--- Done ---")
 
 
 def main():
@@ -275,23 +117,6 @@ def main():
                 - v2.2.11-linux-amd64
                 - v2.2.11-darwin-amd64
                 - v2.2.11-windows-amd64
-            - etcd:
-                - v3.4.15-linux-amd64
-                - v3.4.15-darwin-amd64
-                - v3.4.15-windows-amd64
-                - v3.3.10-linux-amd64
-                - v3.3.10-darwin-amd64
-                - v3.2.26-linux-amd64
-                - v3.2.26-darwin-amd64
-            - consul:
-                - v1.14.4_darwin_amd64
-                - v1.14.4_darwin_arm64
-                - v1.14.4_linux_amd64
-                - v1.14.4_linux_arm64
-                - v1.6.1_linux_amd64
-                - v1.6.1_darwin_amd64
-                - v1.5.0_linux_amd64
-                - v1.5.0_darwin_amd64
             """
         ),
         formatter_class=argparse.RawTextHelpFormatter,
@@ -311,7 +136,9 @@ def main():
         ),
     )
 
-    default_platform = sys.platform + "-amd64"
+    machine = platform.machine()
+    machine = machine_map.get(machine, machine)
+    default_platform = f"{sys.platform}-{machine}"
 
     parser.add_argument(
         "--platform",
@@ -329,12 +156,7 @@ def main():
     parser.add_argument(
         "--traefik",
         action="store_true",
-        help=textwrap.dedent(
-            """\
-            Whether or not to install traefik.
-            By default traefik is NOT going to be installed.
-            """
-        ),
+        help="DEPRECATED, IGNORED",
     )
 
     parser.add_argument(
@@ -349,69 +171,25 @@ def main():
             """
         ),
     )
-
-    parser.add_argument(
-        "--etcd",
-        action="store_true",
-        help=textwrap.dedent(
-            """\
-            Whether or not to install etcd.
-            By default etcd is NOT going to be installed.
-            """
-        ),
-    )
-
-    parser.add_argument(
-        "--etcd-version",
-        dest="etcd_version",
-        default="3.4.15",
-        help=textwrap.dedent(
-            """\
-            The version of etcd to download.
-            If no version is provided, it defaults to:
-            --- %(default)s ---
-            """
-        ),
-    )
-
-    parser.add_argument(
-        "--consul",
-        action="store_true",
-        help=textwrap.dedent(
-            """\
-            Whether or not to install consul.
-            By default consul is NOT going to be installed:
-            """
-        ),
-    )
-
-    parser.add_argument(
-        "--consul-version",
-        dest="consul_version",
-        default="1.14.4",
-        help=textwrap.dedent(
-            """\
-            The version of consul to download.
-            If no version is provided, it defaults to:
-            --- %(default)s ---
-            """
-        ),
-    )
+    if "--etcd" in sys.argv:
+        sys.exit(
+            "Installing etcd is no longer supported. Visit https://github.com/etcd-io/etcd/releases/"
+        )
+    if "--consul" in sys.argv:
+        sys.exit(
+            "Installing consul is no longer supported. Visit https://developer.hashicorp.com/consul/downloads"
+        )
 
     args = parser.parse_args()
     deps_dir = args.installation_dir
     plat = args.plat
     traefik_version = args.traefik_version
-    etcd_version = args.etcd_version
-    consul_version = args.consul_version
 
-    if not args.traefik and not args.etcd and not args.consul:
+    if args.traefik:
         print(
-            """Please specify what binary to install.
-            Tip: python3 -m jupyterhub_traefik_proxy.install --help
-            to get the list of available options."""
+            "Specifying --traefik is deprecated and ignored. Only installing traefik is supported.",
+            file=sys.stderr,
         )
-        return
 
     if os.path.exists(deps_dir):
         print(f"Using existing output directory {deps_dir}...")
@@ -419,12 +197,7 @@ def main():
         print(f"Creating output directory {deps_dir}...")
         os.makedirs(deps_dir)
 
-    if args.traefik:
-        install_traefik(deps_dir, plat, traefik_version)
-    if args.etcd:
-        install_etcd(deps_dir, plat, etcd_version)
-    if args.consul:
-        install_consul(deps_dir, plat, consul_version)
+    install_traefik(deps_dir, plat, traefik_version)
 
 
 if __name__ == "__main__":
