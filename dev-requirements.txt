@@ -7,6 +7,10 @@ notebook>=4.0
 websockets
 # etcd3 & python-consul2 are now soft dependencies
 # Adding them here prevents CI from failing
-etcd3
+
+# python-etcd3 is unmaintained, but there are several forks
+# all the forks (at this point) install the same python module,
+# but with updated grpcio compatibility
+# watch this space to pick a winner...
+etcdpy
 python-consul2
-grpcio
