@@ -90,7 +90,7 @@ class TraefikEtcdProxy(TKvProxy):
         try:
             import etcd3
         except ImportError:
-            raise ImportError("Please install etcd3 package to use traefik-proxy with etcd3")
+            raise ImportError("Please install etcd3 or etcdpy package to use traefik-proxy with etcd3")
         kwargs = {
             'host': etcd_service.hostname,
             'port': etcd_service.port,
@@ -191,7 +191,7 @@ class TraefikEtcdProxy(TKvProxy):
         if not self.traefik_entrypoint:
             self.traefik_entrypoint = await self._get_traefik_entrypoint()
         success.append(put(ep_path, self.traefik_entrypoint))
-                
+
         status, response = await maybe_future(self._etcd_transaction(success))
         return status, response
 
@@ -271,4 +271,3 @@ class TraefikEtcdProxy(TKvProxy):
             transactions.append(self.kv_client.transactions.put(k, v))
         status, response = await maybe_future(self._etcd_transaction(transactions))
         return status, response
-
