@@ -36,7 +36,7 @@ You can choose to:
 Traefik's configuration is divided into two parts:
 
 * The **static** configuration (loaded only at the beginning)
-* The **dynamic** configuration (can be hot-reloaded, without restarting the proxy), 
+* The **dynamic** configuration (can be hot-reloaded, without restarting the proxy),
 where the routing table will be updated continuously.
 
 Traefik allows us to have one file for the static configuration file (`traefik.toml` or `traefik.yaml`) and one or several files for the routes, that traefik would watch.
@@ -55,20 +55,20 @@ By **default**, Traefik will search for `traefik.toml` and `rules.toml` in the f
 You can override this in TraefikFileProviderProxy, by modifying the **static_config_file** argument:
 
 ```python
-c.TraefikFileProviderProxy.static_config_file="/path/to/static_config_filename.toml"
+c.TraefikFileProviderProxy.static_config_file = "/path/to/static_config_filename.toml"
 ```
 
 Similarly, you can override the dynamic configuration file by modifying the **dynamic_config_file** argument:
 
 ```python
-c.TraefikFileProviderProxy.dynamic_config_file="/path/to/dynamic_config_filename.toml"
+c.TraefikFileProviderProxy.dynamic_config_file = "/path/to/dynamic_config_filename.toml"
 ```
 
 ```{note}
 
-* **When JupyterHub starts the proxy**, it writes the static config once, then only edits the dynamic config file. 
+* **When JupyterHub starts the proxy**, it writes the static config once, then only edits the dynamic config file.
 
-* **When JupyterHub does not start the proxy**, the user is totally responsible for the static config and 
+* **When JupyterHub does not start the proxy**, the user is totally responsible for the static config and
 JupyterHub is responsible exclusively for the routes.
 
 * **When JupyterHub does not start the proxy**, the user should tell `traefik` to get its dynamic configuration
@@ -79,15 +79,14 @@ will be managed by JupyterHub. This allows e.g., the administrator to configure 
 
 ## Externally managed TraefikFileProviderProxy
 
-When TraefikFileProviderProxy is externally managed, service managers like [systemd](https://www.freedesktop.org/wiki/Software/systemd/) 
+When TraefikFileProviderProxy is externally managed, service managers like [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
 or [docker](https://www.docker.com/) will be responsible for starting and stopping the proxy.
 
 If TraefikFileProviderProxy is used as an externally managed service, then make sure you follow the steps enumerated below:
 
 1. Let JupyterHub know that the proxy being used is TraefikFileProviderProxy, using the *proxy_class* configuration option:
     ```python
-    from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
-    c.JupyterHub.proxy_class = TraefikFileProviderProxy
+    c.JupyterHub.proxy_class = "traefik_file"
     ```
 
 2. Configure `TraefikFileProviderProxy` in **jupyterhub_config.py**
@@ -152,13 +151,12 @@ If TraefikFileProviderProxy is used as an externally managed service, then make 
    * Check `tests/config_files/traefik.toml` for an example.
 
 ## Example setup
-   
+
 This is an example setup for using JupyterHub and TraefikFileProviderProxy managed by another service than JupyterHub.
 
 1. Configure the proxy through the JupyterHub configuration file, *jupyterhub_config.py*, e.g.:
 
    ```python
-   from jupyterhub_traefik_proxy import TraefikFileProviderProxy
 
    # mark the proxy as externally managed
    c.TraefikFileProviderProxy.should_start = False
@@ -173,7 +171,7 @@ This is an example setup for using JupyterHub and TraefikFileProviderProxy manag
    c.TraefikFileProviderProxy.dynamic_config_file = "/var/run/traefik/rules.toml"
 
    # configure JupyterHub to use TraefikFileProviderProxy
-   c.JupyterHub.proxy_class = TraefikFileProviderProxy
+   c.JupyterHub.proxy_class = "traefik_file"
     ```
 
 2. Create a traefik static configuration file, *traefik.toml*, e.g.:

@@ -273,7 +273,7 @@ class TraefikProxy(Proxy):
             self.traefik_process.wait()
 
     def _start_traefik(self):
-        if self.provider_name not in ("file", "etcd", "consul"):
+        if self.provider_name not in {"file", "etcd", "consul"}:
             raise ValueError(
                 "Configuration mode not supported \n.\
                 The proxy can only be configured through fileprovider, etcd and consul"

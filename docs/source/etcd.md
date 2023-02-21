@@ -69,36 +69,36 @@ You can choose to:
 3. By **default**, TraefikEtcdProxy assumes etcd accepts client requests on the official **default** etcd port `2379` for client requests.
 
     ```python
-    c.TraefikEtcdProxy.kv_url = "http://127.0.0.1:2379"
+    c.TraefikEtcdProxy.etcd_url = "http://127.0.0.1:2379"
     ```
 
-    If the etcd cluster is deployed differently than using the etcd defaults, then you **must** pass the etcd url to the proxy using 
-    the `kv_url` option in *jupyterhub_config.py*:
+    If the etcd cluster is deployed differently than using the etcd defaults, then you **must** pass the etcd url to the proxy using
+    the `etcd_url` option in *jupyterhub_config.py*:
 
     ```python
-    c.TraefikEtcdProxy.kv_url = "scheme://hostname:port"
+    c.TraefikEtcdProxy.etcd_url = "scheme://hostname:port"
     ```
 
 ```{note}
 
 1. **TraefikEtcdProxy does not manage the etcd cluster** and assumes it is up and running before the proxy itself starts.
 
-   However, based on how etcd is configured and started, TraefikEtcdProxy needs to be told about 
+   However, based on how etcd is configured and started, TraefikEtcdProxy needs to be told about
    some etcd configuration details, such as:
    * etcd **address** where it accepts client requests
      ```
-     c.TraefikEtcdProxy.kv_url="scheme://hostname:port"
+     c.TraefikEtcdProxy.etcd_url="scheme://hostname:port"
      ```
    * etcd **credentials** (if etcd has authentication enabled)
      ```
-     c.TraefikEtcdProxy.kv_username="abc"
-     c.TraefikEtcdProxy.kv_password="123"
+     c.TraefikEtcdProxy.etcd_username="abc"
+     c.TraefikEtcdProxy.etcd_password="123"
      ```
 
-2. Etcd has two API versions: the API V3 and the API V2. Traefik suggests using Etcd API V3, 
+2. Etcd has two API versions: the API V3 and the API V2. Traefik suggests using Etcd API V3,
 because the API V2 won't be supported in the future.
 
-   Checkout the [etcd documentation](https://coreos.com/etcd/docs/latest/op-guide/configuration.html) 
+   Checkout the [etcd documentation](https://coreos.com/etcd/docs/latest/op-guide/configuration.html)
 to find out more about possible etcd configuration options.
 ```
 
@@ -124,15 +124,15 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
    c.TraefikEtcdProxy.should_start = False
 
    # if not the default:
-   c.TraefikEtcdProxy.kv_url = "http://etcd-host:2379"
+   c.TraefikEtcdProxy.etcd_url = "http://etcd-host:2379"
 
    # traefik api credentials
    c.TraefikEtcdProxy.traefik_api_username = "abc"
    c.TraefikEtcdProxy.traefik_api_password = "123"
 
    # etcd credentials
-   c.TraefikEtcdProxy.kv_username = "def"
-   c.TraefikEtcdProxy.kv_password = "456"
+   c.TraefikEtcdProxy.etcd_username = "def"
+   c.TraefikEtcdProxy.etcd_password = "456"
    ```
 
 3. Create a *toml* file with traefik's desired static configuration
@@ -207,7 +207,7 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
    c.TraefikEtcdProxy.traefik_api_username = "123"
 
    # etcd url where it accepts client requests
-   c.TraefikEtcdProxy.kv_url = "path/to/rules.toml"
+   c.TraefikEtcdProxy.etcd_url = "http://127.0.0.1:2379"
 
    # configure JupyterHub to use TraefikEtcdProxy
    c.JupyterHub.proxy_class = TraefikEtcdProxy
@@ -218,9 +218,9 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
     If you intend to enable authentication on etcd, add the etcd credentials to *jupyterhub_config.py*:
 
         # etcd username
-        c.TraefikEtcdProxy.kv_username = "def"
+        c.TraefikEtcdProxy.etcd_username = "def"
         # etcd password
-        c.TraefikEtcdProxy.kv_password = "456"
+        c.TraefikEtcdProxy.etcd_password = "456"
     ```
 
 2. Start a single-note etcd cluster on the default port on localhost. e.g.:
@@ -255,7 +255,7 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
     # the port on localhost where the traefik api and dashboard can be found
     [entryPoints.auth_api]
     address = ":8099"
-    
+
     # authenticate the traefik api entrypoint
     [entryPoints.auth_api.auth.basic]
     users = [ "abc:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]

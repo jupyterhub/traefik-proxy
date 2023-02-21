@@ -69,30 +69,30 @@ You can choose to:
 3. By **default**, TraefikConsulProxy assumes consul accepts client requests on the official **default** consul port `8500` for client requests.
 
     ```python
-    c.TraefikConsulProxy.kv_url = "http://127.0.0.1:8500"
+    c.TraefikConsulProxy.consul_url = "http://127.0.0.1:8500"
     ```
 
-    If the consul cluster is deployed differently than using the consul defaults, then you **must** pass the consul url to the proxy using 
-    the `kv_url` option in *jupyterhub_config.py*:
+    If the consul cluster is deployed differently than using the consul defaults, then you **must** pass the consul url to the proxy using
+    the `consul_url` option in *jupyterhub_config.py*:
 
     ```python
-    c.TraefikConsulProxy.kv_url = "scheme://hostname:port"
+    c.TraefikConsulProxy.consul_url = "scheme://hostname:port"
     ```
 
     ```{note}
     **TraefikConsulProxy does not manage the consul cluster** and assumes it is up and running before the proxy itself starts.
-    However, based on how consul is configured and started, TraefikConsulProxy needs to be told about 
+    However, based on how consul is configured and started, TraefikConsulProxy needs to be told about
     some consul configuration details, such as:
       * consul **address** where it accepts client requests
-        ```
-          c.TraefikConsulProxy.kv_url="scheme://hostname:port"
+        ```python
+        c.TraefikConsulProxy.consul_url = "scheme://hostname:port"
         ```
       * consul **credentials** (if consul has acl enabled)
-        ```
-          c.TraefikConsulProxy.kv_password="123"
+        ```pythno
+          c.TraefikConsulProxy.consul_password = "123"
         ```
 
-    Checkout the [consul documentation](https://learn.hashicorp.com/consul/) 
+    Checkout the [consul documentation](https://learn.hashicorp.com/consul/)
     to find out more about possible consul configuration options.
     ```
 
@@ -118,14 +118,14 @@ If TraefikConsulProxy is used as an externally managed service, then make sure y
    c.TraefikConsulProxy.should_start = False
 
    # if not the default:
-   c.TraefikConsulProxy.kv_url = "http://consul-host:2379"
+   c.TraefikConsulProxy.consul_url = "http://consul-host:2379"
 
    # traefik api credentials
    c.TraefikConsulProxy.traefik_api_username = "abc"
    c.TraefikConsulProxy.traefik_api_password = "123"
 
    # consul acl token
-   c.TraefikConsulProxy.kv_password = "456"
+   c.TraefikConsulProxy.consul_password = "456"
    ```
 
 3. Create a *toml* file with traefik's desired static configuration
@@ -198,17 +198,17 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
    c.TraefikConsulProxy.traefik_api_username = "123"
 
    # consul url where it accepts client requests
-   c.TraefikConsulProxy.kv_url = "path/to/rules.toml"
+   c.TraefikConsulProxy.consul_url = "path/to/rules.toml"
 
    # configure JupyterHub to use TraefikConsulProxy
    c.JupyterHub.proxy_class = TraefikConsulProxy
    ```
 
     ```{note}
-    If you intend to enable consul acl, add the acl token to *jupyterhub_config.py* under *kv_password*:
+    If you intend to enable consul acl, add the acl token to *jupyterhub_config.py* under *consul_password*:
 
         # consul token
-        c.TraefikConsulProxy.kv_password = "456"
+        c.TraefikConsulProxy.consul_password = "456"
     ```
 
 2. Starts the agent in development mode on the default port on localhost. e.g.:
@@ -242,7 +242,7 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
     # the port on localhost where the traefik api and dashboard can be found
     [entryPoints.auth_api]
     address = ":8099"
-    
+
     # authenticate the traefik api entrypoint
     [entryPoints.auth_api.auth.basic]
     users = [ "abc:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]

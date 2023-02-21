@@ -87,7 +87,7 @@ async def no_auth_consul_proxy(launch_consul):
     """
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        kv_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
@@ -106,10 +106,10 @@ async def auth_consul_proxy(launch_consul_acl):
     """
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        kv_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
-        kv_password=Config.consul_token,
+        consul_password=Config.consul_token,
         check_route_timeout=45,
         should_start=True,
     )
@@ -154,9 +154,9 @@ async def launch_etcd_proxy():
         public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
-        kv_url="https://localhost:2379",
-        kv_username="root",
-        kv_password=Config.etcd_password,
+        etcd_url="https://localhost:2379",
+        etcd_username="root",
+        etcd_password=Config.etcd_password,
         etcd_client_ca_cert=f"{config_files}/fake-ca-cert.crt",
         etcd_insecure_skip_verify=True,
         check_route_timeout=45,
@@ -254,7 +254,7 @@ async def external_file_proxy_toml(launch_traefik_file):
 async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_consul):
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        kv_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
@@ -271,10 +271,10 @@ async def auth_external_consul_proxy(
     print("creating proxy")
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        kv_url=f"http://127.0.0.1:{Config.consul_auth_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
-        kv_password=Config.consul_token,
+        consul_password=Config.consul_token,
         check_route_timeout=45,
         should_start=False,
     )
@@ -293,7 +293,7 @@ async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
     )
     await proxy._wait_for_static_config()
     yield proxy
-    proxy.kv_client.close()
+    proxy.etcd.close()
 
 
 @pytest.fixture

@@ -19,13 +19,13 @@ Route Specification:
 # Distributed under the terms of the Modified BSD License.
 
 from concurrent.futures import ThreadPoolExecutor
-import escapism
 from urllib.parse import urlparse
+import warnings
 
+import escapism
 from tornado.concurrent import run_on_executor
-from traitlets import Any, default, Bool, List, Unicode
+from traitlets import Any, default, observe, Bool, List, Unicode
 
-from jupyterhub.utils import maybe_future
 from .kv_proxy import TKvProxy
 
 
@@ -73,20 +73,47 @@ class TraefikEtcdProxy(TKvProxy):
         config=True,
         allow_none=True,
         default_value=None,
-        help="""Any grpc options that need to be passed to the etcd client"""
+        help="""Any grpc options that need to be passed to the etcd client""",
     )
 
     @default("executor")
     def _default_executor(self):
         return ThreadPoolExecutor(1)
 
-    @default("kv_url")
-    def _default_kv_url(self):
-        return "http://127.0.0.1:2379"
+    etcd_url = Unicode(
+        "http://127.0.0.1:2379",
+        config=True,
+        help="URL for the etcd endpoint.",
+    )
 
-    @default("kv_client")
+    etcd_username = Unicode(
+        "",
+        config=True,
+        help="Username for accessing etcd.",
+    )
+    etcd_password = Unicode(
+        "",
+        config=True,
+        help="Password for accessing etcd.",
+    )
+
+    kv_url = Unicode("DEPRECATED", config=True)
+    kv_username = Unicode("DEPRECATED", config=True)
+    kv_password = Unicode("DEPRECATED", config=True)
+
+    @observe("kv_url", "kv_username", "kv_password")
+    def _deprecated_config(self, change):
+        new_name = change.name.replace("kv_", "etcd_")
+        warnings.warn(
+            f"TraefikEtcdProxy.{change.name} is deprecated in 0.4. Use TraefikEtcdProxy.{new_name} = {change.new!r}"
+        )
+        setattr(self, new_name, change.new)
+
+    etcd = Any()
+
+    @default("etcd")
     def _default_client(self):
-        etcd_service = urlparse(self.kv_url)
+        etcd_service = urlparse(self.etcd_url)
         try:
             import etcd3
         except ImportError:
@@ -99,37 +126,39 @@ class TraefikEtcdProxy(TKvProxy):
             'cert_key': self.etcd_client_cert_key,
             'grpc_options': self.grpc_options
         }
-        if self.kv_password:
-            kwargs.update({
-                'user': self.kv_username,
-                'password': self.kv_password
-            })
+        if self.etcd_password:
+            kwargs.update(
+                {
+                    "user": self.etcd_username,
+                    "password": self.etcd_password,
+                }
+            )
         return etcd3.client(**kwargs)
 
     def _clean_resources(self):
         super()._clean_resources()
-        self.kv_client.close()
+        self.etcd.close()
 
     @run_on_executor
     def _etcd_transaction(self, success_actions):
-        status, response = self.kv_client.transaction(
+        status, response = self.etcd.transaction(
             compare=[], success=success_actions, failure=[]
         )
         return status, response
 
     @run_on_executor
     def _etcd_get(self, key):
-        value, _ = self.kv_client.get(key)
+        value, _ = self.etcd.get(key)
         return value
 
     @run_on_executor
     def _etcd_get_prefix(self, prefix):
-        routes = self.kv_client.get_prefix(prefix)
+        routes = self.etcd.get_prefix(prefix)
         return routes
 
     def _define_kv_specific_static_config(self):
         self.log.debug("Setting up the etcd provider in the static config")
-        url = urlparse(self.kv_url)
+        url = urlparse(self.etcd_url)
         self.static_config.update({"providers" : {
             "etcd" : {
                 "endpoints": [url.netloc],
@@ -144,11 +173,13 @@ class TraefikEtcdProxy(TKvProxy):
             tls_conf["insecureSkipVerify"] = self.etcd_insecure_skip_verify
             self.static_config["providers"]["etcd"]["tls"] = tls_conf
 
-        if self.kv_username and self.kv_password:
-            self.static_config["providers"]["etcd"].update({
-                "username": self.kv_username,
-                "password": self.kv_password
-            })
+        if self.etcd_username and self.etcd_password:
+            self.static_config["providers"]["etcd"].update(
+                {
+                    "username": self.etcd_username,
+                    "password": self.etcd_password,
+                }
+            )
 
     async def _kv_atomic_add_route_parts(
         self, jupyterhub_routespec, target, data, route_keys, rule
@@ -158,7 +189,7 @@ class TraefikEtcdProxy(TKvProxy):
         jupyterhub_target = self.kv_separator.join(
             [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
         )
-        put = self.kv_client.transactions.put
+        put = self.etcd.transactions.put
         success = [
             # e.g. jupyter/routers/router-1 = {target}
             put(jupyterhub_routespec, target),
@@ -191,12 +222,12 @@ class TraefikEtcdProxy(TKvProxy):
         if not self.traefik_entrypoint:
             self.traefik_entrypoint = await self._get_traefik_entrypoint()
         success.append(put(ep_path, self.traefik_entrypoint))
-                
-        status, response = await maybe_future(self._etcd_transaction(success))
+
+        status, response = await self._etcd_transaction(success)
         return status, response
 
     async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
-        value = await maybe_future(self._etcd_get(jupyterhub_routespec))
+        value = await self._etcd_get(jupyterhub_routespec)
         if value is None:
             self.log.warning(
                 f"Route {jupyterhub_routespec} doesn't exist. Nothing to delete"
@@ -210,7 +241,7 @@ class TraefikEtcdProxy(TKvProxy):
         router_path = self.kv_separator.join(
             ["traefik", "http", "routers", route_keys.router_alias]
         )
-        delete = self.kv_client.transactions.delete
+        delete = self.etcd.transactions.delete
         success = [
             delete(jupyterhub_routespec),
             delete(jupyterhub_target),
@@ -228,17 +259,17 @@ class TraefikEtcdProxy(TKvProxy):
                 tls_path = self.kv_separator.join([tls_path, "certResolver"])
             success.append(delete(tls_path))
 
-        status, response = await maybe_future(self._etcd_transaction(success))
+        status, response = await self._etcd_transaction(success)
         return status, response
 
     async def _kv_get_target(self, jupyterhub_routespec):
-        value = await maybe_future(self._etcd_get(jupyterhub_routespec))
+        value = await self._etcd_get(jupyterhub_routespec)
         if value is None:
             return None
         return value.decode()
 
     async def _kv_get_data(self, target):
-        value = await maybe_future(self._etcd_get(target))
+        value = await self._etcd_get(target)
         if value is None:
             return None
         return value
@@ -261,14 +292,13 @@ class TraefikEtcdProxy(TKvProxy):
     async def _kv_get_jupyterhub_prefixed_entries(self):
         sep = self.kv_separator
         routespecs_prefix = sep.join([self.kv_jupyterhub_prefix, "routes" + sep])
-        routes = await maybe_future(self._etcd_get_prefix(routespecs_prefix))
+        routes = await self._etcd_get_prefix(routespecs_prefix)
         return routes
 
     async def persist_dynamic_config(self):
         data = self.flatten_dict_for_kv(self.dynamic_config, prefix=self.kv_traefik_prefix)
         transactions = []
         for k, v in data.items():
-            transactions.append(self.kv_client.transactions.put(k, v))
-        status, response = await maybe_future(self._etcd_transaction(transactions))
+            transactions.append(self.etcd.transactions.put(k, v))
+        status, response = await self._etcd_transaction(transactions)
         return status, response
-
