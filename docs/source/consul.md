@@ -88,7 +88,7 @@ You can choose to:
         c.TraefikConsulProxy.consul_url = "scheme://hostname:port"
         ```
       * consul **credentials** (if consul has acl enabled)
-        ```pythno
+        ```python
           c.TraefikConsulProxy.consul_password = "123"
         ```
 
