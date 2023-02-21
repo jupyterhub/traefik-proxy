@@ -117,7 +117,7 @@ class TraefikEtcdProxy(TKvProxy):
         try:
             import etcd3
         except ImportError:
-            raise ImportError("Please install etcd3 package to use traefik-proxy with etcd3")
+            raise ImportError("Please install etcd3 or etcdpy package to use traefik-proxy with etcd3")
         kwargs = {
             'host': etcd_service.hostname,
             'port': etcd_service.port,

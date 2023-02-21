@@ -134,7 +134,8 @@ def atomic_writing(path):
             # already deleted by os.replace above
             pass
 
-class TraefikConfigFileHandler(object):
+
+class TraefikConfigFileHandler:
     """Handles reading and writing Traefik config files. Can operate
     on both toml and yaml files"""
     def __init__(self, file_path):
@@ -144,7 +145,7 @@ class TraefikConfigFileHandler(object):
                 from ruamel.yaml import YAML
             except ImportError:
                 raise ImportError("jupyterhub-traefik-proxy requires ruamel.yaml to use YAML config files")
-            config_handler = YAML(typ="safe")
+            config_handler = YAML(typ="rt")
         elif file_ext == 'toml':
             import toml as config_handler
         else:

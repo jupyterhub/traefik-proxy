@@ -370,7 +370,7 @@ class TraefikProxy(Proxy):
         try:
             self.log.debug(f"Persisting the static config: {self.static_config}")
             handler = traefik_utils.TraefikConfigFileHandler(self.static_config_file)
-            handler.dump(self.static_config)
+            handler.atomic_dump(self.static_config)
         except IOError:
             self.log.exception("Couldn't set up traefik's static config.")
             raise
