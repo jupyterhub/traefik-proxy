@@ -75,7 +75,7 @@ jobs:
           curl -L https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip > consul.zip
           unzip consul.zip -d ./bin consul
           curl -L https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz   > etcd.tar.gz
-          tar -xzf etcd.tar.gz -C ./bin --strip-components=1 '*/etcd*'
+          tar -xzf etcd.tar.gz -C ./bin --strip-components=1 --wildcards '*/etcd*'
 
       - name: Select tests
         run: |
