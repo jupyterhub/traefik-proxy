@@ -37,6 +37,22 @@ with examples for the three different implementations.
 * [For TraefikEtcdProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup)
 * [For TraefikConsulProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/consul.html#example-setup)
 
+## Docker Compose
+
+A fully functional `docker-compose` example environment is included in the
+[examples](examples/docker-compose) directory. This can be configured to suit
+your needs.
+
+Running `docker-compose up` from that directory will start two containers, one
+running `jupyterhub` and another running `traefik`. N.B. Two docker volumes
+will be created, as well as two docker networks.
+
+Users logging into this example jupyterhub environment will have
+`jupyterhub/singleuser` notebook servers launched for them in separate docker
+containers (using `JupyterHub.DockerSpawner`). See
+https://jupyterhub-dockerspawner.readthedocs.io/en/latest/docker-image.html for
+instructions on building custom user notebook images. User data will be
+persisted to separate docker volumes created for each user.
 
 ## Running tests
 

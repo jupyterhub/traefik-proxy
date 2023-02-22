@@ -33,6 +33,7 @@ Installation Guide
    :maxdepth: 2
 
    install
+   docker-compose
 
 Getting Started
 ---------------
