@@ -492,7 +492,7 @@ async def _wait_for_etcd(*etcd_args):
         )
         sys.stdout.write(p.stdout)
         sys.stderr.write(p.stderr)
-        return "is healthy" in p.stdout
+        return "is healthy" in p.stdout + p.stderr
 
     await exponential_backoff(check, "etcd health check", timeout=10)
 
