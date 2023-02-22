@@ -21,7 +21,7 @@
    1. Through traefik-proxy's **install utility**.
 
       ```
-      $ python3 -m jupyterhub_traefik_proxy.install  --output=/usr/local/bin
+      $ python3 -m jupyterhub_traefik_proxy.install --output=/usr/local/bin
       ```
 
       This will install `traefik`.
