@@ -56,19 +56,20 @@ class TraefikFileProviderProxy(TraefikProxy):
     def _set_dynamic_config_file(self, change):
         self.dynamic_config_handler = traefik_utils.TraefikConfigFileHandler(self.dynamic_config_file)
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    @default("dynamic_config")
+    def _load_dynamic_config(self):
         try:
             # Load initial dynamic config from disk
-            self.dynamic_config = self.dynamic_config_handler.load()
+            dynamic_config = self.dynamic_config_handler.load()
         except FileNotFoundError:
-            self.dynamic_config = {}
+            dynamic_config = {}
 
-        if not self.dynamic_config:
-            self.dynamic_config = {
+        if not dynamic_config:
+            dynamic_config = {
                 "http" : {"services": {}, "routers": {}},
                 "jupyter": {"routers" : {} }
             }
+        return dynamic_config
 
     def persist_dynamic_config(self):
         """Save the dynamic config file with the current dynamic_config"""
@@ -238,7 +239,6 @@ class TraefikFileProviderProxy(TraefikProxy):
         router_alias = traefik_utils.generate_alias(routespec, "router")
 
         async with self.mutex:
-            
             # Pop each entry and if it's the last one, delete the key
             self.dynamic_config["http"]["routers"].pop(router_alias, None)
             self.dynamic_config["http"]["services"].pop(service_alias, None)
@@ -309,4 +309,3 @@ class TraefikFileProviderProxy(TraefikProxy):
         routespec = self.validate_routespec(routespec)
         async with self.mutex:
             return self._get_route_unsafe(routespec)
-

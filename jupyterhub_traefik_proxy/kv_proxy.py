@@ -22,7 +22,7 @@ import escapism
 import json
 import os
 
-from traitlets import Any, Unicode, default
+from traitlets import Unicode
 from collections.abc import MutableMapping
 
 from . import traefik_utils
@@ -32,49 +32,28 @@ from .proxy import TraefikProxy
 class TKvProxy(TraefikProxy):
     """
     JupyterHub Proxy implementation using traefik and a key-value store.
-    Custom proxy implementations based on trafik and a key-value store
+
+    Custom proxy implementations based on traefik and a key-value store
     can sublass :class:`TKvProxy`.
     """
 
-    kv_client = Any()
-    # Key-value store client
-
-    kv_username = Unicode(
-        config=True, help="""The username for key value store login"""
-    )
-
-    kv_password = Unicode(
-        config=True, help="""The password for key value store login"""
-    )
-
-    kv_url = Unicode(config=True, help="""The URL of the key value store server""")
-
     kv_traefik_prefix = traefik_utils.KVStorePrefix(
+        "traefik",
         config=True,
         help="""The key value store key prefix for traefik static configuration""",
     )
 
-    kv_jupyterhub_prefix = Unicode(
+    kv_jupyterhub_prefix = traefik_utils.KVStorePrefix(
+        "jupyterhub",
         config=True,
         help="""The key value store key prefix for traefik dynamic configuration""",
     )
 
     kv_separator = Unicode(
+        "/",
         config=True,
-        help="""The separator used for the path in the KV store"""
+        help="""The separator used for the path in the KV store""",
     )
-
-    @default("kv_traefik_prefix")
-    def _default_kv_traefik_prefix(self):
-        return "traefik"
-
-    @default("kv_jupyterhub_prefix")
-    def _default_kv_jupyterhub_prefix(self):
-        return "jupyterhub"
-
-    @default("kv_separator")
-    def _default_kv_separator(self):
-        return "/"
 
     def _define_kv_specific_static_config(self):
         """Define the traefik static configuration that configures
@@ -427,5 +406,5 @@ class TKvProxy(TraefikProxy):
                 for n, item in enumerate(v):
                     items.update({ f"{new_key}{sep}{n}" : item })
             else:
-                raise ValueError(f"Cannot upload {v} of type {type(v)} to etcd store")
+                raise ValueError(f"Cannot upload {v} of type {type(v)} to kv store")
         return items

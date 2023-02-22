@@ -33,6 +33,7 @@ jobs:
   # Run "pytest tests" for various Python versions
   pytest:
     runs-on: ubuntu-20.04
+    timeout-minutes: 30
     strategy:
       # Keep running even if one variation of the job fail
       fail-fast: false
