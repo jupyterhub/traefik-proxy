@@ -6,7 +6,7 @@ Make sure to also follow [Project Jupyter's Code of Conduct](https://github.com/
 
 ## Setting up for local development
 
-This package requires Python >= 3.5.
+This package requires Python >= 3.6.
 
 As a Python package, you can set up a development environment by cloning this repo and running:
 
@@ -18,24 +18,18 @@ You can also install the tools we use for testing and development with:
 
     python3 -m pip install -r dev-requirements.txt
 
+### Auto-format with pre-commit
 
-### Auto-format with black
+We use the [pre-commit](https://pre-commit.com) tool for autoformatting.
 
-We are trying out the [black](https://github.com/ambv/black) auto-formatting
-tool on this repo.
+You can install and enable it with:
 
-You can run `black` manually on the repo with:
-
-    black .
-
-in the root of the repo. You can also enable this automatically on each commit
-by installing a pre-commit hook:
-
-    ./git-hooks/install
+    pip install pre-commit
+    pre-commit install
 
 After doing this, every time you make a commit,
-the `black` autoformatter will run,
-ensuring consistent style without you having to worry too much about style.
+`pre-commit` will run autoformatting.
+If it makes any changes, it'll let you know and you can make the commit again with the autoformatting changes.
 
 ## Running the tests
 

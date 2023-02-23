@@ -24,11 +24,11 @@ from os.path import abspath
 from subprocess import Popen, TimeoutExpired
 from urllib.parse import urlparse
 
-from traitlets import Any, Bool, Dict, Integer, Unicode, default, observe
-from tornado.httpclient import AsyncHTTPClient
-
-from jupyterhub.utils import exponential_backoff, url_path_join, new_token
 from jupyterhub.proxy import Proxy
+from jupyterhub.utils import exponential_backoff, new_token, url_path_join
+from tornado.httpclient import AsyncHTTPClient
+from traitlets import Any, Bool, Dict, Integer, Unicode, default
+
 from . import traefik_utils
 
 
@@ -126,14 +126,16 @@ class TraefikProxy(Proxy):
         return urlparse(self.public_url).scheme == "https"
 
     traefik_cert_resolver = Unicode(
-        config=True, help="""The traefik certificate Resolver to use for requesting certificates"""
+        config=True,
+        help="""The traefik certificate Resolver to use for requesting certificates""",
     )
 
     # FIXME: How best to enable TLS on routers assigned to only select
     # entrypoints defined here?
     traefik_entrypoint = Unicode(
         help="""The traefik entrypoint names, to which each """
-             """jupyterhub-configred Traefik router is assigned""")
+        """jupyterhub-configred Traefik router is assigned"""
+    )
 
     async def _get_traefik_entrypoint(self):
         """Find the traefik entrypoint that matches our :attrib:`self.public_url`"""
@@ -143,10 +145,11 @@ class TraefikProxy(Proxy):
             else:
                 return "web"
         import re
+
         # FIXME: Adding '_wait_for_static_config' to get through 'external'
         # tests. Would this be required in the 'real world'?
         # Adding _wait_for_static_config to the 'external' conftests instead...
-        #await self._wait_for_static_config()
+        # await self._wait_for_static_config()
         resp = await self._traefik_api_request("/api/entrypoints")
         json_data = json.loads(resp.body)
         public_url = urlparse(self.public_url)
@@ -159,7 +162,9 @@ class TraefikProxy(Proxy):
             elif public_url.scheme == 'https':
                 hub_port = 443
             else:
-                raise ValueError(f"Cannot discern public_url port from {self.public_url}!")
+                raise ValueError(
+                    f"Cannot discern public_url port from {self.public_url}!"
+                )
         # Traefik entrypoint format described at:-
         # https://doc.traefik.io/traefik/routing/entrypoints/#address
         entrypoint_re = re.compile('([^:]+)?:([0-9]+)/?(tcp|udp)?')
@@ -168,7 +173,9 @@ class TraefikProxy(Proxy):
             if int(port) == hub_port:
                 return entrypoint["name"]
         entrypoints = [entrypoint["address"] for entrypoint in json_data]
-        raise ValueError(f"No traefik entrypoint ports ({entrypoints}) match public_url: {self.public_url}!")
+        raise ValueError(
+            f"No traefik entrypoint ports ({entrypoints}) match public_url: {self.public_url}!"
+        )
 
     @default("traefik_api_password")
     def _warn_empty_password(self):
@@ -213,6 +220,7 @@ class TraefikProxy(Proxy):
 
     def _generate_htpassword(self):
         from passlib.hash import apr_md5_crypt
+
         self.traefik_api_hashed_password = apr_md5_crypt.hash(self.traefik_api_password)
 
     async def _check_for_traefik_service(self, routespec, kind):
@@ -222,7 +230,9 @@ class TraefikProxy(Proxy):
         from a provider
         """
         # expected e.g. 'service' + '_' + routespec @ file
-        expected = traefik_utils.generate_alias(routespec, kind) + "@" + self.provider_name
+        expected = (
+            traefik_utils.generate_alias(routespec, kind) + "@" + self.provider_name
+        )
         path = f"/api/http/{kind}s"
         try:
             resp = await self._traefik_api_request(path)
@@ -244,13 +254,9 @@ class TraefikProxy(Proxy):
 
         async def _check_traefik_dynamic_conf_ready():
             """Check if traefik loaded its dynamic configuration yet"""
-            if not await self._check_for_traefik_service(
-                routespec, "service"
-            ):
+            if not await self._check_for_traefik_service(routespec, "service"):
                 return False
-            if not await self._check_for_traefik_service(
-                routespec, "router"
-            ):
+            if not await self._check_for_traefik_service(routespec, "router"):
                 return False
 
             return True
@@ -327,7 +333,7 @@ class TraefikProxy(Proxy):
                 ["traefik", "--configfile", abspath(self.static_config_file)],
                 env=env,
             )
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             self.log.error(
                 "Failed to find traefik \n"
                 "The proxy can be downloaded from https://github.com/containous/traefik/releases/download."
@@ -348,7 +354,7 @@ class TraefikProxy(Proxy):
         self.log.info("Setting up traefik's static config...")
 
         if self.traefik_log_level:
-            self.static_config["log"] = { "level": self.traefik_log_level }
+            self.static_config["log"] = {"level": self.traefik_log_level}
 
         # FIXME: Do we only create a single entrypoint for jupyterhub?
         # Why not have an http and https entrypoint?
@@ -356,12 +362,12 @@ class TraefikProxy(Proxy):
             self.traefik_entrypoint = await self._get_traefik_entrypoint()
 
         entrypoints = {
-            self.traefik_entrypoint : {
+            self.traefik_entrypoint: {
                 "address": f":{urlparse(self.public_url).port}",
             },
-            "enter_api" : {
+            "enter_api": {
                 "address": f":{urlparse(self.traefik_api_url).port}",
-            }
+            },
         }
 
         self.static_config["entryPoints"] = entrypoints
@@ -371,7 +377,7 @@ class TraefikProxy(Proxy):
             self.log.debug(f"Persisting the static config: {self.static_config}")
             handler = traefik_utils.TraefikConfigFileHandler(self.static_config_file)
             handler.atomic_dump(self.static_config)
-        except IOError:
+        except OSError:
             self.log.exception("Couldn't set up traefik's static config.")
             raise
         except:
@@ -383,41 +389,41 @@ class TraefikProxy(Proxy):
         self._generate_htpassword()
         api_url = urlparse(self.traefik_api_url)
         api_path = api_url.path if api_url.path else '/api'
-        api_credentials = f"{self.traefik_api_username}:{self.traefik_api_hashed_password}"
-        self.dynamic_config.update({
-            "http": {
-                "routers": {
-                    "route_api": {
-                        "rule": f"Host(`{api_url.hostname}`) && (PathPrefix(`{api_path}`) || PathPrefix(`/dashboard`))",
-                        "entryPoints": ["enter_api"],
-                        "service": "api@internal",
-                        "middlewares": ["auth_api"]
+        api_credentials = (
+            f"{self.traefik_api_username}:{self.traefik_api_hashed_password}"
+        )
+        self.dynamic_config.update(
+            {
+                "http": {
+                    "routers": {
+                        "route_api": {
+                            "rule": f"Host(`{api_url.hostname}`) && (PathPrefix(`{api_path}`) || PathPrefix(`/dashboard`))",
+                            "entryPoints": ["enter_api"],
+                            "service": "api@internal",
+                            "middlewares": ["auth_api"],
+                        },
                     },
-                },
-                "middlewares": {
-                    "auth_api": {
-                        "basicAuth": {
-                            "users": [
-                                api_credentials
-                            ]
-                        }
-                    }
+                    "middlewares": {
+                        "auth_api": {"basicAuth": {"users": [api_credentials]}}
+                    },
                 }
             }
-        })
+        )
         if self.ssl_cert and self.ssl_key:
-            self.dynamic_config.update({
-                "tls": {
-                    "stores": {
-                        "default": {
-                            "defaultCertificate": {
-                                "certFile": self.ssl_cert,
-                                "keyFile": self.ssl_key
+            self.dynamic_config.update(
+                {
+                    "tls": {
+                        "stores": {
+                            "default": {
+                                "defaultCertificate": {
+                                    "certFile": self.ssl_cert,
+                                    "keyFile": self.ssl_key,
+                                }
                             }
                         }
                     }
                 }
-            })
+            )
 
     def validate_routespec(self, routespec):
         """Override jupyterhub's default Proxy.validate_routespec method, as traefik

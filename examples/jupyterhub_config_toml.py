@@ -8,6 +8,8 @@ to enable testing without administrative privileges.
 requires jupyterhub 1.0.dev
 """
 
+c = get_config()  # noqa
+
 c.JupyterHub.proxy_class = "traefik_file"
 c.TraefikFileProviderProxy.traefik_api_username = "admin"
 c.TraefikFileProviderProxy.traefik_api_password = "admin"

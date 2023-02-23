@@ -1,4 +1,5 @@
 import asyncio
+
 import websockets
 
 
@@ -9,7 +10,7 @@ async def send_port(websocket, path):
 
 
 if __name__ == "__main__":
-    from sys import argv
+    pass
 
     asyncio.get_event_loop().run_until_complete(
         websockets.serve(send_port, "localhost", 9000)

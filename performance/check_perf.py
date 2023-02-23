@@ -1,10 +1,9 @@
 import asyncio
 import csv
 import os
-import time
 
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 import websockets
+from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 
 from . import perf_utils
 

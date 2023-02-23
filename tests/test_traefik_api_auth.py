@@ -1,6 +1,5 @@
 """Tests for the authentication to the traefik proxy api (dashboard)"""
 import pytest
-
 from jupyterhub.utils import exponential_backoff
 from tornado.httpclient import AsyncHTTPClient
 
@@ -57,9 +56,7 @@ async def test_traefik_api_auth(proxy, username, password, expected_rc):
         else:
             return False
 
-    await exponential_backoff(
-        cmp_api_login, "Traefik API not reacheable"
-    )
+    await exponential_backoff(cmp_api_login, "Traefik API not reacheable")
 
     rc = await api_login()
     assert rc == expected_rc

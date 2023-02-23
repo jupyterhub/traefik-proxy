@@ -18,12 +18,12 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-from urllib.parse import urlparse
 import base64
 import string
+from urllib.parse import urlparse
 
 import escapism
-from traitlets import default, Any, Unicode
+from traitlets import Any, Unicode, default
 
 from .kv_proxy import TKvProxy
 
@@ -81,7 +81,9 @@ class TraefikConsulProxy(TKvProxy):
         try:
             import consul.aio
         except ImportError:
-            raise ImportError("Please install python-consul2 package to use traefik-proxy with consul")
+            raise ImportError(
+                "Please install python-consul2 package to use traefik-proxy with consul"
+            )
         consul_service = urlparse(self.consul_url)
         kwargs = {
             "host": consul_service.hostname,
@@ -124,15 +126,19 @@ class TraefikConsulProxy(TKvProxy):
             self.dynamic_config, prefix=self.kv_traefik_prefix
         )
         payload = []
+
         def append_payload(key, val):
-            payload.append({
-                "KV": {
-                    "Verb": "set",
-                    "Key": key,
-                    "Value": base64.b64encode(val.encode()).decode(),
+            payload.append(
+                {
+                    "KV": {
+                        "Verb": "set",
+                        "Key": key,
+                        "Value": base64.b64encode(val.encode()).decode(),
+                    }
                 }
-            })
-        for k,v in data.items():
+            )
+
+        for k, v in data.items():
             append_payload(k, v)
 
         try:
@@ -156,14 +162,18 @@ class TraefikConsulProxy(TKvProxy):
         )
 
         payload = []
+
         def append_payload(key, value):
-            payload.append({
-                "KV": {
-                    "Verb": "set",
-                    "Key": key,
-                    "Value": base64.b64encode(value.encode()).decode()
+            payload.append(
+                {
+                    "KV": {
+                        "Verb": "set",
+                        "Key": key,
+                        "Value": base64.b64encode(value.encode()).decode(),
+                    }
                 }
-            })
+            )
+
         append_payload(jupyterhub_routespec, target)
         append_payload(jupyterhub_target, data)
         append_payload(route_keys.service_url_path, target)
@@ -198,7 +208,6 @@ class TraefikConsulProxy(TKvProxy):
         return status, response
 
     async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
-
         index, v = await self.consul.kv.get(jupyterhub_routespec)
         if v is None:
             self.log.warning(
@@ -210,7 +219,7 @@ class TraefikConsulProxy(TKvProxy):
             [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
         )
 
-        payload=[
+        payload = [
             {"KV": {"Verb": "delete", "Key": jupyterhub_routespec}},
             {"KV": {"Verb": "delete", "Key": jupyterhub_target}},
             {"KV": {"Verb": "delete", "Key": route_keys.service_url_path}},
@@ -225,11 +234,22 @@ class TraefikConsulProxy(TKvProxy):
             payload.append({"KV": {"Verb": "delete-tree", "Key": tls_path}})
 
         # delete any configured entrypoints
-        payload.append({"KV": {"Verb": "delete-tree", "Key":
-            self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "entryPoints"]
-            )
-        }})
+        payload.append(
+            {
+                "KV": {
+                    "Verb": "delete-tree",
+                    "Key": self.kv_separator.join(
+                        [
+                            "traefik",
+                            "http",
+                            "routers",
+                            route_keys.router_alias,
+                            "entryPoints",
+                        ]
+                    ),
+                }
+            }
+        )
 
         try:
             status, response = await self.consul.txn.put(payload=payload)
@@ -260,9 +280,7 @@ class TraefikConsulProxy(TKvProxy):
 
         # Strip the "jupyterhub/routes/" prefix from the routespec
         sep = self.kv_separator
-        route_prefix = sep.join(
-            [self.kv_jupyterhub_prefix, "routes"]
-        )
+        route_prefix = sep.join([self.kv_jupyterhub_prefix, "routes"])
         routespec = key.replace(route_prefix + sep, "")
 
         target = base64.b64decode(value.encode()).decode()
@@ -282,7 +300,7 @@ class TraefikConsulProxy(TKvProxy):
                         "Verb": "get-tree",
                         "Key": self.kv_separator.join(
                             [self.kv_jupyterhub_prefix, "routes"]
-                        )
+                        ),
                     }
                 }
             ]

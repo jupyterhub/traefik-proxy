@@ -10,4 +10,3 @@ python3 -m performance.check_perf --measure=methods --proxy=EtcdProxy --iteratio
 #stop etcd:
 pkill etcd
 -rf default.etcd/
-

@@ -1,8 +1,8 @@
-import socket
 import json
+import socket
 from urllib.parse import urlparse
 
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError, HTTPRequest
 
 _ports = {"default_backend": 9000, "first_backend": 9090, "second_backend": 9099}
 
@@ -43,7 +43,7 @@ async def check_host_up_http(url):
         return False
     req = HTTPRequest(url, validate_cert=False)
     try:
-        resp = await AsyncHTTPClient().fetch(req)
+        await AsyncHTTPClient().fetch(req)
     except HTTPClientError as e:
         if e.code >= 599:
             # connection error

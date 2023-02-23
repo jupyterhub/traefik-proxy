@@ -18,11 +18,11 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-import os
 import asyncio
-import escapism
+import os
 
-from traitlets import Any, default, Unicode, observe
+import escapism
+from traitlets import Any, Unicode, default, observe
 
 from . import traefik_utils
 from .proxy import TraefikProxy
@@ -54,7 +54,9 @@ class TraefikFileProviderProxy(TraefikProxy):
     # If dynamic_config_file is changed, then update the dynamic config file handler
     @observe("dynamic_config_file")
     def _set_dynamic_config_file(self, change):
-        self.dynamic_config_handler = traefik_utils.TraefikConfigFileHandler(self.dynamic_config_file)
+        self.dynamic_config_handler = traefik_utils.TraefikConfigFileHandler(
+            self.dynamic_config_file
+        )
 
     @default("dynamic_config")
     def _load_dynamic_config(self):
@@ -66,8 +68,8 @@ class TraefikFileProviderProxy(TraefikProxy):
 
         if not dynamic_config:
             dynamic_config = {
-                "http" : {"services": {}, "routers": {}},
-                "jupyter": {"routers" : {} }
+                "http": {"services": {}, "routers": {}},
+                "jupyter": {"routers": {}},
             }
         return dynamic_config
 
@@ -84,10 +86,7 @@ class TraefikFileProviderProxy(TraefikProxy):
 
     async def _setup_traefik_static_config(self):
         self.static_config["providers"] = {
-            "file" : {
-                "filename": self.dynamic_config_file,
-                "watch": True
-            }
+            "file": {"filename": self.dynamic_config_file, "watch": True}
         }
         await super()._setup_traefik_static_config()
 
@@ -111,7 +110,9 @@ class TraefikFileProviderProxy(TraefikProxy):
             # Will this ever cause a KeyError?
             result["target"] = service_node["loadBalancer"]["servers"][0]["url"]
 
-        jupyter_routers = self.dynamic_config["jupyter"]["routers"].get(router_alias, None)
+        jupyter_routers = self.dynamic_config["jupyter"]["routers"].get(
+            router_alias, None
+        )
         if jupyter_routers is not None:
             result["data"] = jupyter_routers["data"]
 
@@ -183,7 +184,7 @@ class TraefikFileProviderProxy(TraefikProxy):
             self.dynamic_config["http"]["routers"][router_alias] = {
                 "service": service_alias,
                 "rule": rule,
-                "entryPoints": [self.traefik_entrypoint]
+                "entryPoints": [self.traefik_entrypoint],
             }
 
             # Enable TLS on this router if globally enabled
@@ -192,30 +193,25 @@ class TraefikFileProviderProxy(TraefikProxy):
                 if self.traefik_cert_resolver:
                     tls_config["certResolver"] = self.traefik_cert_resolver
 
-                self.dynamic_config["http"]["routers"][router_alias].update({
-                    "tls": tls_config
-                })
+                self.dynamic_config["http"]["routers"][router_alias].update(
+                    {"tls": tls_config}
+                )
 
             # Add the data node to a separate top-level node, so traefik doesn't complain.
-            self.dynamic_config["jupyter"]["routers"][router_alias] = {
-                "data": data
-            }
+            self.dynamic_config["jupyter"]["routers"][router_alias] = {"data": data}
 
             if "services" not in self.dynamic_config["http"]:
                 self.dynamic_config["http"]["services"] = {}
 
             self.dynamic_config["http"]["services"][service_alias] = {
-                "loadBalancer": {
-                    "servers": [{"url": target}],
-                    "passHostHeader": True
-                }
+                "loadBalancer": {"servers": [{"url": target}], "passHostHeader": True}
             }
             self.persist_dynamic_config()
 
         if self.should_start:
             try:
                 # Check if traefik was launched
-                pid = self.traefik_process.pid
+                self.traefik_process.pid
             except AttributeError:
                 self.log.error(
                     "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
@@ -280,9 +276,9 @@ class TraefikFileProviderProxy(TraefikProxy):
                 escaped_routespec = "".join(router.split("_", 1)[1:])
                 traefik_routespec = escapism.unescape(escaped_routespec)
                 routespec = self.validate_routespec(traefik_routespec)
-                all_routes.update({
-                  routespec : self._get_route_unsafe(traefik_routespec)
-                })
+                all_routes.update(
+                    {routespec: self._get_route_unsafe(traefik_routespec)}
+                )
 
         return all_routes
 

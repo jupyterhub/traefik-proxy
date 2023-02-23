@@ -1,11 +1,14 @@
-import pytest
 import json
 import os
+
+import pytest
+
 from jupyterhub_traefik_proxy import traefik_utils
+
 
 # Mark all tests in this file as asyncio
 def test_roundtrip_routes():
-    pytestmark = pytest.mark.asyncio
+    pytest.mark.asyncio
     routes = {
         "backends": {
             "backend1": {

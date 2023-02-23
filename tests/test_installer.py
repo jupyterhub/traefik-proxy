@@ -1,12 +1,14 @@
-import pytest
-import sys
-import subprocess
 import os
+import subprocess
+import sys
+
+import pytest
 
 installer_module = "jupyterhub_traefik_proxy.install"
 
 # Mark all tests in this file as slow
 pytestmark = pytest.mark.slow
+
 
 def assert_only_traefik_existence(deps_dir):
     assert deps_dir.exists()

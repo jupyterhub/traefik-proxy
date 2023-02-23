@@ -1,4 +1,3 @@
-
 # JupyterHub Traefik Proxy
 
 [![Documentation build status](https://img.shields.io/readthedocs/jupyterhub-traefik-proxy?logo=read-the-docs)](https://jupyterhub-traefik-proxy.readthedocs.org/en/latest/)
@@ -19,12 +18,12 @@ depending on how traefik store its routing configuration.
 
 For **smaller**, single-node deployments:
 
-* TraefikFileProviderProxy
+- TraefikFileProviderProxy
 
 For **distributed** setups:
 
-* TraefikEtcdProxy
-* TraefikConsulProxy
+- TraefikEtcdProxy
+- TraefikConsulProxy
 
 ## Installation
 
@@ -33,14 +32,13 @@ The [documentation](https://jupyterhub-traefik-proxy.readthedocs.io) contains a
 guide](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/install.html)
 with examples for the three different implementations.
 
-* [For TraefikFileProviderProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/file.html#example-setup)
-* [For TraefikEtcdProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup)
-* [For TraefikConsulProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/consul.html#example-setup)
-
+- [For TraefikFileProviderProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/file.html#example-setup)
+- [For TraefikEtcdProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup)
+- [For TraefikConsulProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/consul.html#example-setup)
 
 ## Running tests
 
-There are some tests that use *etcdctl* command line client for etcd. Make sure
+There are some tests that use _etcdctl_ command line client for etcd. Make sure
 to set environment variable `ETCDCTL_API=3` before running the tests, so that
 the v3 API to be used, e.g.:
 
@@ -48,7 +46,7 @@ the v3 API to be used, e.g.:
 $ export ETCDCTL_API=3
 ```
 
-You can then run the all the test suite from the *traefik-proxy* directory with:
+You can then run the all the test suite from the _traefik-proxy_ directory with:
 
 ```
 $ pytest -v ./tests

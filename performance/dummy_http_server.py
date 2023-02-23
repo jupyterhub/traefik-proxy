@@ -1,8 +1,6 @@
-import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
 import numpy as np
-import sys
-import websockets
 
 
 class DummyServer(BaseHTTPRequestHandler):
