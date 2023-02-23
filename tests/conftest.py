@@ -87,7 +87,7 @@ async def no_auth_consul_proxy(launch_consul):
     """
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        kv_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
@@ -106,10 +106,10 @@ async def auth_consul_proxy(launch_consul_acl):
     """
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        kv_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
-        kv_password=Config.consul_token,
+        consul_password=Config.consul_token,
         check_route_timeout=45,
         should_start=True,
     )
@@ -154,14 +154,14 @@ async def launch_etcd_proxy():
         public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
-        kv_url="https://localhost:2379",
-        kv_username="root",
-        kv_password=Config.etcd_password,
+        etcd_url="https://localhost:2379",
+        etcd_username=Config.etcd_user,
+        etcd_password=Config.etcd_password,
         etcd_client_ca_cert=f"{config_files}/fake-ca-cert.crt",
         etcd_insecure_skip_verify=True,
         check_route_timeout=45,
         should_start=True,
-        grpc_options=grpc_options
+        grpc_options=grpc_options,
     )
 
     await proxy.start()
@@ -254,7 +254,7 @@ async def external_file_proxy_toml(launch_traefik_file):
 async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_consul):
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        kv_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
@@ -271,10 +271,10 @@ async def auth_external_consul_proxy(
     print("creating proxy")
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        kv_url=f"http://127.0.0.1:{Config.consul_auth_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
-        kv_password=Config.consul_token,
+        consul_password=Config.consul_token,
         check_route_timeout=45,
         should_start=False,
     )
@@ -293,7 +293,7 @@ async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
     )
     await proxy._wait_for_static_config()
     yield proxy
-    proxy.kv_client.close()
+    proxy.etcd.close()
 
 
 @pytest.fixture
@@ -450,25 +450,28 @@ async def launch_etcd_auth():
         "--listen-client-urls=https://localhost:2379",
         "--advertise-client-urls=https://localhost:2379",
         "--log-level=debug"],
-        close_fds=True
     )
-    await _wait_for_etcd(
+    try:
+        await _wait_for_etcd(
             "--insecure-skip-tls-verify=true",
             "--insecure-transport=false",
             "--debug")
-    yield etcd_proc
-    shutdown_etcd(etcd_proc)
+        yield etcd_proc
+    finally:
+        shutdown_etcd(etcd_proc)
 
 @pytest.fixture
 async def launch_etcd():
     with TemporaryDirectory() as etcd_path:
         etcd_proc = subprocess.Popen(
             ["etcd", "--log-level=debug"],
-            cwd=etcd_path, close_fds=True
+            cwd=etcd_path,
         )
-        await _wait_for_etcd("--debug=true")
-        yield etcd_proc
-        shutdown_etcd(etcd_proc)
+        try:
+            await _wait_for_etcd("--debug=true")
+            yield etcd_proc
+        finally:
+            shutdown_etcd(etcd_proc)
 
 async def _wait_for_etcd(*etcd_args):
     """Etcd may not be ready if we jump straight into the tests.
@@ -478,11 +481,20 @@ async def _wait_for_etcd(*etcd_args):
     In production, etcd would already be running, so don't put this in the
     proxy classes.
     """
-    assert "is healthy" in subprocess.check_output(
-        ["etcdctl", "endpoint", "health", *etcd_args],
-        env=Config.etcdctl_env,
-        stderr=subprocess.STDOUT,
-    ).decode(sys.stdout.encoding)
+
+    def check():
+        p = subprocess.run(
+            ["etcdctl", "endpoint", "health", *etcd_args],
+            env=Config.etcdctl_env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        sys.stdout.write(p.stdout)
+        sys.stderr.write(p.stderr)
+        return "is healthy" in p.stdout + p.stderr
+
+    await exponential_backoff(check, "etcd health check", timeout=10)
 
 
 # @pytest.fixture(scope="function", autouse=True)
@@ -537,7 +549,7 @@ def launch_consul_acl():
                 f"-config-file={config_files}/consul_config.json",
                 "-bootstrap-expect=1",
             ],
-            cwd=consul_path, close_fds=True
+            cwd=consul_path,
         )
         asyncio.run(
             _wait_for_consul(token=Config.consul_token, port=Config.consul_auth_port)

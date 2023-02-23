@@ -26,11 +26,14 @@ on:
 env:
   ETCDCTL_API: "3"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+  ETCD_DOWNLOAD_VERSION: "3.4.24"
+  CONSUL_VERSION: "1.14.4"
 
 jobs:
   # Run "pytest tests" for various Python versions
   pytest:
     runs-on: ubuntu-20.04
+    timeout-minutes: 30
     strategy:
       # Keep running even if one variation of the job fail
       fail-fast: false
@@ -63,8 +66,15 @@ jobs:
         run: |
           pip install --upgrade setuptools pip
           pip install -r dev-requirements.txt --upgrade .
-          python -m jupyterhub_traefik_proxy.install --traefik --etcd --consul --output=./bin
+          python -m jupyterhub_traefik_proxy.install --output=./bin
+
           pip freeze
+      - name: Install etcd, consul
+        run: |
+          curl -L https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip > consul.zip
+          unzip consul.zip -d ./bin consul
+          curl -L https://github.com/etcd-io/etcd/releases/download/v${ETCD_DOWNLOAD_VERSION}/etcd-v${ETCD_DOWNLOAD_VERSION}-linux-amd64.tar.gz   > etcd.tar.gz
+          tar -xzf etcd.tar.gz -C ./bin --strip-components=1 --wildcards '*/etcd*'
 
       - name: Select tests
         run: |

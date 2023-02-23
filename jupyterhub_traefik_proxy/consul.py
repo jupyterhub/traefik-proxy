@@ -18,20 +18,14 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-import json
-import os
 from urllib.parse import urlparse
-import string
 import base64
+import string
 
-import asyncio
 import escapism
-from tornado.concurrent import run_on_executor
-from traitlets import Any, default, Unicode
+from traitlets import default, Any, Unicode
 
-from . import traefik_utils
 from .kv_proxy import TKvProxy
-import time
 
 
 class TraefikConsulProxy(TKvProxy):
@@ -51,52 +45,75 @@ class TraefikConsulProxy(TKvProxy):
         help="""Consul client root certificates""",
     )
 
-    @default("kv_url")
-    def _default_kv_url(self):
-        return "http://127.0.0.1:8500"
+    consul_url = Unicode(
+        "http://127.0.0.1:8500",
+        config=True,
+        help="URL for the consul endpoint.",
+    )
+    consul_username = Unicode(
+        "",
+        config=True,
+        help="Usrname for accessing consul.",
+    )
+    consul_password = Unicode(
+        "",
+        config=True,
+        help="Password or token for accessing consul.",
+    )
 
-    @default("kv_client")
+    kv_url = Unicode("DEPRECATED", config=True).tag(
+        deprecated_in="0.4",
+        deprecated_for="consul_url",
+    )
+    kv_username = Unicode("DEPRECATED", config=True).tag(
+        deprecated_in="0.4",
+        deprecated_for="consul_username",
+    )
+    kv_password = Unicode("DEPRECATED", config=True).tag(
+        deprecated_in="0.4",
+        deprecated_for="consul_password",
+    )
+
+    consul = Any()
+
+    @default("consul")
     def _default_client(self):
         try:
             import consul.aio
         except ImportError:
             raise ImportError("Please install python-consul2 package to use traefik-proxy with consul")
-        consul_service = urlparse(self.kv_url)
+        consul_service = urlparse(self.consul_url)
         kwargs = {
-            'host': consul_service.hostname,
-            'port': consul_service.port,
-            'cert': self.consul_client_ca_cert
+            "host": consul_service.hostname,
+            "port": consul_service.port,
+            "cert": self.consul_client_ca_cert,
         }
-        if self.kv_password:
-            kwargs.update({'token': self.kv_password})
+        if self.consul_password:
+            kwargs.update({"token": self.consul_password})
         return consul.aio.Consul(**kwargs)
 
     def _define_kv_specific_static_config(self):
         provider_config = {
             "consul": {
                 "rootKey": self.kv_traefik_prefix,
-                "endpoints" : [
-                    urlparse(self.kv_url).netloc
-                ]
+                "endpoints": [urlparse(self.consul_url).netloc],
             }
         }
 
         # FIXME: Same with the tls info
         if self.consul_client_ca_cert:
-            provider_config["consul"]["tls"] = {
-                "ca" : self.consul_client_ca_cert
-            }
+            provider_config["consul"]["tls"] = {"ca": self.consul_client_ca_cert}
 
         self.static_config.update({"providers": provider_config})
 
     def _start_traefik(self):
-        if self.kv_password:
-            if self.kv_username:
+        if self.consul_password:
+            if self.consul_username:
                 self.traefik_env.setdefault(
-                    "CONSUL_HTTP_AUTH", f"{self.kv_username}:{self.kv_password}"
+                    "CONSUL_HTTP_AUTH", f"{self.consul_username}:{self.consul_password}"
                 )
             else:
-                self.traefik_env.setdefault("CONSUL_HTTP_TOKEN", self.kv_password)
+                self.traefik_env.setdefault("CONSUL_HTTP_TOKEN", self.consul_password)
         super()._start_traefik()
 
     def _stop_traefik(self):
@@ -119,14 +136,13 @@ class TraefikConsulProxy(TKvProxy):
             append_payload(k, v)
 
         try:
-            results = await self.kv_client.txn.put(payload=payload)
+            results = await self.consul.txn.put(payload=payload)
             status = 1
             response = ""
         except Exception as e:
             status = 0
             response = str(e)
             self.log.exception(f"Error uploading payload to KV store!\n{response}")
-            self.log.exception(f"Are you missing a token? {self.kv_client.token}")
         else:
             self.log.debug("Successfully uploaded payload to KV store")
 
@@ -170,9 +186,9 @@ class TraefikConsulProxy(TKvProxy):
         entrypoint_path = self.kv_separator.join([router_path, "entryPoints", "0"])
         append_payload(entrypoint_path, self.traefik_entrypoint)
 
-        self.log.debug(f"Uploading route to KV store. Payload: {repr(payload)}")
+        self.log.debug("Uploading route to KV store. Payload: %r", payload)
         try:
-            results = await self.kv_client.txn.put(payload=payload)
+            results = await self.consul.txn.put(payload=payload)
             status = 1
             response = ""
         except Exception as e:
@@ -183,7 +199,7 @@ class TraefikConsulProxy(TKvProxy):
 
     async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
 
-        index, v = await self.kv_client.kv.get(jupyterhub_routespec)
+        index, v = await self.consul.kv.get(jupyterhub_routespec)
         if v is None:
             self.log.warning(
                 "Route %s doesn't exist. Nothing to delete", jupyterhub_routespec
@@ -216,7 +232,7 @@ class TraefikConsulProxy(TKvProxy):
         }})
 
         try:
-            status, response = await self.kv_client.txn.put(payload=payload)
+            status, response = await self.consul.txn.put(payload=payload)
             status = 1
             response = ""
         except Exception as e:
@@ -226,13 +242,13 @@ class TraefikConsulProxy(TKvProxy):
         return status, response
 
     async def _kv_get_target(self, jupyterhub_routespec):
-        _, res = await self.kv_client.kv.get(jupyterhub_routespec)
+        _, res = await self.consul.kv.get(jupyterhub_routespec)
         if res is None:
             return None
         return res["Value"].decode()
 
     async def _kv_get_data(self, target):
-        _, res = await self.kv_client.kv.get(target)
+        _, res = await self.consul.kv.get(target)
 
         if res is None:
             return None
@@ -259,7 +275,7 @@ class TraefikConsulProxy(TKvProxy):
         return routespec, target, data
 
     async def _kv_get_jupyterhub_prefixed_entries(self):
-        routes = await self.kv_client.txn.put(
+        routes = await self.consul.txn.put(
             payload=[
                 {
                     "KV": {
