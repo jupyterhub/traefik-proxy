@@ -48,7 +48,7 @@ def test_version(tmp_path):
             installer_module,
             f"--output={deps_dir}",
             "--traefik",
-            "--traefik-version=2.4.8",
+            "--traefik-version=2.8.8",
         ]
     )
     assert_only_traefik_existence(deps_dir)
