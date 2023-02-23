@@ -18,12 +18,12 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-import escapism
 import json
 import os
-
-from traitlets import Unicode
 from collections.abc import MutableMapping
+
+import escapism
+from traitlets import Unicode
 
 from . import traefik_utils
 from .proxy import TraefikProxy
@@ -227,7 +227,9 @@ class TKvProxy(TraefikProxy):
         self.log.debug("Adding route for %s to %s.", routespec, target)
 
         routespec = self.validate_routespec(routespec)
-        route_keys = traefik_utils.generate_route_keys(self, routespec, separator=self.kv_separator)
+        route_keys = traefik_utils.generate_route_keys(
+            self, routespec, separator=self.kv_separator
+        )
 
         # Store the data dict passed in by JupyterHub
         data = json.dumps(data)
@@ -246,7 +248,7 @@ class TKvProxy(TraefikProxy):
         if self.should_start:
             try:
                 # Check if traefik was launched
-                pid = self.traefik_process.pid
+                self.traefik_process.pid
             except AttributeError:
                 self.log.error(
                     "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
@@ -277,7 +279,9 @@ class TKvProxy(TraefikProxy):
         jupyterhub_routespec = self.kv_separator.join(
             [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
         )
-        route_keys = traefik_utils.generate_route_keys(self, routespec, separator=self.kv_separator)
+        route_keys = traefik_utils.generate_route_keys(
+            self, routespec, separator=self.kv_separator
+        )
 
         status, response = await self._kv_atomic_delete_route_parts(
             jupyterhub_routespec, route_keys
@@ -404,7 +408,7 @@ class TKvProxy(TraefikProxy):
                 items.update({new_key: v})
             elif isinstance(v, list):
                 for n, item in enumerate(v):
-                    items.update({ f"{new_key}{sep}{n}" : item })
+                    items.update({f"{new_key}{sep}{n}": item})
             else:
                 raise ValueError(f"Cannot upload {v} of type {type(v)} to kv store")
         return items

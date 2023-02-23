@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 
 import escapism
 from tornado.concurrent import run_on_executor
-from traitlets import Any, default, Bool, List, Unicode
+from traitlets import Any, Bool, List, Unicode, default
 
 from .kv_proxy import TKvProxy
 
@@ -117,14 +117,16 @@ class TraefikEtcdProxy(TKvProxy):
         try:
             import etcd3
         except ImportError:
-            raise ImportError("Please install etcd3 or etcdpy package to use traefik-proxy with etcd3")
+            raise ImportError(
+                "Please install etcd3 or etcdpy package to use traefik-proxy with etcd3"
+            )
         kwargs = {
             'host': etcd_service.hostname,
             'port': etcd_service.port,
             'ca_cert': self.etcd_client_ca_cert,
             'cert_cert': self.etcd_client_cert_crt,
             'cert_key': self.etcd_client_cert_key,
-            'grpc_options': self.grpc_options
+            'grpc_options': self.grpc_options,
         }
         if self.etcd_password:
             kwargs.update(
@@ -159,12 +161,16 @@ class TraefikEtcdProxy(TKvProxy):
     def _define_kv_specific_static_config(self):
         self.log.debug("Setting up the etcd provider in the static config")
         url = urlparse(self.etcd_url)
-        self.static_config.update({"providers" : {
-            "etcd" : {
-                "endpoints": [url.netloc],
-                "rootKey": self.kv_traefik_prefix,
+        self.static_config.update(
+            {
+                "providers": {
+                    "etcd": {
+                        "endpoints": [url.netloc],
+                        "rootKey": self.kv_traefik_prefix,
+                    }
+                }
             }
-        } })
+        )
         if url.scheme == "https":
             # If etcd is running over TLS, then traefik needs to know
             tls_conf = {}
@@ -214,11 +220,8 @@ class TraefikEtcdProxy(TKvProxy):
                 tls_value = self.traefik_cert_resolver
             success.append(put(tls_path, tls_value))
 
-
         # Specify the entrypoint that jupyterhub's router should bind to
-        ep_path = self.kv_separator.join(
-            [router_key, "entryPoints", "0"]
-        )
+        ep_path = self.kv_separator.join([router_key, "entryPoints", "0"])
         if not self.traefik_entrypoint:
             self.traefik_entrypoint = await self._get_traefik_entrypoint()
         success.append(put(ep_path, self.traefik_entrypoint))
@@ -248,9 +251,7 @@ class TraefikEtcdProxy(TKvProxy):
             delete(route_keys.service_url_path),
             delete(route_keys.router_service_path),
             delete(route_keys.router_rule_path),
-            delete(self.kv_separator.join(
-                [router_path, "entryPoints", "0"]
-            ))
+            delete(self.kv_separator.join([router_path, "entryPoints", "0"])),
         ]
         # If it was enabled, delete TLS on the router too
         if self.is_https:
@@ -296,7 +297,9 @@ class TraefikEtcdProxy(TKvProxy):
         return routes
 
     async def persist_dynamic_config(self):
-        data = self.flatten_dict_for_kv(self.dynamic_config, prefix=self.kv_traefik_prefix)
+        data = self.flatten_dict_for_kv(
+            self.dynamic_config, prefix=self.kv_traefik_prefix
+        )
         transactions = []
         for k, v in data.items():
             transactions.append(self.etcd.transactions.put(k, v))

@@ -4,5 +4,3 @@ put traefik/http/routers/route_api/entryPoints/0 "enter_api"
 put traefik/http/routers/route_api/middlewares/0 "auth_api"
 put traefik/http/routers/route_api/rule "Host(`localhost`) && PathPrefix(`/api`)"
 put traefik/http/routers/route_api/service "api@internal"
-
-

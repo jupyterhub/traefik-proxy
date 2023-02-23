@@ -1,10 +1,5 @@
-pytest
-pytest-asyncio
-pytest-cov
-codecov
 black
-notebook>=4.0
-websockets
+codecov
 # etcd3 & python-consul2 are now soft dependencies
 # Adding them here prevents CI from failing
 
@@ -13,4 +8,9 @@ websockets
 # but with updated grpcio compatibility
 # watch this space to pick a winner...
 etcdpy
+notebook>=4.0
+pytest
+pytest-asyncio
+pytest-cov
 python-consul2
+websockets

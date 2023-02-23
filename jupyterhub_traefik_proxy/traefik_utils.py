@@ -1,13 +1,12 @@
 import os
 import string
+from collections import namedtuple
+from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
-from traitlets import Unicode
 from urllib.parse import unquote
 
 import escapism
-
-from contextlib import contextmanager
-from collections import namedtuple
+from traitlets import Unicode
 
 
 class KVStorePrefix(Unicode):
@@ -40,7 +39,7 @@ def generate_alias(routespec, server_type=""):
     return server_type + "_" + escapism.escape(routespec, safe=safe)
 
 
-def generate_service_entry( proxy, service_alias, separator="/", url=False):
+def generate_service_entry(proxy, service_alias, separator="/", url=False):
     service_entry = separator.join(
         ["http", "services", service_alias, "loadBalancer", "servers", "server1"]
     )
@@ -58,9 +57,7 @@ def generate_router_service_entry(proxy, router_alias):
 
 
 def generate_router_rule_entry(proxy, router_alias, separator="/"):
-    router_rule_entry = separator.join(
-        ["http", "routers", router_alias]
-    )
+    router_rule_entry = separator.join(["http", "routers", router_alias])
     if separator == "/":
         router_rule_entry = separator.join(
             [proxy.kv_traefik_prefix, router_rule_entry, "rule"]
@@ -138,13 +135,16 @@ def atomic_writing(path):
 class TraefikConfigFileHandler:
     """Handles reading and writing Traefik config files. Can operate
     on both toml and yaml files"""
+
     def __init__(self, file_path):
         file_ext = file_path.rsplit('.', 1)[-1]
         if file_ext == 'yaml':
             try:
                 from ruamel.yaml import YAML
             except ImportError:
-                raise ImportError("jupyterhub-traefik-proxy requires ruamel.yaml to use YAML config files")
+                raise ImportError(
+                    "jupyterhub-traefik-proxy requires ruamel.yaml to use YAML config files"
+                )
             config_handler = YAML(typ="rt")
         elif file_ext == 'toml':
             import toml as config_handler
@@ -154,13 +154,13 @@ class TraefikConfigFileHandler:
         self.file_path = file_path
         # Redefined to either yaml.dump or toml.dump
         self._dump = config_handler.dump
-        #self._dumps = config_handler.dumps
+        # self._dumps = config_handler.dumps
         # Redefined by __init__, to either yaml.load or toml.load
         self._load = config_handler.load
 
     def load(self):
         """Depending on self.file_path, call either yaml.load or toml.load"""
-        with open(self.file_path, "r") as fd:
+        with open(self.file_path) as fd:
             return self._load(fd)
 
     def dump(self, data):

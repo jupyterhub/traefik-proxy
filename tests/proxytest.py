@@ -1,29 +1,27 @@
 """Tests for the base traefik proxy"""
 
 import asyncio
-import inspect
 import copy
-import utils
+import inspect
+import pprint
 import subprocess
 import sys
-
 from contextlib import contextmanager
-from os.path import dirname, join, abspath
+from os.path import abspath, dirname, join
 from random import randint
 from unittest.mock import Mock
-from urllib.parse import quote
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import pytest
+import utils
+import websockets
 from jupyterhub.objects import Hub, Server
 from jupyterhub.user import User
 from jupyterhub.utils import exponential_backoff, url_path_join
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPClientError
-import websockets
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError, HTTPRequest
 
-
-import pprint
 pp = pprint.PrettyPrinter(indent=2)
+
 
 class MockApp:
     def __init__(self):
@@ -31,7 +29,6 @@ class MockApp:
 
 
 class MockSpawner:
-
     name = ""
     server = None
     pending = None
@@ -78,6 +75,7 @@ class MockUser(User):
     def _new_spawner(self, spawner_name, **kwargs):
         return MockSpawner(spawner_name, user=self, **kwargs)
 
+
 def assert_equal(value, expected):
     try:
         assert value == expected
@@ -85,6 +83,7 @@ def assert_equal(value, expected):
         pp.pprint({'value': value})
         pp.pprint({"expected": expected})
         raise
+
 
 @pytest.fixture
 def launch_backend():
@@ -203,7 +202,7 @@ async def test_add_get_delete(
 
         if not expect_value_error(spec):
             try:
-                del( route["data"]["last_activity"] )  # CHP
+                del route["data"]["last_activity"]  # CHP
             except TypeError as e:
                 raise TypeError(f"{e}\nRoute got:{route}")
             except KeyError:
@@ -389,7 +388,7 @@ async def test_host_origin_headers(proxy, launch_backend):
         req_url,
         method="GET",
         headers={"Host": expected_host_header, "Origin": expected_origin_header},
-        validate_cert=False
+        validate_cert=False,
     )
     resp = await AsyncHTTPClient().fetch(req)
 
@@ -443,13 +442,14 @@ async def test_check_routes(proxy, username):
 
 async def test_websockets(proxy, launch_backend):
     import ssl
+
     routespec = "/user/username/"
     target = "http://127.0.0.1:9000"
     data = {}
 
     proxy_url = urlparse(proxy.public_url)
-    traefik_port = proxy_url.port
-    traefik_host = proxy_url.hostname
+    proxy_url.port
+    proxy_url.hostname
     default_backend_port = urlparse(target).port
     launch_backend(default_backend_port, "ws")
 

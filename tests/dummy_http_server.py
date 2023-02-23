@@ -1,5 +1,6 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import asyncio
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
 import websockets
 
 

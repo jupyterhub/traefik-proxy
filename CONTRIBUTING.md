@@ -18,7 +18,6 @@ You can also install the tools we use for testing and development with:
 
     python3 -m pip install -r dev-requirements.txt
 
-
 ### Auto-format with black
 
 We are trying out the [black](https://github.com/ambv/black) auto-formatting

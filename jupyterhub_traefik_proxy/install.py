@@ -1,13 +1,13 @@
-import sys
+import argparse
+import hashlib
 import os
 import platform
-from urllib.request import urlretrieve
+import sys
 import tarfile
-import zipfile
-import argparse
 import textwrap
-import hashlib
 import warnings
+import zipfile
+from urllib.request import urlretrieve
 
 checksums_traefik = {
     "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_linux_arm64.tar.gz": "0931fdd9c855fcafd38eba7568a1d287200fad5afd1aef7d112fb3a48d822fcc",
@@ -45,7 +45,9 @@ def install_traefik(prefix, plat, traefik_version):
         traefik_archive_extension = "tar.gz"
         traefik_bin = os.path.join(prefix, "traefik")
 
-    traefik_archive = "traefik_v" + traefik_version + "_" + plat + "." + traefik_archive_extension
+    traefik_archive = (
+        "traefik_v" + traefik_version + "_" + plat + "." + traefik_archive_extension
+    )
     traefik_archive_path = os.path.join(prefix, traefik_archive)
 
     traefik_url = (
@@ -78,7 +80,7 @@ def install_traefik(prefix, plat, traefik_version):
 
     if traefik_url in checksums_traefik:
         if checksum_file(traefik_archive_path) != checksums_traefik[traefik_url]:
-            raise IOError("Checksum failed")
+            raise OSError("Checksum failed")
     else:
         warnings.warn(
             f"Traefik {traefik_version} not tested !",
@@ -98,10 +100,7 @@ def install_traefik(prefix, plat, traefik_version):
     print("--- Done ---")
 
 
-
-
 def main():
-
     parser = argparse.ArgumentParser(
         description="Dependencies intaller",
         epilog=textwrap.dedent(

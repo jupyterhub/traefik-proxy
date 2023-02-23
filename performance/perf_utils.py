@@ -5,12 +5,14 @@ import time
 from urllib.parse import urlparse
 
 import numpy as np
-
-from jupyterhub.tests.mocking import MockHub
 from jupyterhub.proxy import ConfigurableHTTPProxy
-from jupyterhub_traefik_proxy import TraefikConsulProxy
-from jupyterhub_traefik_proxy import TraefikEtcdProxy
-from jupyterhub_traefik_proxy import TraefikFileProviderProxy
+from jupyterhub.tests.mocking import MockHub
+
+from jupyterhub_traefik_proxy import (
+    TraefikConsulProxy,
+    TraefikEtcdProxy,
+    TraefikFileProviderProxy,
+)
 
 
 def configure_argument_parser():
