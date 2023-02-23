@@ -1,5 +1,6 @@
 aiohttp
 escapism
 jupyterhub>=0.9
+packaging
 passlib
 toml
