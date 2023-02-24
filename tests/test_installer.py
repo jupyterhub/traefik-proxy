@@ -75,20 +75,3 @@ def test_platform(tmp_path, platform):
         ]
     )
     assert_only_traefik_existence(deps_dir)
-
-
-def test_warning(tmp_path):
-    deps_dir = tmp_path / "deps"
-    output = subprocess.check_output(
-        [
-            sys.executable,
-            "-m",
-            installer_module,
-            f"--output={deps_dir}",
-            "--platform=linux-amd64",
-            "--traefik-version=2.4.1",
-        ],
-        stderr=subprocess.STDOUT,
-    )
-    assert_only_traefik_existence(deps_dir)
-    assert output.decode().count("UserWarning") == 1

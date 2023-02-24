@@ -2,33 +2,12 @@ import argparse
 import hashlib
 import os
 import platform
-import re
 import sys
 import tarfile
 import textwrap
 import warnings
 import zipfile
-from pathlib import Path
-from urllib.request import urlretrieve
-
-from packaging.version import parse as parse_version
-
-
-def _read_checksums():
-    """Read checksums from checksums.txt"""
-    _checksum_file = Path(__file__).parent.joinpath("checksums.txt")
-    checksums = {}
-    with _checksum_file.open() as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith("#") or not line:
-                continue
-            checksum, name = line.split()
-            checksums[name] = checksum
-    return checksums
-
-
-checksums = _read_checksums()
+from urllib.request import HTTPError, urlopen, urlretrieve
 
 machine_map = {
     "x86_64": "amd64",
@@ -42,6 +21,29 @@ def checksum_file(path):
         for chunk in iter(lambda: f.read(4096), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def fetch_checksums(traefik_version):
+    """Fetch the checksum file from a traefik release"""
+    url = (
+        "https://github.com/traefik/traefik/releases"
+        f"/download/v{traefik_version}/traefik_v{traefik_version}_checksums.txt"
+    )
+    checksums = {}
+    print(f"Fetching checksums from {url}")
+    try:
+        urlopen(url)
+    except HTTPError as e:
+        print(f"Failed to retrieve checksum file: {e}")
+        return {}
+    with urlopen(url) as f:
+        for line in f:
+            line = line.decode("utf8", "replace").strip()
+            if line.startswith("#") or not line:
+                continue
+            checksum, name = line.split()
+            checksums[name] = checksum
+    return checksums
 
 
 def install_traefik(prefix, plat, traefik_version):
@@ -63,29 +65,16 @@ def install_traefik(prefix, plat, traefik_version):
         f"/download/v{traefik_version}/{traefik_archive}"
     )
 
-    expected_checksum = checksums.get(traefik_archive, None)
-
-    if os.path.exists(traefik_bin) and os.path.exists(traefik_archive_path):
-        print("Traefik already exists")
-        if expected_checksum is None:
-            warnings.warn(
-                f"Traefik {traefik_version} not tested!",
-                stacklevel=2,
-            )
-            os.chmod(traefik_bin, 0o755)
-            print("--- Done ---")
-            return
-        else:
-            if checksum_file(traefik_archive_path) == expected_checksum:
-                os.chmod(traefik_bin, 0o755)
-                print("--- Done ---")
-                return
-            else:
-                print(f"checksum mismatch on {traefik_archive_path}")
-                os.remove(traefik_archive_path)
+    if os.path.exists(traefik_bin):
+        print(f"Traefik already exists at {traefik_bin}. Remove it to re-install.")
+        print("--- Done ---")
+        return
 
     print(f"Downloading traefik {traefik_version} from {traefik_url}...")
     urlretrieve(traefik_url, traefik_archive_path)
+
+    checksums = fetch_checksums(traefik_version)
+    expected_checksum = checksums.get(traefik_archive, None)
 
     if expected_checksum is not None:
         checksum = checksum_file(traefik_archive_path)
@@ -93,7 +82,7 @@ def install_traefik(prefix, plat, traefik_version):
             raise OSError(f"Checksum failed {checksum} != {expected_checksum}")
     else:
         warnings.warn(
-            f"Traefik {traefik_version} not tested!",
+            f"Traefik {traefik_version} checksum could not be verified!",
             stacklevel=2,
         )
 
@@ -112,19 +101,8 @@ def install_traefik(prefix, plat, traefik_version):
 
 def main():
     # extract supported and default versions from urls
-    _version_pat = re.compile(r"v\d+\.\d+\.\d+")
-    _versions = set()
-    for filename in checksums:
-        _versions.update(_version_pat.findall(filename))
-    available_versions = sorted(_versions, key=parse_version, reverse=True)
-
     parser = argparse.ArgumentParser(
-        description="Dependencies intaller",
-        epilog=textwrap.dedent(
-            f"""\
-            Checksums available for traefik versions: {', '.join(available_versions)}
-            """
-        ),
+        description="Dependency installer helper",
         formatter_class=argparse.RawTextHelpFormatter,
     )
 

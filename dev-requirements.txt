@@ -1,5 +1,4 @@
 black
-click
 codecov
 # etcd3 & python-consul2 are now soft dependencies
 # Adding them here prevents CI from failing
@@ -10,10 +9,8 @@ codecov
 # watch this space to pick a winner...
 etcdpy
 notebook>=4.0
-pygithub
 pytest
 pytest-asyncio
 pytest-cov
 python-consul2
-requests
 websockets
