@@ -365,10 +365,10 @@ class TraefikProxy(Proxy):
 
         entrypoints = {
             self.traefik_entrypoint: {
-                "address": f":{urlparse(self.public_url).port}",
+                "address": urlparse(self.public_url).netloc,
             },
             "enter_api": {
-                "address": f":{urlparse(self.traefik_api_url).port}",
+                "address": urlparse(self.traefik_api_url).netloc,
             },
         }
 
