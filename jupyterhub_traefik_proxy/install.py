@@ -7,20 +7,7 @@ import tarfile
 import textwrap
 import warnings
 import zipfile
-from urllib.request import urlretrieve
-
-checksums_traefik = {
-    "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_linux_arm64.tar.gz": "0931fdd9c855fcafd38eba7568a1d287200fad5afd1aef7d112fb3a48d822fcc",
-    "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_linux_amd64.tar.gz": "de8d56f6777c5098834d4f8d9ed419b7353a3afe913393a55b6fd14779564129",
-    "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_darwin_amd64.tar.gz": "7d946baa422acfcf166e19779052c005722db03de3ab4d7aff586c4b4873a0f3",
-    "https://github.com/traefik/traefik/releases/download/v2.4.8/traefik_v2.4.8_windows_amd64.zip": "4203443cb1e91d76f81d1e2a41fb70e66452d951b1ffd8964218a7bc211c377d",
-    "https://github.com/traefik/traefik/releases/download/v2.3.7/traefik_v2.3.7_linux_amd64.tar.gz": "a357d40bc9b81ae76070a2bc0334dfd15e77143f41415a93f83bb53af1756909",
-    "https://github.com/traefik/traefik/releases/download/v2.3.7/traefik_v2.3.7_darwin_amd64.tar.gz": "c84fc21b8ee34bba8a66f0f9e71c6c2ea69684ac6330916551f1f111826b9bb3",
-    "https://github.com/traefik/traefik/releases/download/v2.3.7/traefik_v2.3.7_windows_amd64.zip": "eb54b1c9c752a6eaf48d28ff8409c17379a29b9d58390107411762ab6e4edfb4",
-    "https://github.com/traefik/traefik/releases/download/v2.2.11/traefik_v2.2.11_linux_amd64.tar.gz": "b677386423403c63fb9ac9667d39591be587a1a4928afc2e59449c78343bad9c",
-    "https://github.com/traefik/traefik/releases/download/v2.2.11/traefik_v2.2.11_darwin_amd64.tar.gz": "efb1c2bc23e16a9083e5a210594186d026cdec0b522a6b4754ceff43b07d8031",
-    "https://github.com/traefik/traefik/releases/download/v2.2.11/traefik_v2.2.11_windows_amd64.zip": "ee867133e00b2d8395c239d8fed04a26b362e650b371dc0b653f0ee9d52471e6",
-}
+from urllib.request import HTTPError, urlopen, urlretrieve
 
 machine_map = {
     "x86_64": "amd64",
@@ -34,6 +21,29 @@ def checksum_file(path):
         for chunk in iter(lambda: f.read(4096), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def fetch_checksums(traefik_version):
+    """Fetch the checksum file from a traefik release"""
+    url = (
+        "https://github.com/traefik/traefik/releases"
+        f"/download/v{traefik_version}/traefik_v{traefik_version}_checksums.txt"
+    )
+    checksums = {}
+    print(f"Fetching checksums from {url}")
+    try:
+        urlopen(url)
+    except HTTPError as e:
+        print(f"Failed to retrieve checksum file: {e}")
+        return {}
+    with urlopen(url) as f:
+        for line in f:
+            line = line.decode("utf8", "replace").strip()
+            if line.startswith("#") or not line:
+                continue
+            checksum, name = line.split()
+            checksums[name] = checksum
+    return checksums
 
 
 def install_traefik(prefix, plat, traefik_version):
@@ -55,35 +65,24 @@ def install_traefik(prefix, plat, traefik_version):
         f"/download/v{traefik_version}/{traefik_archive}"
     )
 
-    if os.path.exists(traefik_bin) and os.path.exists(traefik_archive_path):
-        print("Traefik already exists")
-        if traefik_url not in checksums_traefik:
-            warnings.warn(
-                f"Traefik {traefik_version} not tested !",
-                stacklevel=2,
-            )
-            os.chmod(traefik_bin, 0o755)
-            print("--- Done ---")
-            return
-        else:
-            if checksum_file(traefik_archive_path) == checksums_traefik[traefik_url]:
-                os.chmod(traefik_bin, 0o755)
-                print("--- Done ---")
-                return
-            else:
-                print(f"checksum mismatch on {traefik_archive_path}")
-                os.remove(traefik_archive_path)
-                os.remove(traefik_bin)
+    if os.path.exists(traefik_bin):
+        print(f"Traefik already exists at {traefik_bin}. Remove it to re-install.")
+        print("--- Done ---")
+        return
 
     print(f"Downloading traefik {traefik_version} from {traefik_url}...")
     urlretrieve(traefik_url, traefik_archive_path)
 
-    if traefik_url in checksums_traefik:
-        if checksum_file(traefik_archive_path) != checksums_traefik[traefik_url]:
-            raise OSError("Checksum failed")
+    checksums = fetch_checksums(traefik_version)
+    expected_checksum = checksums.get(traefik_archive, None)
+
+    if expected_checksum is not None:
+        checksum = checksum_file(traefik_archive_path)
+        if checksum != expected_checksum:
+            raise OSError(f"Checksum failed {checksum} != {expected_checksum}")
     else:
         warnings.warn(
-            f"Traefik {traefik_version} not tested !",
+            f"Traefik {traefik_version} checksum could not be verified!",
             stacklevel=2,
         )
 
@@ -94,30 +93,16 @@ def install_traefik(prefix, plat, traefik_version):
     else:
         with zipfile.ZipFile(traefik_archive_path, "r") as zip_ref:
             zip_ref.extract("traefik.exe", prefix)
-
     os.chmod(traefik_bin, 0o755)
+    print(f"Installed {traefik_bin}")
     os.unlink(traefik_archive_path)
     print("--- Done ---")
 
 
 def main():
+    # extract supported and default versions from urls
     parser = argparse.ArgumentParser(
-        description="Dependencies intaller",
-        epilog=textwrap.dedent(
-            """\
-            Checksums available for:
-            - traefik:
-                - v2.4.8-linux-amd64
-                - v2.4.8-darwin-amd64
-                - v2.4.8-windows-amd64
-                - v2.3.7-linux-amd64
-                - v2.3.7-darwin-amd64
-                - v2.3.7-windows-amd64
-                - v2.2.11-linux-amd64
-                - v2.2.11-darwin-amd64
-                - v2.2.11-windows-amd64
-            """
-        ),
+        description="Dependency installer helper",
         formatter_class=argparse.RawTextHelpFormatter,
     )
 
@@ -161,7 +146,7 @@ def main():
     parser.add_argument(
         "--traefik-version",
         dest="traefik_version",
-        default="2.4.8",
+        default="2.9.8",
         help=textwrap.dedent(
             """\
             The version of traefik to download.
@@ -182,7 +167,7 @@ def main():
     args = parser.parse_args()
     deps_dir = args.installation_dir
     plat = args.plat
-    traefik_version = args.traefik_version
+    traefik_version = args.traefik_version.lstrip("v")
 
     if args.traefik:
         print(

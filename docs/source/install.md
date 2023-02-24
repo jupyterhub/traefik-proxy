@@ -55,7 +55,7 @@
       ```
 
    2. From traefik **release page**:
-      - Install [`traefik`](https://traefik.io/#easy-to-install)
+      - Install [`traefik`](https://doc.traefik.io/traefik/getting-started/install-traefik/)
 
 ## Installing a key-value store
 
