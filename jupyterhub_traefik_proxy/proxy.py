@@ -281,8 +281,6 @@ class TraefikProxy(Proxy):
             self.log.warning("%s GET %s", resp.code, url)
         else:
             self.log.debug("%s GET %s", resp.code, url)
-
-        self.log.debug(f"Succesfully received data from {path}: {resp.body}")
         return resp
 
     async def _wait_for_static_config(self):
@@ -335,12 +333,9 @@ class TraefikProxy(Proxy):
             )
         except FileNotFoundError:
             self.log.error(
-                "Failed to find traefik \n"
-                "The proxy can be downloaded from https://github.com/containous/traefik/releases/download."
+                "Failed to find traefik\n"
+                "The proxy can be downloaded from https://github.com/traefik/traefik/releases/."
             )
-            raise
-        except Exception as e:
-            self.log.exception(e)
             raise
 
     async def _setup_traefik_static_config(self):
@@ -351,7 +346,6 @@ class TraefikProxy(Proxy):
         Subclasses should specify any traefik providers themselves, in
         :attrib:`self.static_config["providers"]`
         """
-        self.log.info("Setting up traefik's static config...")
 
         if self.traefik_log_level:
             self.static_config["log"] = {"level": self.traefik_log_level}
@@ -373,15 +367,13 @@ class TraefikProxy(Proxy):
         self.static_config["entryPoints"] = entrypoints
         self.static_config["api"] = {"dashboard": True}
 
+        self.log.info(f"Writing traefik static config: {self.static_config}")
+
         try:
-            self.log.debug(f"Persisting the static config: {self.static_config}")
             handler = traefik_utils.TraefikConfigFileHandler(self.static_config_file)
             handler.atomic_dump(self.static_config)
-        except OSError:
-            self.log.exception("Couldn't set up traefik's static config.")
-            raise
-        except:
-            self.log.error("Couldn't set up traefik's static config. Unexpected error:")
+        except Exception:
+            self.log.error("Couldn't set up traefik's static config.")
             raise
 
     async def _setup_traefik_dynamic_config(self):
