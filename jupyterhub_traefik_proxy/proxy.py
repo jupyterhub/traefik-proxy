@@ -373,7 +373,7 @@ class TraefikProxy(Proxy):
         }
 
         self.static_config["entryPoints"] = entrypoints
-        self.static_config["api"] = {"dashboard": True}
+        self.static_config["api"] = {}
 
         try:
             self.log.debug(f"Persisting the static config: {self.static_config}")
@@ -399,7 +399,7 @@ class TraefikProxy(Proxy):
                 "http": {
                     "routers": {
                         "route_api": {
-                            "rule": f"Host(`{api_url.hostname}`) && (PathPrefix(`{api_path}`) || PathPrefix(`/dashboard`))",
+                            "rule": f"Host(`{api_url.hostname}`) && PathPrefix(`{api_path}`)",
                             "entryPoints": ["enter_api"],
                             "service": "api@internal",
                             "middlewares": ["auth_api"],
