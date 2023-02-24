@@ -218,7 +218,8 @@ class TraefikFileProviderProxy(TraefikProxy):
                 )
                 raise
         try:
-            await self._wait_for_route(traefik_routespec)
+            async with self.semaphore:
+                await self._wait_for_route(traefik_routespec)
         except TimeoutError:
             self.log.error(
                 f"Is Traefik configured to watch {self.dynamic_config_file}?"

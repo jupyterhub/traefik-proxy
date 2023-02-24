@@ -18,6 +18,7 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
+import asyncio
 import json
 import os
 from os.path import abspath
@@ -26,8 +27,8 @@ from urllib.parse import urlparse, urlunparse
 
 from jupyterhub.proxy import Proxy
 from jupyterhub.utils import exponential_backoff, new_token, url_path_join
-from tornado.httpclient import AsyncHTTPClient
-from traitlets import Any, Bool, Dict, Integer, Unicode, default, validate
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError
+from traitlets import Any, Bool, Dict, Integer, Unicode, default, observe, validate
 
 from . import traefik_utils
 
@@ -36,6 +37,26 @@ class TraefikProxy(Proxy):
     """JupyterHub Proxy implementation using traefik"""
 
     traefik_process = Any()
+
+    concurrency = Integer(
+        10,
+        config=True,
+        help="""
+        The number of requests allowed to be concurrently outstanding to the proxy
+
+        Limiting this number avoids potential timeout errors
+        by sending too many requests to update the proxy at once
+        """,
+    )
+    semaphore = Any()
+
+    @default('semaphore')
+    def _default_semaphore(self):
+        return asyncio.BoundedSemaphore(self.concurrency)
+
+    @observe('concurrency')
+    def _concurrency_changed(self, change):
+        self.semaphore = asyncio.BoundedSemaphore(change.new)
 
     static_config_file = Unicode(
         "traefik.toml", config=True, help="""traefik's static configuration file"""
@@ -235,17 +256,18 @@ class TraefikProxy(Proxy):
         expected = (
             traefik_utils.generate_alias(routespec, kind) + "@" + self.provider_name
         )
-        path = f"/api/http/{kind}s"
+        path = f"/api/http/{kind}s/{expected}"
         try:
             resp = await self._traefik_api_request(path)
-            json_data = json.loads(resp.body)
-        except Exception:
+            json.loads(resp.body)
+        except HTTPClientError as e:
+            if e.code == 404:
+                self.log.debug(f"traefik {expected} not yet in {kind}")
+                return False
             self.log.exception(f"Error checking traefik api for {kind} {routespec}")
             return False
-
-        service_names = [service['name'] for service in json_data]
-        if expected not in service_names:
-            self.log.debug(f"traefik {expected} not yet in {kind}")
+        except Exception:
+            self.log.exception(f"Error checking traefik api for {kind} {routespec}")
             return False
 
         # found the expected endpoint

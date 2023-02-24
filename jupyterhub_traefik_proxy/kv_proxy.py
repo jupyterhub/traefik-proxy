@@ -18,15 +18,41 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
+import asyncio
 import json
 import os
 from collections.abc import MutableMapping
+from functools import wraps
+from weakref import WeakKeyDictionary
 
 import escapism
 from traitlets import Unicode
 
 from . import traefik_utils
 from .proxy import TraefikProxy
+
+
+def _one_at_a_time(method):
+    """decorator to limit an async method to be called only once
+
+    If multiple concurrent calls to this method are made,
+    queue them instead of allowing them to be concurrently outstanding.
+    """
+    # use weak dict for locks
+    # so that the lock is always acquired within the current asyncio loop
+    # should only be relevant in testing, where eventloops are created and destroyed often
+    method._locks = WeakKeyDictionary()
+
+    @wraps(method)
+    async def locked_method(*args, **kwargs):
+        loop = asyncio.get_event_loop()
+        lock = method._locks.get(loop, None)
+        if lock is None:
+            lock = method._locks[loop] = asyncio.Lock()
+        async with lock:
+            return await method(*args, **kwargs)
+
+    return locked_method
 
 
 class TKvProxy(TraefikProxy):
@@ -241,19 +267,11 @@ class TKvProxy(TraefikProxy):
             [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
         )
 
-        status, response = await self._kv_atomic_add_route_parts(
-            jupyterhub_routespec, target, data, route_keys, rule
-        )
+        async with self.semaphore:
+            status, response = await self._kv_atomic_add_route_parts(
+                jupyterhub_routespec, target, data, route_keys, rule
+            )
 
-        if self.should_start:
-            try:
-                # Check if traefik was launched
-                self.traefik_process.pid
-            except AttributeError:
-                self.log.error(
-                    "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
-                )
-                raise
         if status:
             self.log.info(
                 "Added service %s with the alias %s.", target, route_keys.service_alias
@@ -268,8 +286,9 @@ class TKvProxy(TraefikProxy):
             self.log.error(
                 "Couldn't add route for %s. Response: %s", routespec, response
             )
-
-        await self._wait_for_route(routespec)
+            raise RuntimeError(f"Couldn't add route for {routespec}")
+        async with self.semaphore:
+            await self._wait_for_route(routespec)
 
     async def delete_route(self, routespec):
         """Delete a route and all the traefik related info associated given a routespec,
@@ -283,9 +302,10 @@ class TKvProxy(TraefikProxy):
             self, routespec, separator=self.kv_separator
         )
 
-        status, response = await self._kv_atomic_delete_route_parts(
-            jupyterhub_routespec, route_keys
-        )
+        async with self.semaphore:
+            status, response = await self._kv_atomic_delete_route_parts(
+                jupyterhub_routespec, route_keys
+            )
         if status:
             self.log.info("Routespec %s was deleted.", routespec)
         else:
@@ -293,6 +313,7 @@ class TKvProxy(TraefikProxy):
                 "Couldn't delete route %s. Response: %s", routespec, response
             )
 
+    @_one_at_a_time
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
         proxy.
