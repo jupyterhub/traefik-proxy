@@ -22,12 +22,12 @@ import json
 import os
 from os.path import abspath
 from subprocess import Popen, TimeoutExpired
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 from jupyterhub.proxy import Proxy
 from jupyterhub.utils import exponential_backoff, new_token, url_path_join
 from tornado.httpclient import AsyncHTTPClient
-from traitlets import Any, Bool, Dict, Integer, Unicode, default
+from traitlets import Any, Bool, Dict, Integer, Unicode, default, validate
 
 from . import traefik_utils
 
@@ -125,6 +125,23 @@ class TraefikProxy(Proxy):
         # Check if we set https
         return urlparse(self.public_url).scheme == "https"
 
+    @validate("public_url", "traefik_api_url")
+    def _add_port(self, proposal):
+        url = proposal.value
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(
+                f"{self.__class__.__name__}.{proposal.trait.name} must be of the form http[s]://host:port/, got {url}"
+            )
+        if not parsed.port:
+            # ensure port is defined
+            if parsed.scheme == 'http':
+                parsed = parsed._replace(netloc=f'{parsed.hostname}:80')
+            elif parsed.scheme == 'https':
+                parsed = parsed._replace(netloc=f'{parsed.hostname}:443')
+            url = urlunparse(parsed)
+        return url
+
     traefik_cert_resolver = Unicode(
         config=True,
         help="""The traefik certificate Resolver to use for requesting certificates""",
@@ -146,31 +163,16 @@ class TraefikProxy(Proxy):
                 return "web"
         import re
 
-        # FIXME: Adding '_wait_for_static_config' to get through 'external'
-        # tests. Would this be required in the 'real world'?
-        # Adding _wait_for_static_config to the 'external' conftests instead...
-        # await self._wait_for_static_config()
         resp = await self._traefik_api_request("/api/entrypoints")
         json_data = json.loads(resp.body)
         public_url = urlparse(self.public_url)
-        hub_port = public_url.port
-        if not hub_port:
-            # If the port is not specified, then use the default port
-            # according to the scheme (http, or https)
-            if public_url.scheme == 'http':
-                hub_port = 80
-            elif public_url.scheme == 'https':
-                hub_port = 443
-            else:
-                raise ValueError(
-                    f"Cannot discern public_url port from {self.public_url}!"
-                )
+
         # Traefik entrypoint format described at:-
         # https://doc.traefik.io/traefik/routing/entrypoints/#address
         entrypoint_re = re.compile('([^:]+)?:([0-9]+)/?(tcp|udp)?')
         for entrypoint in json_data:
             host, port, prot = entrypoint_re.match(entrypoint["address"]).groups()
-            if int(port) == hub_port:
+            if int(port) == public_url.port:
                 return entrypoint["name"]
         entrypoints = [entrypoint["address"] for entrypoint in json_data]
         raise ValueError(
@@ -357,15 +359,15 @@ class TraefikProxy(Proxy):
 
         entrypoints = {
             self.traefik_entrypoint: {
-                "address": f":{urlparse(self.public_url).port}",
+                "address": urlparse(self.public_url).netloc,
             },
             "enter_api": {
-                "address": f":{urlparse(self.traefik_api_url).port}",
+                "address": urlparse(self.traefik_api_url).netloc,
             },
         }
 
         self.static_config["entryPoints"] = entrypoints
-        self.static_config["api"] = {"dashboard": True}
+        self.static_config["api"] = {}
 
         self.log.info(f"Writing traefik static config: {self.static_config}")
 
@@ -389,7 +391,7 @@ class TraefikProxy(Proxy):
                 "http": {
                     "routers": {
                         "route_api": {
-                            "rule": f"Host(`{api_url.hostname}`) && (PathPrefix(`{api_path}`) || PathPrefix(`/dashboard`))",
+                            "rule": f"Host(`{api_url.hostname}`) && PathPrefix(`{api_path}`)",
                             "entryPoints": ["enter_api"],
                             "service": "api@internal",
                             "middlewares": ["auth_api"],

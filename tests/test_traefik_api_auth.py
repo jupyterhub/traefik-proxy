@@ -26,10 +26,7 @@ def proxy(request):
     [("api_admin", "admin", 200), ("api_admin", "1234", 401), ("", "", 401)],
 )
 async def test_traefik_api_auth(proxy, username, password, expected_rc):
-    traefik_api_url = proxy.traefik_api_url + "/api"
-
-    # Must have a trailing slash!
-    dashboard_url = proxy.traefik_api_url + "/dashboard/"
+    traefik_api_url = proxy.traefik_api_url + "/api/overview"
 
     async def api_login():
         try:
@@ -37,7 +34,7 @@ async def test_traefik_api_auth(proxy, username, password, expected_rc):
                 resp = await AsyncHTTPClient().fetch(traefik_api_url)
             else:
                 resp = await AsyncHTTPClient().fetch(
-                    dashboard_url,
+                    traefik_api_url,
                     auth_username=username,
                     auth_password=password,
                 )
@@ -54,6 +51,7 @@ async def test_traefik_api_auth(proxy, username, password, expected_rc):
         if rc == expected_rc:
             return True
         else:
+            print(f"{rc} != {expected_rc}")
             return False
 
     await exponential_backoff(cmp_api_login, "Traefik API not reacheable")
