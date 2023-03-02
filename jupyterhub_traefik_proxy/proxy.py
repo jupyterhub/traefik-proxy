@@ -107,6 +107,20 @@ class TraefikProxy(Proxy):
     static_config = Dict()
     dynamic_config = Dict()
 
+    traefik_providers_throttle_duration = Unicode(
+        "0s",
+        config=True,
+        help="""
+            throttle traefik reloads of configuration.
+
+            When traefik sees a change in configuration,
+            it will wait this long before applying the next one.
+            This affects how long adding a user to the proxy will take.
+
+            See https://doc.traefik.io/traefik/providers/overview/#providersprovidersthrottleduration
+            """,
+    )
+
     traefik_api_url = Unicode(
         "http://localhost:8099",
         config=True,
@@ -371,6 +385,9 @@ class TraefikProxy(Proxy):
         Subclasses should specify any traefik providers themselves, in
         :attrib:`self.static_config["providers"]`
         """
+        self.static_config["providers"][
+            "providersThrottleDuration"
+        ] = self.traefik_providers_throttle_duration
 
         if self.traefik_log_level:
             self.static_config["log"] = {"level": self.traefik_log_level}
