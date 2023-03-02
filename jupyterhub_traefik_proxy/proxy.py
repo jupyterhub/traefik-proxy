@@ -26,7 +26,7 @@ from urllib.parse import urlparse, urlunparse
 
 from jupyterhub.proxy import Proxy
 from jupyterhub.utils import exponential_backoff, new_token, url_path_join
-from tornado.httpclient import AsyncHTTPClient
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from traitlets import Any, Bool, Dict, Integer, Unicode, default, validate
 
 from . import traefik_utils
@@ -289,16 +289,25 @@ class TraefikProxy(Proxy):
         async def _check_traefik_static_conf_ready():
             """Check if traefik loaded its static configuration yet"""
             try:
-                resp = await self._traefik_api_request("/api/overview")
-            except Exception:
-                self.log.exception("Error checking for traefik static configuration")
-                return False
-
-            if resp.code != 200:
-                self.log.error(
-                    "Unexpected response code %s checking for traefik static configuration",
-                    resp.code,
+                await self._traefik_api_request("/api/overview")
+            except ConnectionRefusedError:
+                self.log.debug(
+                    f"Connection Refused waiting for traefik at {self.traefik_api_url}. It's probably starting up..."
                 )
+                return False
+            except HTTPClientError as e:
+                if e.code == 599:
+                    self.log.debug(
+                        f"Connection error waiting for traefik at {self.traefik_api_url}. It's probably starting up..."
+                    )
+                    return False
+                if e.code == 404:
+                    self.log.debug(
+                        f"traefik api at {e.response.request.url} overview not ready yet"
+                    )
+                    return False
+                # unexpected
+                self.log.error(f"Error checking for traefik static configuration {e}")
                 return False
 
             return True
@@ -326,6 +335,7 @@ class TraefikProxy(Proxy):
                 "Configuration mode not supported \n.\
                 The proxy can only be configured through fileprovider, etcd and consul"
             )
+
         env = os.environ.copy()
         env.update(self.traefik_env)
         try:
