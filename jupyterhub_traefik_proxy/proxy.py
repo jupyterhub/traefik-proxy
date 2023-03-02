@@ -288,6 +288,7 @@ class TraefikProxy(Proxy):
         await exponential_backoff(
             _check_traefik_dynamic_conf_ready,
             f"Traefik route for {routespec} configuration not available",
+            scale_factor=1.2,
             timeout=self.check_route_timeout,
         )
 
