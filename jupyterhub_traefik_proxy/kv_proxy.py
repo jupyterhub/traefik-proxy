@@ -23,7 +23,6 @@ import json
 import os
 from collections.abc import MutableMapping
 from functools import wraps
-from weakref import WeakKeyDictionary
 
 import escapism
 from traitlets import Unicode
@@ -36,21 +35,24 @@ def _one_at_a_time(method):
     """decorator to limit an async method to be called only once
 
     If multiple concurrent calls to this method are made,
-    queue them instead of allowing them to be concurrently outstanding.
+    piggy-back on the outstanding call instead of queuing
+    or letting requests pile up.
     """
-    # use weak dict for locks
-    # so that the lock is always acquired within the current asyncio loop
-    # should only be relevant in testing, where eventloops are created and destroyed often
-    method._locks = WeakKeyDictionary()
 
     @wraps(method)
     async def locked_method(*args, **kwargs):
-        loop = asyncio.get_event_loop()
-        lock = method._locks.get(loop, None)
-        if lock is None:
-            lock = method._locks[loop] = asyncio.Lock()
-        async with lock:
-            return await method(*args, **kwargs)
+        if getattr(method, "_shared_future", None) is not None:
+            f = method._shared_future
+            if f.done():
+                method._shared_future = None
+            else:
+                return await f
+
+        method._shared_future = f = asyncio.ensure_future(method(*args, **kwargs))
+        try:
+            return await f
+        finally:
+            method._shared_future = None
 
     return locked_method
 
