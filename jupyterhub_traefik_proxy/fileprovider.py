@@ -66,11 +66,14 @@ class TraefikFileProviderProxy(TraefikProxy):
         except FileNotFoundError:
             dynamic_config = {}
 
-        if not dynamic_config:
-            dynamic_config = {
-                "http": {"services": {}, "routers": {}},
-                "jupyter": {"routers": {}},
-            }
+        # fill in default keys
+        # use setdefault to ensure these are always fully defined
+        # and never _partially_ defined
+        http = dynamic_config.setdefault("http", {})
+        http.setdefault("services", {})
+        http.setdefault("routers", {})
+        jupyter = dynamic_config.setdefault("jupyter", {})
+        jupyter.setdefault("routers", {})
         return dynamic_config
 
     def persist_dynamic_config(self):
