@@ -93,14 +93,15 @@ class TraefikFileProviderProxy(TraefikProxy):
         }
         await super()._setup_traefik_static_config()
 
-    def _clean_resources(self):
+    def _cleanup(self):
+        """Cleanup dynamic config file as well"""
+        super()._cleanup()
         try:
-            if self.should_start:
-                os.remove(self.static_config_file)
             os.remove(self.dynamic_config_file)
-        except:
-            self.log.error("Failed to remove traefik's configuration files")
-            raise
+        except Exception as e:
+            self.log.error(
+                f"Failed to remove traefik configuration file {self.dynamic_config_file}: {e}"
+            )
 
     def _get_route_unsafe(self, traefik_routespec):
         service_alias = traefik_utils.generate_alias(traefik_routespec, "service")
@@ -123,28 +124,6 @@ class TraefikFileProviderProxy(TraefikProxy):
             self.log.info(f"No route for {routespec} found!")
             result = None
         return result
-
-    async def start(self):
-        """Start the proxy.
-
-        Will be called during startup if should_start is True.
-
-        **Subclasses must define this method**
-        if the proxy is to be started by the Hub
-        """
-        await super().start()
-        await self._wait_for_static_config()
-
-    async def stop(self):
-        """Stop the proxy.
-
-        Will be called during teardown if should_start is True.
-
-        **Subclasses must define this method**
-        if the proxy is to be started by the Hub
-        """
-        await super().stop()
-        self._clean_resources()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.

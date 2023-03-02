@@ -137,8 +137,8 @@ class TraefikEtcdProxy(TKvProxy):
             )
         return etcd3.client(**kwargs)
 
-    def _clean_resources(self):
-        super()._clean_resources()
+    def _cleanup(self):
+        super()._cleanup()
         self.etcd.close()
 
     @run_on_executor

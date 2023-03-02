@@ -438,6 +438,7 @@ class TraefikProxy(Proxy):
         await self._setup_traefik_static_config()
         await self._setup_traefik_dynamic_config()
         self._start_traefik()
+        await self._wait_for_static_config()
 
     async def stop(self):
         """Stop the proxy.
@@ -448,6 +449,20 @@ class TraefikProxy(Proxy):
         if the proxy is to be started by the Hub
         """
         self._stop_traefik()
+        self._cleanup()
+
+    def _cleanup(self):
+        """Cleanup after stop
+
+        Extend if there's more to cleanup than the static config file
+        """
+        if self.should_start:
+            try:
+                os.remove(self.static_config_file)
+            except Exception as e:
+                self.log.error(
+                    f"Failed to remove traefik config file {self.static_config_file}: {e}"
+                )
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
