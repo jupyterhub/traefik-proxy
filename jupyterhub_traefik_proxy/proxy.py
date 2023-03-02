@@ -252,7 +252,7 @@ class TraefikProxy(Proxy):
         return True
 
     async def _wait_for_route(self, routespec):
-        self.log.info(f"Waiting for {routespec} to register with traefik")
+        self.log.debug("Waiting for %s to register with traefik", routespec)
 
         async def _check_traefik_dynamic_conf_ready():
             """Check if traefik loaded its dynamic configuration yet"""
@@ -319,7 +319,7 @@ class TraefikProxy(Proxy):
         )
 
     def _stop_traefik(self):
-        self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
+        self.log.info("Cleaning up traefik proxy [pid=%i]...", self.traefik_process.pid)
         self.traefik_process.terminate()
         try:
             self.traefik_process.communicate(timeout=10)
@@ -389,7 +389,7 @@ class TraefikProxy(Proxy):
             raise
 
     async def _setup_traefik_dynamic_config(self):
-        self.log.info("Setting up traefik's dynamic config...")
+        self.log.debug("Setting up traefik's dynamic config...")
         self._generate_htpassword()
         api_url = urlparse(self.traefik_api_url)
         api_path = api_url.path if api_url.path else '/api'

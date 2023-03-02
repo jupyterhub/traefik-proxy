@@ -232,10 +232,10 @@ class TKvProxy(TraefikProxy):
                 )
                 raise
         if status:
-            self.log.info(
+            self.log.debug(
                 "Added service %s with the alias %s.", target, route_keys.service_alias
             )
-            self.log.info(
+            self.log.debug(
                 "Added router %s for service %s with the following routing rule %s.",
                 route_keys.router_alias,
                 route_keys.service_alias,
@@ -264,7 +264,7 @@ class TKvProxy(TraefikProxy):
             jupyterhub_routespec, route_keys
         )
         if status:
-            self.log.info("Routespec %s was deleted.", routespec)
+            self.log.debug("Routespec %s was deleted.", routespec)
         else:
             self.log.error(
                 "Couldn't delete route %s. Response: %s", routespec, response

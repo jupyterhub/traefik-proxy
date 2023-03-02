@@ -121,7 +121,7 @@ class TraefikFileProviderProxy(TraefikProxy):
             result["data"] = jupyter_routers["data"]
 
         if result["data"] is None and result["target"] is None:
-            self.log.info(f"No route for {routespec} found!")
+            self.log.warning(f"No route for {routespec} found!")
             result = None
         return result
 
