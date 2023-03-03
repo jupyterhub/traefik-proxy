@@ -1,6 +1,7 @@
 """Tests for the base traefik proxy"""
 
 import pytest
+from proxytest import *  # noqa
 
 from jupyterhub_traefik_proxy.proxy import TraefikProxy
 
