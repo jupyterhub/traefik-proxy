@@ -11,7 +11,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-from _pytest.mark import Mark
 from consul.aio import Consul
 from jupyterhub.utils import exponential_backoff
 from traitlets.log import get_logger
@@ -56,13 +55,14 @@ class Config:
 
 
 # Define a "slow" test marker so that we can run the slow tests at the end
-# ref: https://docs.pytest.org/en/6.0.1/example/simple.html#control-skipping-of-tests-according-to-command-line-option
-# ref: https://stackoverflow.com/questions/61533694/run-slow-pytest-commands-at-the-end-of-the-test-suite
-empty_mark = Mark("", [], {})
 
 
 def by_slow_marker(item):
-    return item.get_closest_marker("slow", default=empty_mark)
+    m = item.get_closest_marker("slow")
+    if m is None:
+        return 0
+    else:
+        return 1
 
 
 def pytest_addoption(parser):
