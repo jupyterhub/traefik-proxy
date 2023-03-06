@@ -265,7 +265,7 @@ async def auth_external_consul_proxy(
 
 
 @pytest.fixture
-async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
+async def external_etcd_proxy(launch_traefik_etcd):
     proxy = _make_etcd_proxy(auth=False, should_start=False)
     await proxy._wait_for_static_config()
     yield proxy
@@ -274,7 +274,6 @@ async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
 
 @pytest.fixture
 async def auth_external_etcd_proxy(
-    enable_auth_in_etcd,
     launch_traefik_etcd_auth,
 ):
     proxy = _make_etcd_proxy(auth=True, should_start=False)
@@ -299,7 +298,7 @@ def launch_traefik_file():
 
 
 @pytest.fixture
-def launch_traefik_etcd():
+def launch_traefik_etcd(launch_etcd, configure_etcd):
     env = Config.etcdctl_env
     proc = _launch_traefik_cli("--providers.etcd", env=env)
     yield proc
@@ -307,8 +306,10 @@ def launch_traefik_etcd():
 
 
 @pytest.fixture
-def launch_traefik_etcd_auth(configure_etcd_auth):
+def launch_traefik_etcd_auth(launch_etcd_auth, configure_etcd_auth):
     extra_args = (
+        "--providers.etcd.tls.insecureSkipVerify=true",
+        "--providers.etcd.tls.ca=" + f"{config_files}/fake-ca-cert.crt",
         "--providers.etcd.username=" + Config.etcd_user,
         "--providers.etcd.password=" + Config.etcd_password,
     )
@@ -364,13 +365,13 @@ def _launch_traefik(*extra_args, env=None):
 
 
 @pytest.fixture
-def configure_etcd():
+def configure_etcd(launch_etcd):
     """Load traefik api rules into the etcd kv store"""
     yield _config_etcd()
 
 
 @pytest.fixture
-def configure_etcd_auth():
+def configure_etcd_auth(launch_etcd_auth, enable_auth_in_etcd):
     """Load traefik api rules into the etcd kv store, with authentication"""
     yield _config_etcd(
         "--user=" + Config.etcd_user + ":" + Config.etcd_password,
@@ -459,7 +460,11 @@ async def launch_etcd_auth():
     )
     try:
         await _wait_for_etcd(
-            "--insecure-skip-tls-verify=true", "--insecure-transport=false", "--debug"
+            "--user",
+            f"{Config.etcd_user}:{Config.etcd_password}",
+            "--insecure-skip-tls-verify=true",
+            "--insecure-transport=false",
+            "--debug",
         )
         yield etcd_proc
     finally:
