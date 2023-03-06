@@ -144,8 +144,7 @@ def auth_etcd_proxy(enable_auth_in_etcd, launch_etcd_proxy):
     yield launch_etcd_proxy
 
 
-@pytest.fixture
-async def launch_etcd_proxy():
+def _make_etcd_proxy(**kwargs):
     grpc_options = [
         ("grpc.ssl_target_name_override", "localhost"),
         ("grpc.default_authority", "localhost"),
@@ -160,10 +159,15 @@ async def launch_etcd_proxy():
         etcd_client_ca_cert=f"{config_files}/fake-ca-cert.crt",
         etcd_insecure_skip_verify=True,
         check_route_timeout=45,
-        should_start=True,
         grpc_options=grpc_options,
+        **kwargs,
     )
+    return proxy
 
+
+@pytest.fixture
+async def launch_etcd_proxy():
+    proxy = _make_etcd_proxy(should_start=True)
     await proxy.start()
     yield proxy
     await proxy.stop()
@@ -257,7 +261,6 @@ async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_
 async def auth_external_consul_proxy(
     launch_consul_acl, configure_consul_auth, launch_traefik_consul_auth
 ):
-    print("creating proxy")
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
         consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
@@ -287,9 +290,12 @@ async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
 
 @pytest.fixture
 async def auth_external_etcd_proxy(
-    enable_auth_in_etcd, launch_traefik_etcd_auth, launch_etcd_proxy
+    enable_auth_in_etcd,
+    launch_traefik_etcd_auth,
 ):
-    yield launch_etcd_proxy
+    proxy = _make_etcd_proxy(should_start=False)
+    yield proxy
+    proxy.etcd.close()
 
 
 #########################################################################
@@ -385,7 +391,12 @@ def configure_etcd_auth():
 
 
 def _config_etcd(*extra_args):
-    data_store_cmd = ("etcdctl", "txn") + extra_args
+    common_args = [
+        "--insecure-skip-tls-verify=true",
+        "--insecure-transport=false",
+        "--debug",
+    ]
+    data_store_cmd = ("etcdctl", "txn") + extra_args + tuple(common_args)
     # Load a pre-baked dynamic configuration into the etcd store.
     # This essentially puts authentication on the traefik api handler.
     with open(os.path.join(config_files, "traefik_etcd_txns.txt")) as fd:
@@ -410,10 +421,10 @@ def enable_auth_in_etcd(launch_etcd_auth):
         "--insecure-transport=false",
         "--debug",
     ]
-    subprocess.call(
+    subprocess.check_call(
         ["etcdctl", "user", "add", f"{user}:{pw}"] + common_args, env=Config.etcdctl_env
     )
-    subprocess.call(
+    subprocess.check_call(
         ["etcdctl", "user", "grant-role", user, "root"] + common_args,
         env=Config.etcdctl_env,
     )
