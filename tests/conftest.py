@@ -98,7 +98,7 @@ async def no_auth_consul_proxy(launch_consul):
 
 
 @pytest.fixture
-async def auth_consul_proxy(launch_consul_acl):
+async def auth_consul_proxy(launch_consul_auth):
     """
     Fixture returning a configured TraefikConsulProxy.
     Consul acl enabled.
@@ -130,7 +130,7 @@ async def no_auth_etcd_proxy(launch_etcd):
 
 
 @pytest.fixture
-async def auth_etcd_proxy(enable_auth_in_etcd):
+async def auth_etcd_proxy(launch_etcd_auth):
     """
     Fixture returning a configured TraefikEtcdProxy
     Etcd has credentials set up
@@ -142,10 +142,6 @@ async def auth_etcd_proxy(enable_auth_in_etcd):
 
 
 def _make_etcd_proxy(auth=False, **extra_kwargs):
-    grpc_options = [
-        ("grpc.ssl_target_name_override", "localhost"),
-        ("grpc.default_authority", "localhost"),
-    ]
     kwargs = dict(
         public_url=Config.public_url,
         traefik_api_password=Config.traefik_api_pass,
@@ -155,7 +151,10 @@ def _make_etcd_proxy(auth=False, **extra_kwargs):
     if auth:
         kwargs.update(
             dict(
-                grpc_options=grpc_options,
+                grpc_options=[
+                    ("grpc.ssl_target_name_override", "localhost"),
+                    ("grpc.default_authority", "localhost"),
+                ],
                 etcd_url="https://localhost:2379",
                 etcd_client_ca_cert=f"{config_files}/fake-ca-cert.crt",
                 etcd_insecure_skip_verify=True,
@@ -234,7 +233,7 @@ async def external_file_proxy_toml(launch_traefik_file):
 
 
 @pytest.fixture
-async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_consul):
+async def external_consul_proxy(launch_traefik_consul):
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
         consul_url=f"http://127.0.0.1:{Config.consul_port}",
@@ -248,9 +247,7 @@ async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_
 
 
 @pytest.fixture
-async def auth_external_consul_proxy(
-    launch_consul_acl, configure_consul_auth, launch_traefik_consul_auth
-):
+async def auth_external_consul_proxy(launch_traefik_consul_auth):
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
         consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
@@ -298,7 +295,7 @@ def launch_traefik_file():
 
 
 @pytest.fixture
-def launch_traefik_etcd(launch_etcd, configure_etcd):
+def launch_traefik_etcd(launch_etcd):
     env = Config.etcdctl_env
     proc = _launch_traefik_cli("--providers.etcd", env=env)
     yield proc
@@ -306,7 +303,7 @@ def launch_traefik_etcd(launch_etcd, configure_etcd):
 
 
 @pytest.fixture
-def launch_traefik_etcd_auth(launch_etcd_auth, configure_etcd_auth):
+def launch_traefik_etcd_auth(launch_etcd_auth):
     extra_args = (
         "--providers.etcd.tls.insecureSkipVerify=true",
         "--providers.etcd.tls.ca=" + f"{config_files}/fake-ca-cert.crt",
@@ -319,14 +316,14 @@ def launch_traefik_etcd_auth(launch_etcd_auth, configure_etcd_auth):
 
 
 @pytest.fixture
-def launch_traefik_consul():
+def launch_traefik_consul(launch_consul):
     proc = _launch_traefik_cli("--providers.consul")
     yield proc
     shutdown_traefik(proc)
 
 
 @pytest.fixture
-def launch_traefik_consul_auth():
+def launch_traefik_consul_auth(launch_consul_auth):
     extra_args = (
         f"--providers.consul.endpoints=http://127.0.0.1:{Config.consul_auth_port}",
     )
@@ -364,22 +361,6 @@ def _launch_traefik(*extra_args, env=None):
 ##################################
 
 
-@pytest.fixture
-def configure_etcd(launch_etcd):
-    """Load traefik api rules into the etcd kv store"""
-    yield _config_etcd()
-
-
-@pytest.fixture
-def configure_etcd_auth(launch_etcd_auth, enable_auth_in_etcd):
-    """Load traefik api rules into the etcd kv store, with authentication"""
-    yield _config_etcd(
-        "--user=" + Config.etcd_user + ":" + Config.etcd_password,
-        "--insecure-skip-tls-verify=true",
-        "--insecure-transport=false",
-    )
-
-
 def _config_etcd(*extra_args):
     data_store_cmd = ("etcdctl", "txn", "--debug") + extra_args
     # Load a pre-baked dynamic configuration into the etcd store.
@@ -397,15 +378,10 @@ def _config_etcd(*extra_args):
     ), f"{data_store_cmd} exited with status {proc.returncode}"
 
 
-@pytest.fixture
-def enable_auth_in_etcd(launch_etcd_auth):
+def _enable_auth_in_etcd(*common_args):
+    common_args = list(common_args)
     user = Config.etcd_user
     pw = Config.etcd_password
-    common_args = [
-        "--insecure-skip-tls-verify=true",
-        "--insecure-transport=false",
-        "--debug",
-    ]
     subprocess.check_call(
         ["etcdctl", "user", "add", f"{user}:{pw}"] + common_args, env=Config.etcdctl_env
     )
@@ -420,24 +396,6 @@ def enable_auth_in_etcd(launch_etcd_auth):
         .decode(sys.stdout.encoding)
         .strip()
         == "Authentication Enabled"
-    )
-    yield
-
-    assert (
-        subprocess.check_output(
-            ["etcdctl", "--user", f"{user}:{pw}", "auth", "disable"] + common_args,
-            env=Config.etcdctl_env,
-        )
-        .decode(sys.stdout.encoding)
-        .strip()
-        == "Authentication Disabled"
-    )
-    subprocess.call(
-        ["etcdctl", "user", "revoke-role", "root", user] + common_args,
-        env=Config.etcdctl_env,
-    )
-    subprocess.call(
-        ["etcdctl", "user", "delete", user] + common_args, env=Config.etcdctl_env
     )
 
 
@@ -458,14 +416,17 @@ async def launch_etcd_auth():
             "--log-level=debug",
         ],
     )
+    etcdctl_args = [
+        "--user",
+        f"{Config.etcd_user}:{Config.etcd_password}",
+        "--insecure-skip-tls-verify=true",
+        "--insecure-transport=false",
+        "--debug",
+    ]
     try:
-        await _wait_for_etcd(
-            "--user",
-            f"{Config.etcd_user}:{Config.etcd_password}",
-            "--insecure-skip-tls-verify=true",
-            "--insecure-transport=false",
-            "--debug",
-        )
+        await _wait_for_etcd(*etcdctl_args)
+        _enable_auth_in_etcd(*etcdctl_args)
+        _config_etcd(*etcdctl_args)
         yield etcd_proc
     finally:
         shutdown_etcd(etcd_proc)
@@ -480,6 +441,7 @@ async def launch_etcd():
         )
         try:
             await _wait_for_etcd("--debug=true")
+            _config_etcd()
             yield etcd_proc
         finally:
             shutdown_etcd(etcd_proc)
@@ -509,13 +471,6 @@ async def _wait_for_etcd(*etcd_args):
     await exponential_backoff(check, "etcd health check", timeout=10)
 
 
-# @pytest.fixture(scope="function", autouse=True)
-# Is this referenced anywhere??
-# @pytest.fixture
-def clean_etcd():
-    subprocess.run(["etcdctl", "del", '""', "--from-key=true"], env=Config.etcdctl_env)
-
-
 # Consul Launchers and configurers #
 ####################################
 
@@ -533,15 +488,18 @@ def launch_consul():
             ],
             cwd=consul_path,
         )
-        asyncio.run(
-            _wait_for_consul(token=Config.consul_token, port=Config.consul_port)
-        )
-        yield consul_proc
-        shutdown_consul(consul_proc)
+        try:
+            asyncio.run(
+                _wait_for_consul(token=Config.consul_token, port=Config.consul_port)
+            )
+            _config_consul()
+            yield consul_proc
+        finally:
+            shutdown_consul(consul_proc)
 
 
 @pytest.fixture(scope="module")
-def launch_consul_acl():
+def launch_consul_auth():
     with TemporaryDirectory() as consul_path:
         consul_proc = subprocess.Popen(
             [
@@ -563,13 +521,21 @@ def launch_consul_acl():
             ],
             cwd=consul_path,
         )
-        asyncio.run(
-            _wait_for_consul(token=Config.consul_token, port=Config.consul_auth_port)
-        )
-        yield consul_proc
-        shutdown_consul(
-            consul_proc, secret=Config.consul_token, port=Config.consul_auth_port
-        )
+        try:
+            # asyncio.run instead of await because this fixture's scope
+            # is module-scoped, while event_loop is 'function'-scoped
+            asyncio.run(
+                _wait_for_consul(
+                    token=Config.consul_token, port=Config.consul_auth_port
+                )
+            )
+
+            _config_consul(secret=Config.consul_token, port=Config.consul_auth_port)
+            yield consul_proc
+        finally:
+            shutdown_consul(
+                consul_proc, secret=Config.consul_token, port=Config.consul_auth_port
+            )
 
 
 async def _wait_for_consul(token=None, **kwargs):
@@ -596,18 +562,6 @@ async def _wait_for_consul(token=None, **kwargs):
         "Consul not available",
         timeout=20,
     )
-
-
-@pytest.fixture
-def configure_consul():
-    """Load an initial config into the consul KV store"""
-    yield _config_consul()
-
-
-@pytest.fixture
-def configure_consul_auth():
-    """Load an initial config into the consul KV store, using authentication"""
-    yield _config_consul(secret=Config.consul_token, port=Config.consul_auth_port)
 
 
 def _config_consul(secret=None, port=8500):
@@ -651,7 +605,6 @@ def shutdown_consul(consul_proc, secret=None, port=8500):
 
 
 def shutdown_etcd(etcd_proc):
-    clean_etcd()
     terminate_process(etcd_proc, timeout=20)
 
     # Remove the default.etcd folder, so no settings left over
