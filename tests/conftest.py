@@ -123,55 +123,49 @@ async def no_auth_etcd_proxy(launch_etcd):
     Fixture returning a configured TraefikEtcdProxy.
     No etcd authentication.
     """
-    proxy = TraefikEtcdProxy(
-        public_url=Config.public_url,
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
-        check_route_timeout=45,
-        should_start=True,
-    )
+    proxy = _make_etcd_proxy(auth=False)
     await proxy.start()
     yield proxy
     await proxy.stop()
 
 
 @pytest.fixture
-def auth_etcd_proxy(enable_auth_in_etcd, launch_etcd_proxy):
+async def auth_etcd_proxy(enable_auth_in_etcd):
     """
     Fixture returning a configured TraefikEtcdProxy
     Etcd has credentials set up
     """
-    yield launch_etcd_proxy
-
-
-@pytest.fixture
-async def launch_etcd_proxy():
-    grpc_options = [
-        ("grpc.ssl_target_name_override", "localhost"),
-        ("grpc.default_authority", "localhost"),
-    ]
-    proxy = TraefikEtcdProxy(
-        public_url=Config.public_url,
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
-        etcd_url="https://localhost:2379",
-        etcd_username=Config.etcd_user,
-        etcd_password=Config.etcd_password,
-        etcd_client_ca_cert=f"{config_files}/fake-ca-cert.crt",
-        etcd_insecure_skip_verify=True,
-        check_route_timeout=45,
-        should_start=True,
-        grpc_options=grpc_options,
-    )
-
+    proxy = _make_etcd_proxy(auth=True)
     await proxy.start()
     yield proxy
     await proxy.stop()
 
 
-@pytest.fixture(params=["no_auth_etcd_proxy", "auth_etcd_proxy"])
-def etcd_proxy(request):
-    return request.getfixturevalue(request.param)
+def _make_etcd_proxy(auth=False, **extra_kwargs):
+    grpc_options = [
+        ("grpc.ssl_target_name_override", "localhost"),
+        ("grpc.default_authority", "localhost"),
+    ]
+    kwargs = dict(
+        public_url=Config.public_url,
+        traefik_api_password=Config.traefik_api_pass,
+        traefik_api_username=Config.traefik_api_user,
+        check_route_timeout=45,
+    )
+    if auth:
+        kwargs.update(
+            dict(
+                grpc_options=grpc_options,
+                etcd_url="https://localhost:2379",
+                etcd_client_ca_cert=f"{config_files}/fake-ca-cert.crt",
+                etcd_insecure_skip_verify=True,
+                etcd_username=Config.etcd_user,
+                etcd_password=Config.etcd_password,
+            )
+        )
+    kwargs.update(extra_kwargs)
+    proxy = TraefikEtcdProxy(**kwargs)
+    return proxy
 
 
 @pytest.fixture(autouse=True)
@@ -257,7 +251,6 @@ async def external_consul_proxy(launch_consul, configure_consul, launch_traefik_
 async def auth_external_consul_proxy(
     launch_consul_acl, configure_consul_auth, launch_traefik_consul_auth
 ):
-    print("creating proxy")
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
         consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
@@ -272,14 +265,8 @@ async def auth_external_consul_proxy(
 
 
 @pytest.fixture
-async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
-    proxy = TraefikEtcdProxy(
-        public_url=Config.public_url,
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
-        check_route_timeout=45,
-        should_start=False,
-    )
+async def external_etcd_proxy(launch_traefik_etcd):
+    proxy = _make_etcd_proxy(auth=False, should_start=False)
     await proxy._wait_for_static_config()
     yield proxy
     proxy.etcd.close()
@@ -287,9 +274,12 @@ async def external_etcd_proxy(launch_etcd, configure_etcd, launch_traefik_etcd):
 
 @pytest.fixture
 async def auth_external_etcd_proxy(
-    enable_auth_in_etcd, launch_traefik_etcd_auth, launch_etcd_proxy
+    launch_traefik_etcd_auth,
 ):
-    yield launch_etcd_proxy
+    proxy = _make_etcd_proxy(auth=True, should_start=False)
+    await proxy._wait_for_static_config()
+    yield proxy
+    proxy.etcd.close()
 
 
 #########################################################################
@@ -308,7 +298,7 @@ def launch_traefik_file():
 
 
 @pytest.fixture
-def launch_traefik_etcd():
+def launch_traefik_etcd(launch_etcd, configure_etcd):
     env = Config.etcdctl_env
     proc = _launch_traefik_cli("--providers.etcd", env=env)
     yield proc
@@ -316,8 +306,10 @@ def launch_traefik_etcd():
 
 
 @pytest.fixture
-def launch_traefik_etcd_auth(configure_etcd_auth):
+def launch_traefik_etcd_auth(launch_etcd_auth, configure_etcd_auth):
     extra_args = (
+        "--providers.etcd.tls.insecureSkipVerify=true",
+        "--providers.etcd.tls.ca=" + f"{config_files}/fake-ca-cert.crt",
         "--providers.etcd.username=" + Config.etcd_user,
         "--providers.etcd.password=" + Config.etcd_password,
     )
@@ -373,19 +365,23 @@ def _launch_traefik(*extra_args, env=None):
 
 
 @pytest.fixture
-def configure_etcd():
+def configure_etcd(launch_etcd):
     """Load traefik api rules into the etcd kv store"""
     yield _config_etcd()
 
 
 @pytest.fixture
-def configure_etcd_auth():
+def configure_etcd_auth(launch_etcd_auth, enable_auth_in_etcd):
     """Load traefik api rules into the etcd kv store, with authentication"""
-    yield _config_etcd("--user=" + Config.etcd_user + ":" + Config.etcd_password)
+    yield _config_etcd(
+        "--user=" + Config.etcd_user + ":" + Config.etcd_password,
+        "--insecure-skip-tls-verify=true",
+        "--insecure-transport=false",
+    )
 
 
 def _config_etcd(*extra_args):
-    data_store_cmd = ("etcdctl", "txn") + extra_args
+    data_store_cmd = ("etcdctl", "txn", "--debug") + extra_args
     # Load a pre-baked dynamic configuration into the etcd store.
     # This essentially puts authentication on the traefik api handler.
     with open(os.path.join(config_files, "traefik_etcd_txns.txt")) as fd:
@@ -393,8 +389,12 @@ def _config_etcd(*extra_args):
     proc = subprocess.Popen(
         data_store_cmd, stdin=subprocess.PIPE, env=Config.etcdctl_env
     )
-    proc.communicate(txns.encode())
+    # need two trailing newlines for etcdctl txn to complete
+    proc.communicate(txns.encode() + b'\n\n')
     proc.wait()
+    assert (
+        proc.returncode == 0
+    ), f"{data_store_cmd} exited with status {proc.returncode}"
 
 
 @pytest.fixture
@@ -406,10 +406,10 @@ def enable_auth_in_etcd(launch_etcd_auth):
         "--insecure-transport=false",
         "--debug",
     ]
-    subprocess.call(
+    subprocess.check_call(
         ["etcdctl", "user", "add", f"{user}:{pw}"] + common_args, env=Config.etcdctl_env
     )
-    subprocess.call(
+    subprocess.check_call(
         ["etcdctl", "user", "grant-role", user, "root"] + common_args,
         env=Config.etcdctl_env,
     )
@@ -460,7 +460,11 @@ async def launch_etcd_auth():
     )
     try:
         await _wait_for_etcd(
-            "--insecure-skip-tls-verify=true", "--insecure-transport=false", "--debug"
+            "--user",
+            f"{Config.etcd_user}:{Config.etcd_password}",
+            "--insecure-skip-tls-verify=true",
+            "--insecure-transport=false",
+            "--debug",
         )
         yield etcd_proc
     finally:
