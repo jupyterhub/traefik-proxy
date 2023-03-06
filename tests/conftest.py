@@ -393,8 +393,12 @@ def _config_etcd(*extra_args):
     proc = subprocess.Popen(
         data_store_cmd, stdin=subprocess.PIPE, env=Config.etcdctl_env
     )
-    proc.communicate(txns.encode())
+    # need two trailing newlines for etcdctl txn to complete
+    proc.communicate(txns.encode() + b'\n\n')
     proc.wait()
+    assert (
+        proc.returncode == 0
+    ), f"{data_store_cmd} exited with status {proc.returncode}"
 
 
 @pytest.fixture
