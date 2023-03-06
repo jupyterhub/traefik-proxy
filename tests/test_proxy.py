@@ -1,6 +1,8 @@
 """Tests for the base traefik proxy"""
 
 import pytest
+
+# Some proxy tests are defined in `proxytest` so that they can be used in external repositories
 from proxytest import *  # noqa
 
 from jupyterhub_traefik_proxy.proxy import TraefikProxy
