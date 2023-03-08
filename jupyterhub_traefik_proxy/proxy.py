@@ -386,38 +386,25 @@ class TraefikProxy(Proxy):
         api_credentials = (
             f"{self.traefik_api_username}:{self.traefik_api_hashed_password}"
         )
-        self.dynamic_config.update(
-            {
-                "http": {
-                    "routers": {
-                        "route_api": {
-                            "rule": f"Host(`{api_url.hostname}`) && PathPrefix(`{api_path}`)",
-                            "entryPoints": ["enter_api"],
-                            "service": "api@internal",
-                            "middlewares": ["auth_api"],
-                        },
-                    },
-                    "middlewares": {
-                        "auth_api": {"basicAuth": {"users": [api_credentials]}}
-                    },
+        http = self.dynamic_config.setdefault("http", {})
+        routers = http.setdefault("routers", {})
+        routers["route_api"] = {
+            "rule": f"Host(`{api_url.hostname}`) && PathPrefix(`{api_path}`)",
+            "entryPoints": ["enter_api"],
+            "service": "api@internal",
+            "middlewares": ["auth_api"],
+        }
+        middlewares = http.setdefault("middlewares", {})
+        middlewares["auth_api"] = {"basicAuth": {"users": [api_credentials]}}
+        if self.ssl_cert and self.ssl_key:
+            tls = self.dynamic_config.setdefault("tls", {})
+            tls.setdefault("stores", {})
+            tls["default"] = {
+                "defaultCertificate": {
+                    "certFile": self.ssl_cert,
+                    "keyFile": self.ssl_key,
                 }
             }
-        )
-        if self.ssl_cert and self.ssl_key:
-            self.dynamic_config.update(
-                {
-                    "tls": {
-                        "stores": {
-                            "default": {
-                                "defaultCertificate": {
-                                    "certFile": self.ssl_cert,
-                                    "keyFile": self.ssl_key,
-                                }
-                            }
-                        }
-                    }
-                }
-            )
 
     def validate_routespec(self, routespec):
         """Override jupyterhub's default Proxy.validate_routespec method, as traefik

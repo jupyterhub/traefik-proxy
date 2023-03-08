@@ -78,7 +78,24 @@ class TraefikFileProviderProxy(TraefikProxy):
 
     def persist_dynamic_config(self):
         """Save the dynamic config file with the current dynamic_config"""
-        self.dynamic_config_handler.atomic_dump(self.dynamic_config)
+        # avoid writing empty dicts, which traefik doesn't handle for some reason
+        dynamic_config = self.dynamic_config
+        if (
+            not dynamic_config["http"]["routers"]
+            or not dynamic_config["http"]["services"]
+        ):
+            # traefik can't handle empty dicts, so don't persist them.
+            # But don't _remove_ them from our own config
+            # I think this is a bug in traefik - empty dicts satisfy the spec
+            # use shallow copy, which is cheap but most be done at every level where we modify keys
+            dynamic_config = dynamic_config.copy()
+            dynamic_config["http"] = http = dynamic_config["http"].copy()
+            for key in ("routers", "services"):
+                if not http[key]:
+                    http.pop(key)
+            if not http:
+                dynamic_config.pop("http")
+        self.dynamic_config_handler.atomic_dump(dynamic_config)
 
     async def _setup_traefik_dynamic_config(self):
         await super()._setup_traefik_dynamic_config()
@@ -173,17 +190,6 @@ class TraefikFileProviderProxy(TraefikProxy):
             self.traefik_entrypoint = await self._get_traefik_entrypoint()
 
         async with self.mutex:
-            # If we've emptied the http and/or routers section, create it.
-            if "http" not in self.dynamic_config:
-                self.dynamic_config["http"] = {
-                    "routers": {},
-                }
-                self.dynamic_config["jupyter"] = {"routers": {}}
-
-            elif "routers" not in self.dynamic_config["http"]:
-                self.dynamic_config["http"]["routers"] = {}
-                self.dynamic_config["jupyter"]["routers"] = {}
-
             self.dynamic_config["http"]["routers"][router_alias] = {
                 "service": service_alias,
                 "rule": rule,
@@ -202,9 +208,6 @@ class TraefikFileProviderProxy(TraefikProxy):
 
             # Add the data node to a separate top-level node, so traefik doesn't complain.
             self.dynamic_config["jupyter"]["routers"][router_alias] = {"data": data}
-
-            if "services" not in self.dynamic_config["http"]:
-                self.dynamic_config["http"]["services"] = {}
 
             self.dynamic_config["http"]["services"][service_alias] = {
                 "loadBalancer": {"servers": [{"url": target}], "passHostHeader": True}
@@ -238,19 +241,10 @@ class TraefikFileProviderProxy(TraefikProxy):
         router_alias = traefik_utils.generate_alias(routespec, "router")
 
         async with self.mutex:
-            # Pop each entry and if it's the last one, delete the key
+            # Pop each entry
             self.dynamic_config["http"]["routers"].pop(router_alias, None)
             self.dynamic_config["http"]["services"].pop(service_alias, None)
             self.dynamic_config["jupyter"]["routers"].pop(router_alias, None)
-
-            if not self.dynamic_config["http"]["routers"]:
-                self.dynamic_config["http"].pop("routers")
-            if not self.dynamic_config["http"]["services"]:
-                self.dynamic_config["http"].pop("services")
-            if not self.dynamic_config["http"]:
-                self.dynamic_config.pop("http")
-            if not self.dynamic_config["jupyter"]["routers"]:
-                self.dynamic_config["jupyter"].pop("routers")
 
             self.persist_dynamic_config()
 
