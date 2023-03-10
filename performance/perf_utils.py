@@ -1,18 +1,29 @@
 import argparse
-import contextlib
+import asyncio
+import logging
+import sys
 import textwrap
 import time
-from urllib.parse import urlparse
+from contextlib import asynccontextmanager, contextmanager, nullcontext
+from inspect import isawaitable
+from multiprocessing import cpu_count
+from pathlib import Path
+from subprocess import Popen
+from tempfile import TemporaryDirectory
 
+import aiohttp
 import numpy as np
 from jupyterhub.proxy import ConfigurableHTTPProxy
 from jupyterhub.tests.mocking import MockHub
+from jupyterhub.utils import wait_for_http_server
 
-from jupyterhub_traefik_proxy import (
-    TraefikConsulProxy,
-    TraefikEtcdProxy,
-    TraefikFileProviderProxy,
-)
+from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
+from jupyterhub_traefik_proxy.etcd import TraefikEtcdProxy
+from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
+
+aiohttp.TCPConnector.__init__.__kwdefaults__['limit'] = 10
+
+performance_dir = Path(__file__).parent.resolve()
 
 
 def configure_argument_parser():
@@ -34,9 +45,16 @@ def configure_argument_parser():
     )
 
     parser.add_argument(
-        "--measure",
-        dest="metric",
+        "metric",
+        nargs="?",
         default="methods",
+        choices=[
+            "methods",
+            "http_throughput_small",
+            "http_throughput_large",
+            "ws_throughput_small",
+            "ws_throughput_large",
+        ],
         help=textwrap.dedent(
             """\
             What metric to measure. Available metrics:
@@ -51,39 +69,17 @@ def configure_argument_parser():
     )
 
     parser.add_argument(
-        "--concurrent",
-        dest="concurrent",
-        action="store_true",
-        help=textwrap.dedent(
-            """\
-            Whether or not to run the methods concurrent.
-            """
-        ),
-    )
-
-    parser.add_argument(
-        "--sequential",
-        dest="concurrent",
-        action="store_false",
-        help=textwrap.dedent(
-            """\
-            Whether or not to run the methods sequentially.
-            """
-        ),
-    )
-
-    parser.add_argument(
         "--proxy",
         dest="proxy_class",
-        default="FileProxy",
+        default="file",
         help=textwrap.dedent(
             """\
             Proxy class to analyze.
             Available proxies:
-            -FileProxy
-            -EtcdProxy
-            -ConsulProxy
-            -CHP
+            - file
+            - etcd
+            - consul
+            - chp
             If no proxy is provided, it defaults to:
             --- %(default)s ---
             """
@@ -91,8 +87,8 @@ def configure_argument_parser():
     )
 
     parser.add_argument(
-        "--routes_number",
-        dest="routes_number",
+        "--routes",
+        dest="routes",
         default=10,
         help=textwrap.dedent(
             """\
@@ -104,12 +100,14 @@ def configure_argument_parser():
     )
 
     parser.add_argument(
-        "--concurrent_requests_number",
-        dest="concurrent_requests_number",
+        "-j",
+        "--concurrency",
+        dest="concurrency",
         default=10,
         help=textwrap.dedent(
             """\
             Number of concurrent requests when computing the throughput.
+            Number of concurrent API calls when computing method performance.
             If no number is provided, it defaults to:
             --- %(default)s ---
             """
@@ -117,8 +115,8 @@ def configure_argument_parser():
     )
 
     parser.add_argument(
-        "--total_requests_number",
-        dest="total_requests_number",
+        "--requests",
+        dest="total_requests",
         default=1000,
         help=textwrap.dedent(
             """\
@@ -153,24 +151,68 @@ def configure_argument_parser():
         ),
     )
 
-    parser.add_argument(
-        "--backend_port",
-        dest="backend_port",
-        default=9000,
-        help=textwrap.dedent(
-            """
-            The port where the backend receives http/websocket requests.
-            If no port is provided, it defaults to:
-            --- %(default)s ---
-            Note: Don't forget to start the backend on this port!
-            """
-        ),
-    )
-
     return parser
 
 
-@contextlib.contextmanager
+@contextmanager
+def etcd():
+    """Context manager for running etcd"""
+    with TemporaryDirectory() as td:
+        p = Popen(['etcd'], cwd=td)
+        # wait for it to start
+        time.sleep(5)
+        try:
+            yield
+        finally:
+            try:
+                p.terminate()
+            except Exception as e:
+                print(f"Error stopping {p}: {e}", file=sys.stderr)
+
+
+@contextmanager
+def consul():
+    """Context manager for running consul"""
+    with TemporaryDirectory() as td:
+        p = Popen(['consul', 'agent', '-dev'], cwd=td)
+        # wait for it to start
+        time.sleep(5)
+        try:
+            yield
+        finally:
+            try:
+                p.terminate()
+            except Exception as e:
+                print(f"Error stopping {p}: {e}", file=sys.stderr)
+
+
+@asynccontextmanager
+async def backend(concurrency=4):
+    port = 9000
+    # limit backend workers to 1 per CPU
+    concurrency = min(concurrency, cpu_count())
+
+    p = Popen(
+        [
+            "uvicorn",
+            "dummy_http_server:app",
+            f"--workers={concurrency}",
+            f"--port={port}",
+            "--log-level=warning",
+        ],
+        cwd=performance_dir,
+    )
+    try:
+        await wait_for_http_server(f"http://127.0.0.1:{port}")
+        yield port
+    finally:
+        try:
+            p.terminate()
+        except Exception as e:
+            print(f"Error stopping {p}: {e}", file=sys.stderr)
+
+
+@contextmanager
 def measure_time(print_message, stdout_print, time_taken):
     real_time = time.perf_counter()
     process_time = time.process_time()
@@ -193,11 +235,13 @@ async def no_auth_consul_proxy():
     Function returning a configured TraefikEtcdProxy.
     No etcd authentication.
     """
+
     proxy = TraefikConsulProxy(
         public_url="http://127.0.0.1:8000",
         traefik_api_password="admin",
         traefik_api_username="admin",
         should_start=True,
+        # traefik_log_level="DEBUG",
     )
     await proxy.start()
     return proxy
@@ -225,6 +269,7 @@ async def file_proxy():
         traefik_api_password="admin",
         traefik_api_username="admin",
         should_start=True,
+        # traefik_log_level="DEBUG",
     )
 
     await proxy.start()
@@ -249,79 +294,88 @@ async def configurable_http_proxy():
     return proxy
 
 
+@asynccontextmanager
 async def get_proxy(proxy_class):
-    if proxy_class == "FileProxy":
-        proxy = await file_proxy()
-    elif proxy_class == "EtcdProxy":
-        proxy = await no_auth_etcd_proxy()
-    elif proxy_class == "ConsulProxy":
-        proxy = await no_auth_consul_proxy()
-    elif proxy_class == "CHP":
-        proxy = await configurable_http_proxy()
+    logging.basicConfig(level=logging.INFO)
+    parent_context = nullcontext
+    if proxy_class == "file":
+        proxy_f = file_proxy
+    elif proxy_class == "etcd":
+        proxy_f = no_auth_etcd_proxy
+        parent_context = etcd
+    elif proxy_class == "consul":
+        proxy_f = no_auth_consul_proxy
+        parent_context = consul
+    elif proxy_class == "chp":
+        proxy_f = configurable_http_proxy
     else:
-        print("Proxy version not supported")
+        raise ValueError(f"Proxy {proxy_class} not supported")
         return
 
-    return proxy
+    with parent_context():
+        proxy = await proxy_f()
+        try:
+            yield proxy
+        finally:
+            stop = proxy.stop()
+            if isawaitable(stop):
+                await stop
+    # let everything cleanup
+    await asyncio.sleep(3)
 
 
-async def stop_proxy(proxy_class, proxy):
-    if proxy_class == "CHP":
-        proxy.stop()
-    else:
-        await proxy.stop()
-
-
-def get_tasks_result(tasks):
-    results = {}
-    for task in tasks:
-        route_idx, time_taken = task.result()
-        results[route_idx] = time_taken
-
-    return results
-
-
-def format_method_result(method, proxy_class, test_id, sample, fieldnames, results):
-    constants = [proxy_class, test_id, method, sample]
-    result = dict(zip(fieldnames[:-1], constants))
+def format_method_result(
+    method,
+    test_id,
+    sample,
+    results,
+    const_fields,
+):
+    result = {}
+    result.update(const_fields)
+    result["method"] = method
+    result["test_id"] = test_id
+    result["route_idx"] = sample
     result["cpu_time"] = results[test_id][method][sample]["cpu"]
     result["real_time"] = results[test_id][method][sample]["real"]
     return result
 
 
 def persist_methods_results_to_csv(
-    csv_writer, results, fieldnames, test_iterations, samples, proxy_class
+    csv_writer,
+    results,
+    test_iterations,
+    samples,
+    const_fields,
 ):
     for test_id in range(test_iterations):
-        for sample in samples:
+        for sample in results[test_id]["add"].keys():
             result_add_dict = format_method_result(
-                "add", proxy_class, test_id, sample, fieldnames, results
+                "add", test_id, sample, results, const_fields
             )
             result_delete_dict = format_method_result(
-                "delete", proxy_class, test_id, sample, fieldnames, results
-            )
-            result_get_all_dict = format_method_result(
-                "get_all", proxy_class, test_id, sample, fieldnames, results
+                "delete", test_id, sample, results, const_fields
             )
 
             csv_writer.writerow(result_add_dict)
             csv_writer.writerow(result_delete_dict)
-            csv_writer.writerow(result_get_all_dict)
+            if sample in results[test_id]["get_all"]:
+                result_get_all_dict = format_method_result(
+                    "get_all",
+                    test_id,
+                    sample,
+                    results,
+                    const_fields,
+                )
+                csv_writer.writerow(result_get_all_dict)
 
 
-def logspace_samples(routes_number):
+def logspace_samples(routes):
     sample_no = 3
-    if routes_number > 40:
-        sample_no = routes_number / 10
+    if routes > 40:
+        sample_no = routes // 10
 
     samples = np.unique(
-        np.logspace(0, np.log10(routes_number), sample_no, endpoint=False, dtype=int)
+        np.logspace(0, np.log10(routes), sample_no, endpoint=False, dtype=int)
     )
     return samples
-
-
-def create_request_url(proxy, routespec, proto):
-    if proto == "http":
-        return proxy.public_url + routespec
-    req_url = "ws://" + urlparse(proxy.public_url).netloc + routespec
-    return req_url

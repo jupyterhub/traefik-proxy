@@ -1,8 +1,10 @@
 # our own .gitignore
 
-/dependencies
+dependencies
 *.etcd
-/traefik.toml
+traefik.toml
+
+.DS_Store
 
 ## Below: imported standard Python gitignore
 

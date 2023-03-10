@@ -1,44 +1,31 @@
 #!/bin/sh
-#CHP methods performance
-python3 -m performance.check_perf --measure=methods --proxy=CHP --iterations=4 --routes_number=500 --concurrent --output=./results/chp_methods_concurrent.csv
-# FileProxy methods performance - throttle = 2s
-python3 -m performance.check_perf --measure=methods --proxy=FileProxy --iterations=4 --routes_number=500 --concurrent --output=./results/file_methods_concurrent.csv
-# EtcdProxy methods performance - throttle = 2s
-#start etcd:
-etcd &>/dev/null &
-python3 -m performance.check_perf --measure=methods --proxy=EtcdProxy --iterations=4 --routes_number=500 --concurrent --output=./results/etcd_methods_concurrent.csv
-#stop etcd:
-pkill etcd
--rf default.etcd/
+# no -e to allow data generation, only losing failed results
+set -xuo pipefail
+
+echo $0
+cd $(dirname "$0")
+export PYTHONPATH="$PWD/.."
+
+iterations=${iterations:-3}
+routes=${routes:-500}
+
+proxies="${proxies:-chp file etcd consul}"
+# add/remove route API performance
+for proxy in $proxies; do
+  for concurrency in 1 10 20 50; do
+    python3 -m performance.check_perf methods --proxy=$proxy --iterations=$iterations --concurrency=$concurrency --routes=$routes --output=./results/${proxy}-methods.csv
+  done
+done
+
 
 # Throughput:
-#start backends:
-python3 ./performance/dummy_http_server.py 9001 & #port 9001
-python3 ./performance/dummy_ws_server.py & #port 9000
 
-python3 -m performance.check_perf --measure=http_throughput_small --proxy=CHP --concurrent_requests_number=10 --backend_port=9001 --output=./results/http_throughput_small.csv
-python3 -m performance.check_perf --measure=http_throughput_small --proxy=FileProxy --concurrent_requests_number=10 --backend_port=9001 --output=./results/http_throughput_small.csv
-#start etcd:
-etcd &>/dev/null &
-python3 -m performance.check_perf --measure=http_throughput_small --proxy=EtcdProxy --concurrent_requests_number=10 --backend_port=9001 --output=./results/http_throughput_small.csv
-#stop etcd:
-pkill etcd
--rf default.etcd/
-
-python3 -m performance.check_perf --measure=http_throughput_large --proxy=CHP --concurrent_requests_number=10 --backend_port=9001 --output=./results/http_throughput_large.csv
-python3 -m performance.check_perf --measure=http_throughput_large --proxy=FileProxy --concurrent_requests_number=10 --backend_port=9001 --output=./results/http_throughput_large.csv
-#start etcd:
-etcd &>/dev/null &
-python3 -m performance.check_perf --measure=http_throughput_large --proxy=EtcdProxy --concurrent_requests_number=10 --backend_port=9001 --output=./results/http_throughput_large.csv
-#stop etcd:
-pkill etcd
--rf default.etcd/
- 
-python3 -m performance.check_perf --measure=ws_throughput --proxy=CHP --concurrent_requests_number=10 --output=./results/ws_throughput.csv
-python3 -m performance.check_perf --measure=ws_throughput --proxy=FileProxy --concurrent_requests_number=10 --output=./results/ws_throughput.csv
-#start etcd:
-etcd &>/dev/null &
-python3 -m performance.check_perf --measure=ws_throughput --proxy=EtcdProxy --concurrent_requests_number=10 --output=./results/ws_throughput.csv
-#stop etcd:
-pkill etcd
--rf default.etcd/
+for metric in http_throughput_small http_throughput_large ws_throughput_small ws_throughput_large; do
+  for concurrency in 1 10 20 50; do
+    for proxy in chp file; do
+    # no reason to use other config backends when testing throughput
+      sleep 5
+      python3 check_perf.py $metric --proxy=$proxy --iterations=$iterations --concurrency=$concurrency --output=./results/${proxy}-${metric}.csv
+    done
+  done
+done
