@@ -97,7 +97,10 @@ def launch_backends():
 
     Session-scoped, so backends are re-used
 
-    Returns a function that takes
+    The fixture result is an async function that takes a number of backends required,
+    and returns a list of URLs for those backends.
+
+    When the function returns, the backends are already running and responsive.
     """
 
     dummy_server_path = abspath(join(dirname(__file__), "dummy_http_server.py"))
@@ -106,6 +109,10 @@ def launch_backends():
     base_port = 9000
 
     async def _launch_backends(n=1):
+        """Launch `n` backends, returning their URLs
+
+        Always returns a list of length `n`.
+        """
         already_available = len(running_backends)
         for i in range(already_available, n):
             port = base_port + i
@@ -115,7 +122,7 @@ def launch_backends():
             running_backends.append(backend)
             urls.append(url)
 
-        if already_available != n:
+        if already_available < n:
             # await _new_ backends
             await wait_for_services(urls[already_available:])
 
