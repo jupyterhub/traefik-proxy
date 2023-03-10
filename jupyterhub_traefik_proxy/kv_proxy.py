@@ -20,7 +20,6 @@ Route Specification:
 
 import asyncio
 import json
-import os
 from collections.abc import MutableMapping
 from functools import wraps
 
@@ -205,14 +204,6 @@ class TKvProxy(TraefikProxy):
 
         raise NotImplementedError()
 
-    def _clean_resources(self):
-        try:
-            if self.should_start:
-                os.remove(self.static_config_file)
-        except:
-            self.log.error("Failed to remove traefik's configuration files")
-            raise
-
     async def _setup_traefik_static_config(self):
         self._define_kv_specific_static_config()
         await super()._setup_traefik_static_config()
@@ -220,20 +211,6 @@ class TKvProxy(TraefikProxy):
     async def _setup_traefik_dynamic_config(self):
         await super()._setup_traefik_dynamic_config()
         await self.persist_dynamic_config()
-
-    async def start(self):
-        """Start the proxy.
-        Will be called during startup if should_start is True.
-        """
-        await super().start()
-        await self._wait_for_static_config()
-
-    async def stop(self):
-        """Stop the proxy.
-        Will be called during teardown if should_start is True.
-        """
-        await super().stop()
-        self._clean_resources()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
@@ -275,10 +252,10 @@ class TKvProxy(TraefikProxy):
             )
 
         if status:
-            self.log.info(
+            self.log.debug(
                 "Added service %s with the alias %s.", target, route_keys.service_alias
             )
-            self.log.info(
+            self.log.debug(
                 "Added router %s for service %s with the following routing rule %s.",
                 route_keys.router_alias,
                 route_keys.service_alias,
@@ -309,7 +286,7 @@ class TKvProxy(TraefikProxy):
                 jupyterhub_routespec, route_keys
             )
         if status:
-            self.log.info("Routespec %s was deleted.", routespec)
+            self.log.debug("Routespec %s was deleted.", routespec)
         else:
             self.log.error(
                 "Couldn't delete route %s. Response: %s", routespec, response

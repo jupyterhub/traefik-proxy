@@ -288,7 +288,7 @@ class TraefikProxy(Proxy):
         return True
 
     async def _wait_for_route(self, routespec):
-        self.log.info(f"Waiting for {routespec} to register with traefik")
+        self.log.debug("Waiting for %s to register with traefik", routespec)
 
         async def _check_traefik_dynamic_conf_ready():
             """Check if traefik loaded its dynamic configuration yet"""
@@ -326,16 +326,25 @@ class TraefikProxy(Proxy):
         async def _check_traefik_static_conf_ready():
             """Check if traefik loaded its static configuration yet"""
             try:
-                resp = await self._traefik_api_request("/api/overview")
-            except Exception:
-                self.log.exception("Error checking for traefik static configuration")
-                return False
-
-            if resp.code != 200:
-                self.log.error(
-                    "Unexpected response code %s checking for traefik static configuration",
-                    resp.code,
+                await self._traefik_api_request("/api/overview")
+            except ConnectionRefusedError:
+                self.log.debug(
+                    f"Connection Refused waiting for traefik at {self.traefik_api_url}. It's probably starting up..."
                 )
+                return False
+            except HTTPClientError as e:
+                if e.code == 599:
+                    self.log.debug(
+                        f"Connection error waiting for traefik at {self.traefik_api_url}. It's probably starting up..."
+                    )
+                    return False
+                if e.code == 404:
+                    self.log.debug(
+                        f"traefik api at {e.response.request.url} overview not ready yet"
+                    )
+                    return False
+                # unexpected
+                self.log.error(f"Error checking for traefik static configuration {e}")
                 return False
 
             return True
@@ -347,7 +356,7 @@ class TraefikProxy(Proxy):
         )
 
     def _stop_traefik(self):
-        self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
+        self.log.info("Cleaning up traefik proxy [pid=%i]...", self.traefik_process.pid)
         self.traefik_process.terminate()
         try:
             self.traefik_process.communicate(timeout=10)
@@ -363,6 +372,7 @@ class TraefikProxy(Proxy):
                 "Configuration mode not supported \n.\
                 The proxy can only be configured through fileprovider, etcd and consul"
             )
+
         env = os.environ.copy()
         env.update(self.traefik_env)
         try:
@@ -419,7 +429,7 @@ class TraefikProxy(Proxy):
             raise
 
     async def _setup_traefik_dynamic_config(self):
-        self.log.info("Setting up traefik's dynamic config...")
+        self.log.debug("Setting up traefik's dynamic config...")
         self._generate_htpassword()
         api_url = urlparse(self.traefik_api_url)
         api_path = api_url.path if api_url.path else '/api'
@@ -478,6 +488,7 @@ class TraefikProxy(Proxy):
         await self._setup_traefik_static_config()
         await self._setup_traefik_dynamic_config()
         self._start_traefik()
+        await self._wait_for_static_config()
 
     async def stop(self):
         """Stop the proxy.
@@ -488,6 +499,20 @@ class TraefikProxy(Proxy):
         if the proxy is to be started by the Hub
         """
         self._stop_traefik()
+        self._cleanup()
+
+    def _cleanup(self):
+        """Cleanup after stop
+
+        Extend if there's more to cleanup than the static config file
+        """
+        if self.should_start:
+            try:
+                os.remove(self.static_config_file)
+            except Exception as e:
+                self.log.error(
+                    f"Failed to remove traefik config file {self.static_config_file}: {e}"
+                )
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
