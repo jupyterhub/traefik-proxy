@@ -91,18 +91,44 @@ def assert_equal(value, expected):
         raise
 
 
-@pytest.fixture
-def launch_backend():
+@pytest.fixture(scope="session")
+def launch_backends():
+    """Launch n backends
+
+    Session-scoped, so backends are re-used
+
+    The fixture result is an async function that takes a number of backends required,
+    and returns a list of URLs for those backends.
+
+    When the function returns, the backends are already running and responsive.
+    """
+
     dummy_server_path = abspath(join(dirname(__file__), "dummy_http_server.py"))
     running_backends = []
+    urls = []
+    base_port = 9000
 
-    def _launch_backend(port, proto="http"):
-        backend = subprocess.Popen(
-            [sys.executable, dummy_server_path, str(port), proto]
-        )
-        running_backends.append(backend)
+    async def _launch_backends(n=1):
+        """Launch `n` backends, returning their URLs
 
-    yield _launch_backend
+        Always returns a list of length `n`.
+        """
+        already_available = len(running_backends)
+        for i in range(already_available, n):
+            port = base_port + i
+            url = f"http://127.0.0.1:{port}"
+            print(f"Launching backend on {url}")
+            backend = subprocess.Popen([sys.executable, dummy_server_path, str(port)])
+            running_backends.append(backend)
+            urls.append(url)
+
+        if already_available < n:
+            # await _new_ backends
+            await wait_for_services(urls[already_available:])
+
+        return urls[:n]
+
+    yield _launch_backends
 
     for proc in running_backends:
         proc.terminate()
@@ -130,7 +156,16 @@ def launch_backend():
 )
 def proxy(request):
     """Parameterized fixture to run all the tests with every proxy implementation"""
-    return request.getfixturevalue(request.param)
+    proxy = request.getfixturevalue(request.param)
+    # wait for public endpoint to be reachable
+    asyncio.run(
+        exponential_backoff(
+            utils.check_host_up_http,
+            f"Proxy public url {proxy.public_url} cannot be reached",
+            url=proxy.public_url,
+        )
+    )
+    return proxy
 
 
 async def wait_for_services(urls):
@@ -197,13 +232,14 @@ def test_default_port():
     ],
 )
 async def test_add_get_delete(
-    request, proxy, launch_backend, routespec, existing_routes, event_loop
+    request, proxy, launch_backends, routespec, existing_routes, event_loop
 ):
-    default_target = "http://127.0.0.1:9000"
     data = {"test": "test1", "user": "username"}
 
-    default_backend = urlparse(default_target)
-    extra_backends = []
+    backends = await launch_backends(1 + len(existing_routes))
+
+    default_backend = backends[0]
+    extra_backends = backends[1:]
 
     proxy_url = proxy.public_url.rstrip("/")
 
@@ -246,7 +282,7 @@ async def test_add_get_delete(
             except KeyError:
                 pass
 
-            assert_equal(route, expected_output(spec, backend.geturl()))
+            assert_equal(route, expected_output(spec, backend))
 
             # Test the actual routing
             responding_backend1 = await utils.get_responding_backend_port(
@@ -255,26 +291,13 @@ async def test_add_get_delete(
             responding_backend2 = await utils.get_responding_backend_port(
                 proxy_url, normalize_spec(spec) + "something"
             )
-            assert responding_backend1 == backend.port
-            assert responding_backend2 == backend.port
-
-    for i, spec in enumerate(existing_routes, start=1):
-        backend = default_backend._replace(
-            netloc=f"{default_backend.hostname}:{default_backend.port+i}"
-        )
-        launch_backend(backend.port, backend.scheme)
-        extra_backends.append(backend)
-
-    launch_backend(default_backend.port, default_backend.scheme)
-    await wait_for_services(
-        [proxy.public_url, default_backend.geturl()]
-        + [backend.geturl() for backend in extra_backends]
-    )
+            assert responding_backend1 == urlparse(backend).port
+            assert responding_backend2 == urlparse(backend).port
 
     # Create existing routes
     futures = []
     for i, spec in enumerate(existing_routes):
-        f = proxy.add_route(spec, extra_backends[i].geturl(), copy.copy(data))
+        f = proxy.add_route(spec, extra_backends[i], copy.copy(data))
         futures.append(f)
 
     if futures:
@@ -299,7 +322,7 @@ async def test_add_get_delete(
 
     # Test add
     with context(routespec):
-        await proxy.add_route(routespec, default_backend.geturl(), copy.copy(data))
+        await proxy.add_route(routespec, default_backend, copy.copy(data))
 
     # Test get
     await test_route_exist(routespec, default_backend)
@@ -323,7 +346,7 @@ async def test_add_get_delete(
             ]:
                 try:
                     result = await utils.get_responding_backend_port(proxy_url, spec)
-                    if result != default_backend.port:
+                    if result != urlparse(default_backend).port:
                         deleted += 1
                 except HTTPClientError:
                     deleted += 1
@@ -339,13 +362,9 @@ async def test_add_get_delete(
         await test_route_exist(spec, extra_backends[i])
 
 
-async def test_get_all_routes(proxy, launch_backend):
+async def test_get_all_routes(proxy, launch_backends):
     routespecs = ["/proxy/path1", "/proxy/path2/", "/proxy/path3/"]
-    targets = [
-        "http://127.0.0.1:9900",
-        "http://127.0.0.1:9090",
-        "http://127.0.0.1:9999",
-    ]
+    targets = await launch_backends(len(routespecs))
     datas = [{"test": "test1"}, {}, {"test": "test2"}]
 
     expected_output = {
@@ -367,11 +386,6 @@ async def test_get_all_routes(proxy, launch_backend):
         },
     }
 
-    for target in targets:
-        launch_backend(urlparse(target).port)
-
-    await wait_for_services([proxy.public_url] + targets)
-
     futures = []
     for routespec, target, data in zip(routespecs, targets, datas):
         f = proxy.add_route(routespec, target, copy.copy(data))
@@ -389,7 +403,7 @@ async def test_get_all_routes(proxy, launch_backend):
     assert_equal(routes, expected_output)
 
 
-async def test_host_origin_headers(proxy, launch_backend):
+async def test_host_origin_headers(proxy, launch_backends):
     routespec = "/user/username/"
     target = "http://127.0.0.1:9000"
     data = {}
@@ -397,8 +411,9 @@ async def test_host_origin_headers(proxy, launch_backend):
     proxy_url = urlparse(proxy.public_url)
     traefik_port = proxy_url.port
     traefik_host = proxy_url.hostname
-    default_backend_port = urlparse(target).port
-    launch_backend(default_backend_port)
+    backends = await launch_backends(1)
+    target = backends[0]
+    urlparse(target).port
 
     # wait for traefik to be reachable
     await exponential_backoff(
@@ -478,30 +493,16 @@ async def test_check_routes(proxy, username):
     assert_equal(before, after)
 
 
-async def test_websockets(proxy, launch_backend):
+async def test_websockets(proxy, launch_backends):
     routespec = "/user/username/"
-    target = "http://127.0.0.1:9000"
     data = {}
 
     proxy_url = urlparse(proxy.public_url)
     proxy_url.port
     proxy_url.hostname
+    backends = await launch_backends(1)
+    target = backends[0]
     default_backend_port = urlparse(target).port
-    launch_backend(default_backend_port, "ws")
-
-    # wait for traefik to be reachable
-    await exponential_backoff(
-        utils.check_host_up_http,
-        "Traefik cannot be reached",
-        url=proxy_url.geturl(),
-    )
-
-    # wait for backend to be reachable
-    await exponential_backoff(
-        utils.check_host_up_http,
-        "Backends cannot be reached",
-        url=target,
-    )
 
     # Add route to default_backend
     await proxy.add_route(routespec, target, data)
@@ -512,7 +513,7 @@ async def test_websockets(proxy, launch_backend):
     else:
         kwargs = {}
         scheme = "ws://"
-    req_url = scheme + proxy_url.netloc + routespec
+    req_url = scheme + proxy_url.netloc + url_path_join(routespec, "ws")
 
     # Don't validate the ssl certificate, it's self-signed by traefik
     print(f"Connecting with websockets to {req_url}")
