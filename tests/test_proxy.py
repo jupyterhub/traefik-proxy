@@ -229,6 +229,10 @@ def test_default_port():
                 "other.host/path/no/slash/abc/",
             ],
         ),
+        (
+            "/one/",
+            [],
+        ),
     ],
 )
 async def test_add_get_delete(
@@ -363,6 +367,10 @@ async def test_add_get_delete(
 
 
 async def test_get_all_routes(proxy, launch_backends):
+    # initial state: no routes
+    routes = await proxy.get_all_routes()
+    assert routes == {}
+
     routespecs = ["/proxy/path1", "/proxy/path2/", "/proxy/path3/"]
     targets = await launch_backends(len(routespecs))
     datas = [{"test": "test1"}, {}, {"test": "test2"}]
@@ -401,6 +409,11 @@ async def test_get_all_routes(proxy, launch_backends):
         pass
 
     assert_equal(routes, expected_output)
+
+    for routespec in routespecs:
+        await proxy.delete_route(routespec)
+    routes = await proxy.get_all_routes()
+    assert routes == {}
 
 
 async def test_host_origin_headers(proxy, launch_backends):
