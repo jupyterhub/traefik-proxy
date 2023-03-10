@@ -13,7 +13,7 @@ e.g. with multiple traefik-proxy instances.
 5. Install **traefik**
 6. Install **consul**
 
-- You can find the full installation guide and examples in the [Introduction section](install.html#traefik-proxy-installation)
+- You can find the full installation guide and examples in the [installation section](install)
 
 ## How-To enable TraefikConsulProxy
 

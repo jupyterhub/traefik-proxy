@@ -9,7 +9,7 @@
 2. Install **jupyterhub-traefik-proxy**
 3. Install **traefik**
 
-- You can find the full installation guide and examples in the [Introduction section](install.html#traefik-proxy-installation)
+- You can find the full installation guide and examples in the [installation section](install)
 
 ## How-To enable TraefikFileProviderProxy
 

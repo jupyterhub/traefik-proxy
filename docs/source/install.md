@@ -107,9 +107,9 @@ c.JupyterHub.proxy_class = "traefik_consul"
 
 ## Implementation details
 
-1. **Traefik Dashboard**
+1. **Traefik API**
 
-   Traefik provides a Web UI **dashboard** where you can see the frontends and backends registered, the routing rules, some metrics, but also other configuration elements. Find out more about traefik api's, [here](https://docs.traefik.io/configuration/api/#security).
+   traefik-proxy uses the [Traefik API](https://docs.traefik.io/configuration/api/) to monitor routes and configurations.
 
    Because of **security** concerns, in traefik-proxy implementation, traefik api endpoint isn't exposed on the public http endpoint. Instead, it runs on a dedicated **authenticated endpoint** that's on localhost by default.
 
@@ -121,8 +121,7 @@ c.JupyterHub.proxy_class = "traefik_consul"
    c.TraefikFileProviderProxy.traefik_api_username = "admin"
    ```
 
-   Check out TraefikProxy's **API Reference** for more configuration options.
-   <br/><br/>
+   Check out TraefikProxy's [API Reference](TraefikProxy) for more configuration options.
 
 2. **TKvProxy class**
 
