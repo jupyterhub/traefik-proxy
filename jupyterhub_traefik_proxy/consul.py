@@ -118,9 +118,6 @@ class TraefikConsulProxy(TKvProxy):
                 self.traefik_env.setdefault("CONSUL_HTTP_TOKEN", self.consul_password)
         super()._start_traefik()
 
-    def _stop_traefik(self):
-        super()._stop_traefik()
-
     async def persist_dynamic_config(self):
         data = self.flatten_dict_for_kv(
             self.dynamic_config, prefix=self.kv_traefik_prefix
@@ -307,6 +304,3 @@ class TraefikConsulProxy(TKvProxy):
         )
 
         return routes["Results"]
-
-    async def stop(self):
-        await super().stop()
