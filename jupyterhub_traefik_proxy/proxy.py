@@ -18,6 +18,7 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
+import asyncio
 import json
 import os
 from os.path import abspath
@@ -26,8 +27,8 @@ from urllib.parse import urlparse, urlunparse
 
 from jupyterhub.proxy import Proxy
 from jupyterhub.utils import exponential_backoff, new_token, url_path_join
-from tornado.httpclient import AsyncHTTPClient
-from traitlets import Any, Bool, Dict, Integer, Unicode, default, validate
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError
+from traitlets import Any, Bool, Dict, Integer, Unicode, default, observe, validate
 
 from . import traefik_utils
 
@@ -36,6 +37,26 @@ class TraefikProxy(Proxy):
     """JupyterHub Proxy implementation using traefik"""
 
     traefik_process = Any()
+
+    concurrency = Integer(
+        10,
+        config=True,
+        help="""
+        The number of requests allowed to be concurrently outstanding to the proxy
+
+        Limiting this number avoids potential timeout errors
+        by sending too many requests to update the proxy at once
+        """,
+    )
+    semaphore = Any()
+
+    @default('semaphore')
+    def _default_semaphore(self):
+        return asyncio.BoundedSemaphore(self.concurrency)
+
+    @observe('concurrency')
+    def _concurrency_changed(self, change):
+        self.semaphore = asyncio.BoundedSemaphore(change.new)
 
     static_config_file = Unicode(
         "traefik.toml", config=True, help="""traefik's static configuration file"""
@@ -85,6 +106,20 @@ class TraefikProxy(Proxy):
 
     static_config = Dict()
     dynamic_config = Dict()
+
+    traefik_providers_throttle_duration = Unicode(
+        "0s",
+        config=True,
+        help="""
+            throttle traefik reloads of configuration.
+
+            When traefik sees a change in configuration,
+            it will wait this long before applying the next one.
+            This affects how long adding a user to the proxy will take.
+
+            See https://doc.traefik.io/traefik/providers/overview/#providersprovidersthrottleduration
+            """,
+    )
 
     traefik_api_url = Unicode(
         "http://localhost:8099",
@@ -235,24 +270,25 @@ class TraefikProxy(Proxy):
         expected = (
             traefik_utils.generate_alias(routespec, kind) + "@" + self.provider_name
         )
-        path = f"/api/http/{kind}s"
+        path = f"/api/http/{kind}s/{expected}"
         try:
             resp = await self._traefik_api_request(path)
-            json_data = json.loads(resp.body)
-        except Exception:
+            json.loads(resp.body)
+        except HTTPClientError as e:
+            if e.code == 404:
+                self.log.debug(f"traefik {expected} not yet in {kind}")
+                return False
             self.log.exception(f"Error checking traefik api for {kind} {routespec}")
             return False
-
-        service_names = [service['name'] for service in json_data]
-        if expected not in service_names:
-            self.log.debug(f"traefik {expected} not yet in {kind}")
+        except Exception:
+            self.log.exception(f"Error checking traefik api for {kind} {routespec}")
             return False
 
         # found the expected endpoint
         return True
 
     async def _wait_for_route(self, routespec):
-        self.log.info(f"Waiting for {routespec} to register with traefik")
+        self.log.debug("Waiting for %s to register with traefik", routespec)
 
         async def _check_traefik_dynamic_conf_ready():
             """Check if traefik loaded its dynamic configuration yet"""
@@ -266,6 +302,7 @@ class TraefikProxy(Proxy):
         await exponential_backoff(
             _check_traefik_dynamic_conf_ready,
             f"Traefik route for {routespec} configuration not available",
+            scale_factor=1.2,
             timeout=self.check_route_timeout,
         )
 
@@ -289,16 +326,25 @@ class TraefikProxy(Proxy):
         async def _check_traefik_static_conf_ready():
             """Check if traefik loaded its static configuration yet"""
             try:
-                resp = await self._traefik_api_request("/api/overview")
-            except Exception:
-                self.log.exception("Error checking for traefik static configuration")
-                return False
-
-            if resp.code != 200:
-                self.log.error(
-                    "Unexpected response code %s checking for traefik static configuration",
-                    resp.code,
+                await self._traefik_api_request("/api/overview")
+            except ConnectionRefusedError:
+                self.log.debug(
+                    f"Connection Refused waiting for traefik at {self.traefik_api_url}. It's probably starting up..."
                 )
+                return False
+            except HTTPClientError as e:
+                if e.code == 599:
+                    self.log.debug(
+                        f"Connection error waiting for traefik at {self.traefik_api_url}. It's probably starting up..."
+                    )
+                    return False
+                if e.code == 404:
+                    self.log.debug(
+                        f"traefik api at {e.response.request.url} overview not ready yet"
+                    )
+                    return False
+                # unexpected
+                self.log.error(f"Error checking for traefik static configuration {e}")
                 return False
 
             return True
@@ -310,7 +356,7 @@ class TraefikProxy(Proxy):
         )
 
     def _stop_traefik(self):
-        self.log.info("Cleaning up proxy[%i]...", self.traefik_process.pid)
+        self.log.info("Cleaning up traefik proxy [pid=%i]...", self.traefik_process.pid)
         self.traefik_process.terminate()
         try:
             self.traefik_process.communicate(timeout=10)
@@ -326,6 +372,7 @@ class TraefikProxy(Proxy):
                 "Configuration mode not supported \n.\
                 The proxy can only be configured through fileprovider, etcd and consul"
             )
+
         env = os.environ.copy()
         env.update(self.traefik_env)
         try:
@@ -348,6 +395,9 @@ class TraefikProxy(Proxy):
         Subclasses should specify any traefik providers themselves, in
         :attrib:`self.static_config["providers"]`
         """
+        self.static_config["providers"][
+            "providersThrottleDuration"
+        ] = self.traefik_providers_throttle_duration
 
         if self.traefik_log_level:
             self.static_config["log"] = {"level": self.traefik_log_level}
@@ -379,7 +429,7 @@ class TraefikProxy(Proxy):
             raise
 
     async def _setup_traefik_dynamic_config(self):
-        self.log.info("Setting up traefik's dynamic config...")
+        self.log.debug("Setting up traefik's dynamic config...")
         self._generate_htpassword()
         api_url = urlparse(self.traefik_api_url)
         api_path = api_url.path if api_url.path else '/api'
@@ -425,6 +475,7 @@ class TraefikProxy(Proxy):
         await self._setup_traefik_static_config()
         await self._setup_traefik_dynamic_config()
         self._start_traefik()
+        await self._wait_for_static_config()
 
     async def stop(self):
         """Stop the proxy.
@@ -435,6 +486,20 @@ class TraefikProxy(Proxy):
         if the proxy is to be started by the Hub
         """
         self._stop_traefik()
+        self._cleanup()
+
+    def _cleanup(self):
+        """Cleanup after stop
+
+        Extend if there's more to cleanup than the static config file
+        """
+        if self.should_start:
+            try:
+                os.remove(self.static_config_file)
+            except Exception as e:
+                self.log.error(
+                    f"Failed to remove traefik config file {self.static_config_file}: {e}"
+                )
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.

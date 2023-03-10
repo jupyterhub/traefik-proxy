@@ -18,15 +18,42 @@ Route Specification:
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
+import asyncio
 import json
-import os
 from collections.abc import MutableMapping
+from functools import wraps
 
 import escapism
 from traitlets import Unicode
 
 from . import traefik_utils
 from .proxy import TraefikProxy
+
+
+def _one_at_a_time(method):
+    """decorator to limit an async method to be called only once
+
+    If multiple concurrent calls to this method are made,
+    piggy-back on the outstanding call instead of queuing
+    or letting requests pile up.
+    """
+
+    @wraps(method)
+    async def locked_method(*args, **kwargs):
+        if getattr(method, "_shared_future", None) is not None:
+            f = method._shared_future
+            if f.done():
+                method._shared_future = None
+            else:
+                return await f
+
+        method._shared_future = f = asyncio.ensure_future(method(*args, **kwargs))
+        try:
+            return await f
+        finally:
+            method._shared_future = None
+
+    return locked_method
 
 
 class TKvProxy(TraefikProxy):
@@ -177,14 +204,6 @@ class TKvProxy(TraefikProxy):
 
         raise NotImplementedError()
 
-    def _clean_resources(self):
-        try:
-            if self.should_start:
-                os.remove(self.static_config_file)
-        except:
-            self.log.error("Failed to remove traefik's configuration files")
-            raise
-
     async def _setup_traefik_static_config(self):
         self._define_kv_specific_static_config()
         await super()._setup_traefik_static_config()
@@ -192,20 +211,6 @@ class TKvProxy(TraefikProxy):
     async def _setup_traefik_dynamic_config(self):
         await super()._setup_traefik_dynamic_config()
         await self.persist_dynamic_config()
-
-    async def start(self):
-        """Start the proxy.
-        Will be called during startup if should_start is True.
-        """
-        await super().start()
-        await self._wait_for_static_config()
-
-    async def stop(self):
-        """Stop the proxy.
-        Will be called during teardown if should_start is True.
-        """
-        await super().stop()
-        self._clean_resources()
 
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
@@ -241,24 +246,16 @@ class TKvProxy(TraefikProxy):
             [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
         )
 
-        status, response = await self._kv_atomic_add_route_parts(
-            jupyterhub_routespec, target, data, route_keys, rule
-        )
+        async with self.semaphore:
+            status, response = await self._kv_atomic_add_route_parts(
+                jupyterhub_routespec, target, data, route_keys, rule
+            )
 
-        if self.should_start:
-            try:
-                # Check if traefik was launched
-                self.traefik_process.pid
-            except AttributeError:
-                self.log.error(
-                    "You cannot add routes if the proxy isn't running! Please start the proxy: proxy.start()"
-                )
-                raise
         if status:
-            self.log.info(
+            self.log.debug(
                 "Added service %s with the alias %s.", target, route_keys.service_alias
             )
-            self.log.info(
+            self.log.debug(
                 "Added router %s for service %s with the following routing rule %s.",
                 route_keys.router_alias,
                 route_keys.service_alias,
@@ -268,8 +265,9 @@ class TKvProxy(TraefikProxy):
             self.log.error(
                 "Couldn't add route for %s. Response: %s", routespec, response
             )
-
-        await self._wait_for_route(routespec)
+            raise RuntimeError(f"Couldn't add route for {routespec}")
+        async with self.semaphore:
+            await self._wait_for_route(routespec)
 
     async def delete_route(self, routespec):
         """Delete a route and all the traefik related info associated given a routespec,
@@ -283,16 +281,18 @@ class TKvProxy(TraefikProxy):
             self, routespec, separator=self.kv_separator
         )
 
-        status, response = await self._kv_atomic_delete_route_parts(
-            jupyterhub_routespec, route_keys
-        )
+        async with self.semaphore:
+            status, response = await self._kv_atomic_delete_route_parts(
+                jupyterhub_routespec, route_keys
+            )
         if status:
-            self.log.info("Routespec %s was deleted.", routespec)
+            self.log.debug("Routespec %s was deleted.", routespec)
         else:
             self.log.error(
                 "Couldn't delete route %s. Response: %s", routespec, response
             )
 
+    @_one_at_a_time
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
         proxy.
