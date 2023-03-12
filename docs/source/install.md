@@ -109,7 +109,7 @@ c.JupyterHub.proxy_class = "traefik_consul"
 
 1. **Traefik API**
 
-   traefik-proxy uses the [Traefik API](https://docs.traefik.io/configuration/api/) to monitor routes and configurations.
+   traefik-proxy uses the [Traefik API](https://doc.traefik.io/traefik/operations/api/) to monitor routes and configurations.
 
    Because of **security** concerns, in traefik-proxy implementation, traefik api endpoint isn't exposed on the public http endpoint. Instead, it runs on a dedicated **authenticated endpoint** that's on localhost by default.
 
