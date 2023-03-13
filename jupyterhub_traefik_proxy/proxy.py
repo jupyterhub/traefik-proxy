@@ -66,7 +66,7 @@ class TraefikProxy(Proxy):
         config=True,
         help="Deprecated. Use static_config_file",
     ).tag(
-        deprecated_in="0.4",
+        deprecated_in="1.0",
         deprecated_for="static_config_file",
     )
 

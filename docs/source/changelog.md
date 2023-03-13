@@ -4,9 +4,9 @@ For detailed changes from the prior release, click on the version number
 and its link will bring up a GitHub listing of changes. Use `git log` on
 the command line for details.
 
-### 0.4.0 (prerelease)
+### 1.0.0 (prerelease)
 
-0.4 is a big release for jupyterhub-traefik-proxy!
+1.0.0 is a big release for jupyterhub-traefik-proxy!
 It updates support for traefik to version 2.x (current: 2.9.8).
 Traefik versions < 2.0 are no longer supported.
 If you have custom traefik configuration,
@@ -29,7 +29,7 @@ Major changes:
 
 Performance and responsiveness is also greatly improved.
 
-([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/0.3.0...ec8eadcc7d274911d8e5bdcbed9082c02edd642f))
+([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/0.3.0...HEAD))
 
 #### API and Breaking Changes
 
