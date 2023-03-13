@@ -8,12 +8,12 @@ the command line for details.
 
 0.4 is a big release for jupyterhub-traefik-proxy!
 It updates support for traefik to version 2.x (current: 2.9.8).
-Treafik versions < 2.0 is no longer supported.
+Traefik versions < 2.0 are no longer supported.
 If you have custom traefik configuration,
 make sure to checkout [traefik's v1 to v2 migration guide](https://doc.traefik.io/traefik/migration/v1-to-v2/),
 since your configuration may need updating.
 
-A major consequence if the v2 updates is that the performance of adding and removing routes when there are a large number already defined is now greatly improved,
+A major consequence of the v2 updates is that the performance of adding and removing routes when there are a large number already defined is now greatly improved,
 and no longer grows significantly with the number of routes.
 
 Major changes:
@@ -53,7 +53,7 @@ Performance and responsiveness is also greatly improved.
 
 - reuse backends across tests [#174](https://github.com/jupyterhub/traefik-proxy/pull/174) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
 - simplify some test fixtures [#169](https://github.com/jupyterhub/traefik-proxy/pull/169) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
-- avod deprecation warning in `--slow-last` sorting [#168](https://github.com/jupyterhub/traefik-proxy/pull/168) ([@minrk](https://github.com/minrk))
+- avoid deprecation warning in `--slow-last` sorting [#168](https://github.com/jupyterhub/traefik-proxy/pull/168) ([@minrk](https://github.com/minrk))
 - restore proxy tests [#167](https://github.com/jupyterhub/traefik-proxy/pull/167) ([@minrk](https://github.com/minrk), [@manics](https://github.com/manics))
 - Minor cleanup of start/stop methods and logging [#166](https://github.com/jupyterhub/traefik-proxy/pull/166) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
 - Respect ip address config in urls, don't serve dashboard by default [#162](https://github.com/jupyterhub/traefik-proxy/pull/162) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena), [@consideRatio](https://github.com/consideRatio))
