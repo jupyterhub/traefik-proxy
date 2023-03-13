@@ -31,15 +31,12 @@ from .proxy import TraefikProxy
 class TraefikFileProviderProxy(TraefikProxy):
     """JupyterHub Proxy implementation using traefik and toml or yaml config file"""
 
+    provider_name = "file"
     mutex = Any()
 
     @default("mutex")
     def _default_mutex(self):
         return asyncio.Lock()
-
-    @default("provider_name")
-    def _provider_name(self):
-        return "file"
 
     dynamic_config_file = Unicode(
         "rules.toml", config=True, help="""traefik's dynamic configuration file"""

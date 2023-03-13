@@ -31,12 +31,10 @@ from .kv_proxy import TKvProxy
 class TraefikConsulProxy(TKvProxy):
     """JupyterHub Proxy implementation using traefik and Consul"""
 
+    provider_name = "consul"
+
     # Consul doesn't accept keys containing // or starting with / so we have to escape them
     key_safe_chars = string.ascii_letters + string.digits + "!@#$%^&*();<>-.+?:"
-
-    @default("provider_name")
-    def _provider_name(self):
-        return "consul"
 
     consul_client_ca_cert = Unicode(
         config=True,

@@ -33,9 +33,7 @@ class TraefikEtcdProxy(TKvProxy):
 
     executor = Any()
 
-    @default("provider_name")
-    def _provider_name(self):
-        return "etcd"
+    provider_name = "etcd"
 
     etcd_client_ca_cert = Unicode(
         config=True,

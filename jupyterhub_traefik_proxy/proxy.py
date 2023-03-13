@@ -36,6 +36,8 @@ from . import traefik_utils
 class TraefikProxy(Proxy):
     """JupyterHub Proxy implementation using traefik"""
 
+    provider_name = ""  # must be set in subclasses
+
     traefik_process = Any()
 
     concurrency = Integer(
@@ -356,12 +358,6 @@ class TraefikProxy(Proxy):
             self.traefik_process.wait()
 
     def _start_traefik(self):
-        if self.provider_name not in {"file", "etcd", "consul"}:
-            raise ValueError(
-                "Configuration mode not supported \n.\
-                The proxy can only be configured through fileprovider, etcd and consul"
-            )
-
         env = os.environ.copy()
         env.update(self.traefik_env)
         try:
