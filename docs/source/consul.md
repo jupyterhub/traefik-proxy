@@ -1,5 +1,11 @@
 # Using TraefikConsulProxy
 
+```{warning}
+While it works today (2023), there does not appear to be a maintained Python client for the consul API.
+As such, using jupyterhub-traefik-proxy with consul is deprecated in jupyterhub-traefik-proxy 1.0.
+You can use etcd instead to achieve the same functionality (and slightly better performance).
+```
+
 [Consul](https://www.consul.io/)
 is a distributed key-value store.
 This and TraefikEtcdProxy is the choice to use when using jupyterhub-traefik-proxy
