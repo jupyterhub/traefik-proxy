@@ -94,6 +94,12 @@ class TraefikConsulProxy(TKvProxy):
             kwargs.update({"token": self.consul_password})
         return consul.aio.Consul(**kwargs)
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.log.warning(
+            "Using traefik with consul is deprecated in jupyterhub-traefik-proxy 1.0 due to lack of support for the python-consul2 API client. Use etcd instead."
+        )
+
     def _define_kv_specific_static_config(self):
         provider_config = {
             "consul": {
