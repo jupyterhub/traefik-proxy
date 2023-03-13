@@ -55,10 +55,10 @@ jobs:
           echo "PATH=$PWD/bin:$PATH" >> $GITHUB_ENV
 
       - uses: actions/checkout@v3
-      # NOTE: actions/setup-python@v2 make use of a cache within the GitHub base
+      # NOTE: actions/setup-python@v4 make use of a cache within the GitHub base
       #       environment and setup in a fraction of a second.
       - name: Install Python ${{ matrix.python }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python }}
 
