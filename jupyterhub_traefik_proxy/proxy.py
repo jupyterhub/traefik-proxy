@@ -25,6 +25,7 @@ from os.path import abspath
 from subprocess import Popen, TimeoutExpired
 from urllib.parse import urlparse, urlunparse
 
+import escapism
 from jupyterhub.proxy import Proxy
 from jupyterhub.utils import exponential_backoff, new_token, url_path_join
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
@@ -258,6 +259,7 @@ class TraefikProxy(Proxy):
         from a provider
         """
         # expected e.g. 'service' + '_' + routespec @ file
+        routespec = self.validate_routespec(routespec)
         expected = (
             traefik_utils.generate_alias(routespec, kind) + "@" + self.provider_name
         )
@@ -428,13 +430,14 @@ class TraefikProxy(Proxy):
         middlewares["auth_api"] = {"basicAuth": {"users": [api_credentials]}}
         if self.ssl_cert and self.ssl_key:
             tls = self.dynamic_config.setdefault("tls", {})
-            tls.setdefault("stores", {})
-            tls["default"] = {
+            stores = tls.setdefault("stores", {})
+            stores["default"] = {
                 "defaultCertificate": {
                     "certFile": self.ssl_cert,
                     "keyFile": self.ssl_key,
                 }
             }
+        await self.persist_dynamic_config()
 
     def validate_routespec(self, routespec):
         """Override jupyterhub's default Proxy.validate_routespec method, as traefik
@@ -481,6 +484,62 @@ class TraefikProxy(Proxy):
                     f"Failed to remove traefik config file {self.static_config_file}: {e}"
                 )
 
+    def _dynamic_config_for_route(self, routespec, target, data):
+        """Returns two dicts, which will be used to update traefik configuration for a given route
+
+        (traefik_config, jupyterhub_config) -
+            where traefik_config is traefik dynamic_config to be merged,
+            and jupyterhub_config is jupyterhub-specific data to be stored elsewhere
+            (implementation-specific) and associated with the route
+        """
+
+        service_alias = traefik_utils.generate_alias(routespec, "service")
+        router_alias = traefik_utils.generate_alias(routespec, "router")
+        rule = traefik_utils.generate_rule(routespec)
+        # dynamic config to deep merge
+        traefik_config = {
+            "http": {
+                "routers": {},
+                "services": {},
+            },
+        }
+        jupyterhub_config = {
+            "routes": {},
+        }
+        traefik_config["http"]["routers"][router_alias] = router = {
+            "service": service_alias,
+            "rule": rule,
+            "entryPoints": [self.traefik_entrypoint],
+        }
+        traefik_config["http"]["services"][service_alias] = {
+            "loadBalancer": {"servers": [{"url": target}], "passHostHeader": True}
+        }
+
+        # Enable TLS on this router if globally enabled
+        if self.is_https:
+            tls_config = {}
+            if self.traefik_cert_resolver:
+                tls_config["certResolver"] = self.traefik_cert_resolver
+            else:
+                # we need _some_ key to be set
+                # because key-value stores can't store empty dicts.
+                # put a default value here
+                tls_config["options"] = "default"
+
+            router["tls"] = tls_config
+
+        # Add the data node to a separate top-level node, so traefik doesn't see it.
+        # key needs to be key-value safe (no '/')
+        # store original routespec, router, service aliases for easy lookup
+        jupyterhub_config["routes"][escapism.escape(routespec)] = {
+            "data": data,
+            "routespec": routespec,
+            "target": target,
+            "router": router_alias,
+            "service": service_alias,
+        }
+        return traefik_config, jupyterhub_config
+
     async def add_route(self, routespec, target, data):
         """Add a route to the proxy.
 
@@ -499,12 +558,54 @@ class TraefikProxy(Proxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
-        raise NotImplementedError()
+        routespec = self.validate_routespec(routespec)
+
+        traefik_config, jupyterhub_config = self._dynamic_config_for_route(
+            routespec, target, data
+        )
+        await self._apply_dynamic_config(traefik_config, jupyterhub_config)
+
+        try:
+            async with self.semaphore:
+                await self._wait_for_route(routespec)
+        except TimeoutError:
+            self.log.error(f"Traefik route for {routespec} never appeared.")
+            raise
 
     async def delete_route(self, routespec):
         """Delete a route with a given routespec if it exists.
 
         **Subclasses must define this method**
+        """
+        raise NotImplementedError()
+
+    def _route_from_dynamic_config(self, routespec, traefik_config, jupyterhub_config):
+        """Given jupyterhub config and traefik config,
+        build the expected get_route result
+        """
+        routespec = self.validate_routespec(routespec)
+        service_alias = traefik_utils.generate_alias(routespec, "service")
+        router_alias = traefik_utils.generate_alias(routespec, "router")
+        result = {"data": None, "target": None, "routespec": routespec}
+
+        service_node = traefik_config["http"]["services"].get(service_alias, None)
+        if service_node is not None:
+            # Will this ever cause a KeyError?
+            result["target"] = service_node["loadBalancer"]["servers"][0]["url"]
+
+        jupyter_router = jupyterhub_config["routers"].get(router_alias)
+        if jupyter_router is not None:
+            result["data"] = jupyter_router["data"]
+
+        if result["data"] is None and result["target"] is None:
+            self.log.warning(f"No route for {routespec} found!")
+            result = None
+        return result
+
+    async def _get_jupyterhub_data(self):
+        """Get the jupyterhub part of our dynamic config
+
+        This houses serialization of routespecs, etc.
         """
         raise NotImplementedError()
 
@@ -523,7 +624,16 @@ class TraefikProxy(Proxy):
             'data': the attached data dict for this route (as specified in add_route)
           }
         """
-        raise NotImplementedError()
+        jupyterhub_config = await self._get_jupyterhub_data()
+
+        all_routes = {}
+        for _key, route in jupyterhub_config.get("routes", {}).items():
+            all_routes[route["routespec"]] = {
+                "routespec": route["routespec"],
+                "data": route.get("data", {}),
+                "target": route["target"],
+            }
+        return all_routes
 
     async def get_route(self, routespec):
         """Return the route info for a given routespec.

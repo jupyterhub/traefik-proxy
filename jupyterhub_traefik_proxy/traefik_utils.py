@@ -1,6 +1,5 @@
 import os
 import string
-from collections import namedtuple
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
 from urllib.parse import unquote
@@ -64,43 +63,6 @@ def generate_router_rule_entry(proxy, router_alias, separator="/"):
         )
 
     return router_rule_entry
-
-
-def generate_route_keys(proxy, routespec, separator="/"):
-    service_alias = generate_alias(routespec, "service")
-    router_alias = generate_alias(routespec, "router")
-
-    RouteKeys = namedtuple(
-        "RouteKeys",
-        [
-            "service_alias",
-            "service_url_path",
-            "router_alias",
-            "router_service_path",
-            "router_rule_path",
-        ],
-    )
-
-    if separator != ".":
-        service_url_path = generate_service_entry(proxy, service_alias, url=True)
-        router_rule_path = generate_router_rule_entry(proxy, router_alias)
-        router_service_path = generate_router_service_entry(proxy, router_alias)
-    else:
-        service_url_path = generate_service_entry(
-            proxy, service_alias, separator=separator
-        )
-        router_rule_path = generate_router_rule_entry(
-            proxy, router_alias, separator=separator
-        )
-        router_service_path = ""
-
-    return RouteKeys(
-        service_alias,
-        service_url_path,
-        router_alias,
-        router_service_path,
-        router_rule_path,
-    )
 
 
 # atomic writing adapted from jupyter/notebook 5.7
@@ -172,3 +134,20 @@ class TraefikConfigFileHandler:
         :func:`atomic_writing`"""
         with atomic_writing(self.file_path) as f:
             self._dump(data, f)
+
+
+def deep_merge(a, b):
+    """Merges dict b into dict a, returning a
+
+    Note: a is modified in the process!
+    """
+    for k, v in b.items():
+        if k in a:
+            if isinstance(a[k], dict):
+                # recursive update
+                a[k] = deep_merge(a[k], v)
+            else:
+                a[k] = v
+        else:
+            a[k] = v
+    return a
