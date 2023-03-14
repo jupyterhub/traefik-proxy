@@ -91,6 +91,7 @@ async def no_auth_consul_proxy(launch_consul):
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
         should_start=True,
+        traefik_log_level="DEBUG",
     )
     await proxy.start()
     yield proxy
@@ -147,6 +148,7 @@ def _make_etcd_proxy(auth=False, **extra_kwargs):
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
+        traefik_log_level="DEBUG",
     )
     if auth:
         kwargs.update(
@@ -210,6 +212,7 @@ def _file_proxy(dynamic_config_file, **kwargs):
         traefik_api_username=Config.traefik_api_user,
         dynamic_config_file=dynamic_config_file,
         check_route_timeout=60,
+        traefik_log_level="DEBUG",
         **kwargs,
     )
 
@@ -256,6 +259,7 @@ async def auth_external_consul_proxy(launch_traefik_consul_auth):
         consul_password=Config.consul_token,
         check_route_timeout=45,
         should_start=False,
+        traefik_log_level="DEBUG",
     )
     await proxy._wait_for_static_config()
     yield proxy
