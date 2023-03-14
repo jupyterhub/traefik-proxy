@@ -185,34 +185,23 @@ class TraefikProxy(Proxy):
     # FIXME: How best to enable TLS on routers assigned to only select
     # entrypoints defined here?
     traefik_entrypoint = Unicode(
-        help="""The traefik entrypoint names, to which each """
-        """jupyterhub-configred Traefik router is assigned"""
+        help="""The traefik entrypoint name to use.
+
+        By default, will be `web` if http or `websecure` if https.
+
+        If running traefik externally with your own specified entrypoint name,
+        set this value.
+        """,
+        config=True,
     )
 
-    async def _get_traefik_entrypoint(self):
+    @default("traefik_entrypoint")
+    def _default_traefik_entrypoint(self):
         """Find the traefik entrypoint that matches our :attrib:`self.public_url`"""
-        if self.should_start:
-            if self.is_https:
-                return "websecure"
-            else:
-                return "web"
-        import re
-
-        resp = await self._traefik_api_request("/api/entrypoints")
-        json_data = json.loads(resp.body)
-        public_url = urlparse(self.public_url)
-
-        # Traefik entrypoint format described at:-
-        # https://doc.traefik.io/traefik/routing/entrypoints/#address
-        entrypoint_re = re.compile('([^:]+)?:([0-9]+)/?(tcp|udp)?')
-        for entrypoint in json_data:
-            host, port, prot = entrypoint_re.match(entrypoint["address"]).groups()
-            if int(port) == public_url.port:
-                return entrypoint["name"]
-        entrypoints = [entrypoint["address"] for entrypoint in json_data]
-        raise ValueError(
-            f"No traefik entrypoint ports ({entrypoints}) match public_url: {self.public_url}!"
-        )
+        if self.is_https:
+            return "websecure"
+        else:
+            return "web"
 
     @default("traefik_api_password")
     def _warn_empty_password(self):
@@ -401,11 +390,6 @@ class TraefikProxy(Proxy):
 
         if self.traefik_log_level:
             self.static_config["log"] = {"level": self.traefik_log_level}
-
-        # FIXME: Do we only create a single entrypoint for jupyterhub?
-        # Why not have an http and https entrypoint?
-        if not self.traefik_entrypoint:
-            self.traefik_entrypoint = await self._get_traefik_entrypoint()
 
         entrypoints = {
             self.traefik_entrypoint: {
