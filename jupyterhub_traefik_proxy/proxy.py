@@ -319,6 +319,9 @@ class TraefikProxy(Proxy):
             """Check if traefik loaded its static configuration yet"""
             try:
                 await self._traefik_api_request("/api/overview")
+                await self._traefik_api_request(
+                    f"/api/entrypoints/{self.traefik_entrypoint}"
+                )
             except ConnectionRefusedError:
                 self.log.debug(
                     f"Connection Refused waiting for traefik at {self.traefik_api_url}. It's probably starting up..."
@@ -331,9 +334,14 @@ class TraefikProxy(Proxy):
                     )
                     return False
                 if e.code == 404:
-                    self.log.debug(
-                        f"traefik api at {e.response.request.url} overview not ready yet"
-                    )
+                    if "/entrypoints/" in e.response.request.url:
+                        self.log.warning(
+                            f"c.{self.__class__.__name__}.traefik_entrypoint={self.traefik_entrypoint!r} not found in traefik. Is it correct?"
+                        )
+                    else:
+                        self.log.debug(
+                            f"traefik api at {e.response.request.url} overview not ready yet"
+                        )
                     return False
                 # unexpected
                 self.log.error(f"Error checking for traefik static configuration {e}")
