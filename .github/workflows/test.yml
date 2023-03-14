@@ -65,7 +65,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade setuptools pip
-          pip install -r dev-requirements.txt --upgrade .
+          pip install -r dev-requirements.txt -e .
           python -m jupyterhub_traefik_proxy.install --output=./bin
 
           pip freeze
