@@ -105,7 +105,7 @@ async def auth_consul_proxy(launch_consul_auth):
     """
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        consul_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         consul_password=Config.consul_token,
