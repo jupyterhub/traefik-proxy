@@ -178,22 +178,17 @@ This is an example setup for using JupyterHub and TraefikFileProviderProxy manag
 
 2. Create a traefik static configuration file, _traefik.toml_, e.g.:
 
-   ```
-   # the api entrypoint
+   ```toml
+   # enable the api
    [api]
-   dashboard = true
 
-   # websockets protocol
-   [wss]
-   protocol = "http"
-
-   # the port on localhost where traefik accepts http requests
+   # the public port where traefik accepts http requests
    [entryPoints.web]
    address = ":8000"
 
-   # the port on localhost where the traefik api and dashboard can be found
+   # the port on localhost where the traefik api should be found
    [entryPoints.enter_api]
-   address = ":8099"
+   address = "localhost:8099"
 
    # the dynamic configuration directory
    # This must match the directory provided in Step 1. above.
@@ -202,22 +197,7 @@ This is an example setup for using JupyterHub and TraefikFileProviderProxy manag
    watch = true
    ```
 
-3. Create a traefik dynamic configuration file in the directory provided in the dynamic configuration above, to provide the api authentication parameters, e.g.
-
-   ```
-   # Router configuration for the api service
-   [http.routers.router-api]
-   rule = "Host(`localhost`) && PathPrefix(`/api`)"
-   entryPoints = ["enter_api"]
-   service = "api@internal"
-   middlewares = ["auth_api"]
-
-   # authenticate the traefik api entrypoint
-   [http.middlewares.auth_api.basicAuth]
-   users = [ "api_admin:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
-   ```
-
-4. Start traefik with the configuration specified above, e.g.:
+3. Start traefik with the configuration specified above, e.g.:
    ```bash
    $ traefik --configfile traefik.toml
    ```

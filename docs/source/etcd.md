@@ -149,49 +149,35 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
    - **Keep in mind that the static configuration must configure at least:**
 
      - The default entrypoint
-     - The api entrypoint (_and authenticate it_)
-     - The websockets protocol
-     - The etcd endpoint
+     - The api entrypoint
+     - The etcd provider
 
    - **Example:**
 
-     ```
-      defaultentrypoints = ["http"]
-      debug = true
-      logLevel = "ERROR"
+     ```toml
+     [api]
 
-      [api]
-      dashboard = true
-      entrypoint = "auth_api"
+     [entryPoints.http]
+     address = "127.0.0.1:8000"
 
-      [wss]
-      protocol = "http"
+     [entryPoints.auth_api]
+     address = "127.0.0.1:8099"
 
-      [entryPoints.http]
-      address = "127.0.0.1:8000"
-
-      [entryPoints.auth_api]
-      address = "127.0.0.1:8099"
-
-      [entryPoints.auth_api.auth.basic]
-      users = [ "abc:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
-
-      [etcd]
-      endpoint = "127.0.0.1:2379"
-      prefix = "/jupyterhub"
-      useapiv3 = true
-      watch = true
+     [providers.etcd]
+     endpoints = [ "127.0.0.1:2379",]
+     rootKey = "traefik"
      ```
 
-   ```{note}
+   ````{note}
      **If you choose to enable the authentication on etcd**, you can use this *toml* file to pass the credentials to traefik, e.g.:
 
-         [etcd]
+         ```toml
+         [providers.etcd]
          username = "root"
          password = "admin"
-         endpoint = "127.0.0.1:2379"
          ...
-   ```
+         ```
+   ````
 
 ## Example setup
 
@@ -200,8 +186,6 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
 1. Configure the proxy through the JupyterHub configuration file, _jupyterhub_config.py_, e.g.:
 
    ```python
-   from jupyterhub_traefik_proxy import TraefikEtcdProxy
-
    # mark the proxy as externally managed
    c.TraefikEtcdProxy.should_start = False
 
@@ -215,7 +199,7 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
    c.TraefikEtcdProxy.etcd_url = "http://127.0.0.1:2379"
 
    # configure JupyterHub to use TraefikEtcdProxy
-   c.JupyterHub.proxy_class = TraefikEtcdProxy
+   c.JupyterHub.proxy_class = "traefik_etcd"
    ```
 
    ```{note}
@@ -240,44 +224,27 @@ This is an example setup for using JupyterHub and TraefikEtcdProxy managed by an
 
 3. Create a traefik static configuration file, _traefik.toml_, e.g:.
 
-   ```
-   # the default entrypoint
-   defaultentrypoints = ["http"]
-
-   # the api entrypoint
+   ```toml
+   # enable the api
    [api]
-   dashboard = true
-   entrypoint = "auth_api"
 
-   # websockets protocol
-   [wss]
-   protocol = "http"
-
-   # the port on localhost where traefik accepts http requests
-   [entryPoints.http]
+   # the public port where traefik accepts http requests
+   [entryPoints.web]
    address = ":8000"
 
-   # the port on localhost where the traefik api and dashboard can be found
-   [entryPoints.auth_api]
-   address = ":8099"
+   # the port on localhost where the traefik api should be found
+   [entryPoints.enter_api]
+   address = "localhost:8099"
 
-   # authenticate the traefik api entrypoint
-   [entryPoints.auth_api.auth.basic]
-   users = [ "abc:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
-
-   [etcd]
+   [providers.etcd]
    # the etcd username (if auth is enabled)
    username = "def"
    # the etcd password (if auth is enabled)
    password = "456"
    # the etcd address
-   endpoint = "127.0.0.1:2379"
+   endpoints = ["127.0.0.1:2379"]
    # the prefix to use for the static configuration
-   prefix = "/traefik/"
-   # tell etcd to use the v3 version of the api
-   useapiv3 = true
-   # watch etcd for changes
-   watch = true
+   rootKey = "traefik"
    ```
 
 4. Start traefik with the configuration specified above, e.g.:

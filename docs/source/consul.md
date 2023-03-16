@@ -107,87 +107,84 @@ You can choose to:
 
 If TraefikConsulProxy is used as an externally managed service, then make sure you follow the steps enumerated below:
 
-1. Let JupyterHub know that the proxy being used is TraefikConsulProxy, using the _proxy_class_ configuration option:
+1.  Let JupyterHub know that the proxy being used is TraefikConsulProxy, using the _proxy_class_ configuration option:
 
-   ```python
-   c.JupyterHub.proxy_class = "traefik_consul"
-   ```
+    ```python
+    c.JupyterHub.proxy_class = "traefik_consul"
+    ```
 
-2. Configure `TraefikConsulProxy` in **jupyterhub_config.py**
+2.  Configure `TraefikConsulProxy` in **jupyterhub_config.py**
 
-   JupyterHub configuration file, _jupyterhub_config.py_ must specify at least:
+    JupyterHub configuration file, _jupyterhub_config.py_ must specify at least:
 
-   - That the proxy is externally managed
-   - The traefik api credentials
-   - The consul credentials (if consul acl is enabled)
+    - That the proxy is externally managed
+    - The traefik api credentials
+    - The consul credentials (if consul acl is enabled)
 
-   Example configuration:
+    Example configuration:
 
-   ```python
-   # JupyterHub shouldn't start the proxy, it's already running
-   c.TraefikConsulProxy.should_start = False
+    ```python
+    # JupyterHub shouldn't start the proxy, it's already running
+    c.TraefikConsulProxy.should_start = False
 
-   # if not the default:
-   c.TraefikConsulProxy.consul_url = "http://consul-host:2379"
+    # if not the default:
+    c.TraefikConsulProxy.consul_url = "http://consul-host:2379"
 
-   # traefik api credentials
-   c.TraefikConsulProxy.traefik_api_username = "abc"
-   c.TraefikConsulProxy.traefik_api_password = "123"
+    # traefik api credentials
+    c.TraefikConsulProxy.traefik_api_username = "abc"
+    c.TraefikConsulProxy.traefik_api_password = "123"
 
-   # consul acl token
-   c.TraefikConsulProxy.consul_password = "456"
-   ```
+    # consul acl token
+    c.TraefikConsulProxy.consul_password = "456"
+    ```
 
-3. Create a _toml_ file with traefik's desired static configuration
+3.  Create a _toml_ file with traefik's desired static configuration
 
-   Before starting the traefik process, you must create a _toml_ file with the desired
-   traefik static configuration and pass it to traefik when you launch the process.
-   Keep in mind that in order for the routes to be stored in **consul**,
-   this _toml_ file **must** specify consul as the provider/
+    Before starting the traefik process, you must create a _toml_ file with the desired
+    traefik static configuration and pass it to traefik when you launch the process.
+    Keep in mind that in order for the routes to be stored in **consul**,
+    this _toml_ file **must** specify consul as the provider/
 
-   - **Keep in mind that the static configuration must configure at least:**
-     - The default entrypoint
-     - The api entrypoint (_and authenticate it_)
-     - The websockets protocol
-     - The consul endpoint
+    - **Keep in mind that the static configuration must configure at least:**
+      - The default entrypoint
+      - The api entrypoint
+      - The consul provider
 
-   Example:
+    Example:
 
-   ```
-    defaultentrypoints = ["http"]
-    debug = true
-    logLevel = "ERROR"
-
+    ```toml
+    # enable the api
     [api]
-    dashboard = true
-    entrypoint = "auth_api"
 
-    [wss]
-    protocol = "http"
+    # the public port where traefik accepts http requests
+    [entryPoints.web]
+    address = ":8000"
 
-    [entryPoints.http]
-    address = "127.0.0.1:8000"
+    # the port on localhost where the traefik api should be found
+    [entryPoints.enter_api]
+    address = "localhost:8099"
 
-    [entryPoints.auth_api]
-    address = "127.0.0.1:8099"
+    [providers.consul]
+    # the consul username (if auth is enabled)
+    username = "def"
+    # the consul password (if auth is enabled)
+    password = "456"
+    # the consul address
+    endpoints = ["127.0.0.1:8500"]
+    # the prefix to use for the static configuration
+    rootKey = "traefik"
+    ```
 
-    [entryPoints.auth_api.auth.basic]
-    users = [ "abc:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
+    ````{note}
+    If you choose to enable consul Access Control Lists (ACLs) to secure the UI, API, CLI, service communications, and agent communications, you can use this *toml* file to pass the credentials to traefik, e.g.:
 
-    [consul]
-    endpoint = "127.0.0.1:8500"
-    prefix = "traefik/"
-    watch = true
-   ```
+    ```toml
+    [providers.consul]
+    password = "admin"
+    ...
+    ```
 
-   ````{note}
-   If you choose to enable consul Access Control Lists (ACLs) to secure the UI, API, CLI, service communications, and agent communications, you can use this *toml* file to pass the credentials to traefik, e.g.:
-      ```
-        [consul]
-        password = "admin"
-        ...
-      ```
-   ````
+    ````
 
 ## Example setup
 
@@ -196,8 +193,6 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
 1. Configure the proxy through the JupyterHub configuration file, _jupyterhub_config.py_, e.g.:
 
    ```python
-   from jupyterhub_traefik_proxy import TraefikConsulProxy
-
    # mark the proxy as externally managed
    c.TraefikConsulProxy.should_start = False
 
@@ -208,10 +203,10 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
    c.TraefikConsulProxy.traefik_api_username = "123"
 
    # consul url where it accepts client requests
-   c.TraefikConsulProxy.consul_url = "path/to/rules.toml"
+   c.TraefikConsulProxy.consul_url = "http://127.0.0.1:8500"
 
    # configure JupyterHub to use TraefikConsulProxy
-   c.JupyterHub.proxy_class = TraefikConsulProxy
+   c.JupyterHub.proxy_class = "traefik_consul"
    ```
 
    ```{note}
@@ -233,40 +228,27 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
 
 3. Create a traefik static configuration file, _traefik.toml_, e.g:.
 
-   ```
-   # the default entrypoint
-   defaultentrypoints = ["http"]
-
-   # the api entrypoint
+   ```toml
+   # enable the api
    [api]
-   dashboard = true
-   entrypoint = "auth_api"
 
-   # websockets protocol
-   [wss]
-   protocol = "http"
-
-   # the port on localhost where traefik accepts http requests
-   [entryPoints.http]
+   # the public port where traefik accepts http requests
+   [entryPoints.web]
    address = ":8000"
 
-   # the port on localhost where the traefik api and dashboard can be found
-   [entryPoints.auth_api]
-   address = ":8099"
+   # the port on localhost where the traefik api should be found
+   [entryPoints.enter_api]
+   address = "localhost:8099"
 
-   # authenticate the traefik api entrypoint
-   [entryPoints.auth_api.auth.basic]
-   users = [ "abc:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./",]
-
-   [consul]
-   # the consul acl token (if acl is enabled)
+   [providers.consul]
+   # the username (if auth is enabled)
+   username = "def"
+   # the password (if auth is enabled)
    password = "456"
    # the consul address
-   endpoint = "127.0.0.1:8500"
+   endpoints = ["127.0.0.1:8500"]
    # the prefix to use for the static configuration
-   prefix = "traefik/"
-   # watch consul for changes
-   watch = true
+   rootKey = "traefik"
    ```
 
 4. Start traefik with the configuration specified above, e.g.:
