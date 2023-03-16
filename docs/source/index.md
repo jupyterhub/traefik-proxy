@@ -44,6 +44,7 @@ consul
 
 api/index
 changelog
+details
 ```
 
 ## Indices and tables
