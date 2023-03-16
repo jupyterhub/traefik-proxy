@@ -2,10 +2,9 @@
 level = "debug"
 
 [api]
-dashboard = true
 
-[wss]
-protocol = "http"
+[providers]
+providersThrottleDuration = "0s"
 
 [providers.file]
 directory = "./tests/config_files/dynamic_config"
