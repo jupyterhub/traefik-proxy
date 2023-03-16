@@ -33,9 +33,18 @@ def generate_rule(routespec):
     return rule
 
 
-def generate_alias(routespec, server_type=""):
-    safe = string.ascii_letters + string.digits + "-"
-    return server_type + "_" + escapism.escape(routespec, safe=safe)
+_safe = set(string.ascii_letters + string.digits + "-")
+
+
+def generate_alias(routespec, kind=""):
+    """Generate an alias for a routespec
+
+    A safe string for use in key-value store keys, etc.
+    """
+    alias = escapism.escape(routespec, safe=_safe)
+    if kind:
+        alias = f"{kind}_{alias}"
+    return alias
 
 
 # atomic writing adapted from jupyter/notebook 5.7
