@@ -221,7 +221,6 @@ def _file_proxy(dynamic_config_file, **kwargs):
 async def external_file_proxy_yaml(launch_traefik_file):
     dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.yaml")
     proxy = _file_proxy(dynamic_config_file, should_start=False)
-    await proxy._wait_for_static_config()
     yield proxy
     os.remove(dynamic_config_file)
 
@@ -230,7 +229,6 @@ async def external_file_proxy_yaml(launch_traefik_file):
 async def external_file_proxy_toml(launch_traefik_file):
     dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.toml")
     proxy = _file_proxy(dynamic_config_file, should_start=False)
-    await proxy._wait_for_static_config()
     yield proxy
     os.remove(dynamic_config_file)
 
@@ -245,7 +243,6 @@ async def external_consul_proxy(launch_traefik_consul):
         check_route_timeout=45,
         should_start=False,
     )
-    await proxy._wait_for_static_config()
     yield proxy
 
 
@@ -261,14 +258,12 @@ async def auth_external_consul_proxy(launch_traefik_consul_auth):
         should_start=False,
         traefik_log_level="DEBUG",
     )
-    await proxy._wait_for_static_config()
     yield proxy
 
 
 @pytest.fixture
 async def external_etcd_proxy(launch_traefik_etcd):
     proxy = _make_etcd_proxy(auth=False, should_start=False)
-    await proxy._wait_for_static_config()
     yield proxy
     proxy.etcd.close()
 
@@ -278,7 +273,6 @@ async def auth_external_etcd_proxy(
     launch_traefik_etcd_auth,
 ):
     proxy = _make_etcd_proxy(auth=True, should_start=False)
-    await proxy._wait_for_static_config()
     yield proxy
     proxy.etcd.close()
 
