@@ -38,33 +38,6 @@ def generate_alias(routespec, server_type=""):
     return server_type + "_" + escapism.escape(routespec, safe=safe)
 
 
-def generate_service_entry(proxy, service_alias, separator="/", url=False):
-    service_entry = separator.join(
-        ["http", "services", service_alias, "loadBalancer", "servers", "server1"]
-    )
-    if separator == "/":
-        service_entry = proxy.kv_traefik_prefix + separator + service_entry
-    if url:
-        service_entry += separator + "url"
-    return service_entry
-
-
-def generate_router_service_entry(proxy, router_alias):
-    return "/".join(
-        [proxy.kv_traefik_prefix, "http", "routers", router_alias, "service"]
-    )
-
-
-def generate_router_rule_entry(proxy, router_alias, separator="/"):
-    router_rule_entry = separator.join(["http", "routers", router_alias])
-    if separator == "/":
-        router_rule_entry = separator.join(
-            [proxy.kv_traefik_prefix, router_rule_entry, "rule"]
-        )
-
-    return router_rule_entry
-
-
 # atomic writing adapted from jupyter/notebook 5.7
 # unlike atomic writing there, which writes the canonical path
 # and only use the temp file for recovery,
