@@ -20,8 +20,8 @@ Route Specification:
 
 import asyncio
 import os
+from itertools import chain
 
-import escapism
 from traitlets import Any, Unicode, default, observe
 
 from . import traefik_utils
@@ -73,7 +73,7 @@ class TraefikFileProviderProxy(TraefikProxy):
         jupyterhub.setdefault("routes", {})
         return dynamic_config
 
-    async def persist_dynamic_config(self):
+    def _persist_dynamic_config(self):
         """Save the dynamic config file with the current dynamic_config"""
         # avoid writing empty dicts, which traefik doesn't handle for some reason
         dynamic_config = self.dynamic_config
@@ -119,31 +119,45 @@ class TraefikFileProviderProxy(TraefikProxy):
     async def _get_jupyterhub_dynamic_config(self):
         return self.dynamic_config["jupyterhub"]
 
-    async def _apply_dynamic_config(self, traefik_config, jupyterhub_config):
+    async def _apply_dynamic_config(self, traefik_config, jupyterhub_config=None):
         dynamic_config = {}
         dynamic_config.update(traefik_config)
         # file provider stores jupyterhub info in "jupyterhub" key
-        dynamic_config["jupyterhub"] = jupyterhub_config
+        if jupyterhub_config is not None:
+            dynamic_config["jupyterhub"] = jupyterhub_config
         async with self.mutex:
             self.dynamic_config = traefik_utils.deep_merge(
                 self.dynamic_config, dynamic_config
             )
-            await self.persist_dynamic_config()
+            self._persist_dynamic_config()
 
-    async def delete_route(self, routespec):
-        """Delete a route with a given routespec if it exists."""
-        routespec = self.validate_routespec(routespec)
-        escaped_routespec = escapism.escape(routespec)
-        service_alias = traefik_utils.generate_alias(routespec, "service")
-        router_alias = traefik_utils.generate_alias(routespec, "router")
+    async def _delete_dynamic_config(self, traefik_keys, jupyterhub_keys):
+        """Delete keys from dynamic configuration
 
+        jupyterhub dynamic config is _inside_ traefik dynamic config,
+        under the 'jupyterhub' key
+        """
+        jupyterhub_keys = (["jupyterhub"] + key_path for key_path in jupyterhub_keys)
         async with self.mutex:
-            # Pop each entry
-            self.dynamic_config["http"]["routers"].pop(router_alias, None)
-            self.dynamic_config["http"]["services"].pop(service_alias, None)
-            self.dynamic_config["jupyterhub"]["routes"].pop(escaped_routespec, None)
+            for key_path in chain(traefik_keys, jupyterhub_keys):
+                parent = self.dynamic_config
+                for key in key_path[:-1]:
+                    if key in parent:
+                        parent = parent[key]
+                    else:
+                        parent = {}
+                        break
 
-            await self.persist_dynamic_config()
+                # final key, time to delete
+                key = key_path[-1]
+                if key in parent:
+                    parent.pop(key)
+                else:
+                    self.log.warning(
+                        f"Missing dynamic config, nothing to delete: {'.'.join(key_path)}"
+                    )
+
+            self._persist_dynamic_config()
 
     async def get_route(self, routespec):
         """Return the route info for a given routespec.
@@ -166,9 +180,9 @@ class TraefikFileProviderProxy(TraefikProxy):
             None: if there are no routes matching the given routespec
         """
         routespec = self.validate_routespec(routespec)
-        escaped_routespec = escapism.escape(routespec)
+        router_alias = traefik_utils.generate_alias(routespec, "router")
         async with self.mutex:
-            route = self.dynamic_config["jupyterhub"]["routes"].get(escaped_routespec)
+            route = self.dynamic_config["jupyterhub"]["routes"].get(router_alias)
             if not route:
                 return None
             return {

@@ -23,7 +23,6 @@ from collections.abc import Mapping
 from functools import wraps
 from numbers import Number
 
-import escapism
 from traitlets import Unicode
 
 from . import traefik_utils
@@ -113,55 +112,44 @@ class TKvProxy(TraefikProxy):
         """
         raise NotImplementedError()
 
-    async def persist_dynamic_config(self):
-        await self._apply_dynamic_config(self.dynamic_config, None)
+    # now: implement methods required by TraefikProxy base class
 
-    async def _apply_dynamic_config(self, dynamic_config, jupyterhub_info=None):
+    async def _apply_dynamic_config(self, dynamic_config, jupyterhub_config=None):
         """Apply dynamic config (and optional jupyterhub info) atomically"""
         to_set = self.flatten_dict_for_kv(dynamic_config, prefix=self.kv_traefik_prefix)
-        if jupyterhub_info:
+        if jupyterhub_config:
             to_set.update(
                 self.flatten_dict_for_kv(
-                    jupyterhub_info, prefix=self.kv_jupyterhub_prefix
+                    jupyterhub_config, prefix=self.kv_jupyterhub_prefix
                 )
             )
         self.log.debug("Setting key-value config %s", to_set)
         await self._kv_atomic_set(to_set)
 
-    async def delete_route(self, routespec):
-        """Delete a route and all the traefik related info associated given a routespec,
-        (if it exists).
-        """
-        routespec = self.validate_routespec(routespec)
-        router_alias = traefik_utils.generate_alias(routespec, "router")
-        service_alias = traefik_utils.generate_alias(routespec, "service")
+    async def _delete_dynamic_config(self, traefik_keys, jupyterhub_keys):
+        """Delete keys from dynamic configuration
 
-        # empty string ensures these end with kv_separator
-        # which indicates a tree deletion
+        Translate key paths to flat kv keys
+        """
         to_delete = [
-            self.kv_separator.join(
-                [self.kv_traefik_prefix, "http", "routers", router_alias, ""]
-            ),
-            self.kv_separator.join(
-                [self.kv_traefik_prefix, "http", "services", service_alias, ""]
-            ),
-            self.kv_separator.join(
-                [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec), ""]
-            ),
+            self.kv_separator.join([self.kv_traefik_prefix] + key_path + [""])
+            for key_path in traefik_keys
         ]
+        to_delete.extend(
+            self.kv_separator.join([self.kv_jupyterhub_prefix] + key_path + [""])
+            for key_path in jupyterhub_keys
+        )
         async with self.semaphore:
             try:
                 await self._kv_atomic_delete(*to_delete)
             except Exception as e:
-                self.log.error("Couldn't delete route %s: %s", routespec, e)
+                self.log.error("Couldn't delete config %s: %s", to_delete, e)
                 raise
 
-        self.log.debug("Route %s was deleted.", routespec)
-
     @_one_at_a_time
-    def _get_jupyterhub_dynamic_config(self):
+    async def _get_jupyterhub_dynamic_config(self):
         """jupyterhub data is in our kv store"""
-        return self._kv_get_tree(self.kv_jupyterhub_prefix)
+        return await self._kv_get_tree(self.kv_jupyterhub_prefix)
 
     async def get_route(self, routespec):
         """Return the route info for a given routespec.
@@ -184,13 +172,16 @@ class TKvProxy(TraefikProxy):
             None: if there are no routes matching the given routespec
         """
         routespec = self.validate_routespec(routespec)
+        router_alias = traefik_utils.generate_alias(routespec, "router")
         route_key = self.kv_separator.join(
-            [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
+            [self.kv_jupyterhub_prefix, "routes", router_alias]
         )
         route = await self._kv_get_tree(route_key)
         if not route:
             return None
         return {key: route[key] for key in ("routespec", "data", "target")}
+
+    # deep/flat dict translation
 
     def _kv_to_str(self, value):
         """KV stores only store strings

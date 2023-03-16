@@ -25,7 +25,6 @@ from os.path import abspath
 from subprocess import Popen, TimeoutExpired
 from urllib.parse import urlparse, urlunparse
 
-import escapism
 from jupyterhub.proxy import Proxy
 from jupyterhub.utils import exponential_backoff, new_token, url_path_join
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
@@ -437,7 +436,7 @@ class TraefikProxy(Proxy):
                     "keyFile": self.ssl_key,
                 }
             }
-        await self.persist_dynamic_config()
+        await self._apply_dynamic_config(self.dynamic_config, None)
 
     def validate_routespec(self, routespec):
         """Override jupyterhub's default Proxy.validate_routespec method, as traefik
@@ -531,7 +530,7 @@ class TraefikProxy(Proxy):
         # Add the data node to a separate top-level node, so traefik doesn't see it.
         # key needs to be key-value safe (no '/')
         # store original routespec, router, service aliases for easy lookup
-        jupyterhub_config["routes"][escapism.escape(routespec)] = {
+        jupyterhub_config["routes"][router_alias] = {
             "data": data,
             "routespec": routespec,
             "target": target,
@@ -563,14 +562,49 @@ class TraefikProxy(Proxy):
         traefik_config, jupyterhub_config = self._dynamic_config_for_route(
             routespec, target, data
         )
-        await self._apply_dynamic_config(traefik_config, jupyterhub_config)
 
         try:
             async with self.semaphore:
+                await self._apply_dynamic_config(traefik_config, jupyterhub_config)
                 await self._wait_for_route(routespec)
         except TimeoutError:
             self.log.error(f"Traefik route for {routespec} never appeared.")
             raise
+
+    def _keys_for_route(self, routespec):
+        """Return (traefik_keys, jupyterhub_keys)
+
+        keys in dynamic_config and jupyterhub_dynamic_config that correspond to a route.
+
+        These keys may be used in delete_route and get_route.
+
+        each key is a list of strings, representing
+        `config[key[0]][key[1]]` etc.
+
+        i.e. ( (["http", "routers", "router_name"], ("routes", "route_name") )
+        """
+        service_alias = traefik_utils.generate_alias(routespec, "service")
+        router_alias = traefik_utils.generate_alias(routespec, "router")
+        traefik_keys = (
+            ["http", "routers", router_alias],
+            ["http", "services", service_alias],
+        )
+        jupyterhub_keys = (["routes", router_alias],)
+        return traefik_keys, jupyterhub_keys
+
+    async def _delete_dynamic_config(self, traefik_keys, jupyterhub_keys):
+        """Delete keys from dynamic configuration
+
+        Must be implemented in subclasses
+        """
+        raise NotImplementedError()
+
+    async def delete_route(self, routespec):
+        """Delete a route with a given routespec if it exists."""
+        routespec = self.validate_routespec(routespec)
+        traefik_keys, jupyterhub_keys = self._keys_for_route(routespec)
+        await self._delete_dynamic_config(traefik_keys, jupyterhub_keys)
+        self.log.debug("Route %s was deleted.", routespec)
 
     async def _get_jupyterhub_dynamic_config(self):
         """Get the jupyterhub part of our dynamic config
@@ -604,11 +638,3 @@ class TraefikProxy(Proxy):
                 "target": route["target"],
             }
         return all_routes
-
-    async def persist_dynamic_config(self):
-        """Save the Traefik dynamic configuration, depending on the backend
-        provider in use. This is used to e.g. set up the api endpoint's
-        authentication (username and password), as well as default tls
-        certificates to use, when should_start is True.
-        """
-        raise NotImplementedError()
