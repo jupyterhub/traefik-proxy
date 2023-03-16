@@ -116,7 +116,7 @@ class TraefikFileProviderProxy(TraefikProxy):
                 f"Failed to remove traefik configuration file {self.dynamic_config_file}: {e}"
             )
 
-    async def _get_jupyterhub_data(self):
+    async def _get_jupyterhub_dynamic_config(self):
         return self.dynamic_config["jupyterhub"]
 
     async def _apply_dynamic_config(self, traefik_config, jupyterhub_config):

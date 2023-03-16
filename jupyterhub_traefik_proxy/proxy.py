@@ -572,30 +572,7 @@ class TraefikProxy(Proxy):
             self.log.error(f"Traefik route for {routespec} never appeared.")
             raise
 
-    def _route_from_dynamic_config(self, routespec, traefik_config, jupyterhub_config):
-        """Given jupyterhub config and traefik config,
-        build the expected get_route result
-        """
-        routespec = self.validate_routespec(routespec)
-        service_alias = traefik_utils.generate_alias(routespec, "service")
-        router_alias = traefik_utils.generate_alias(routespec, "router")
-        result = {"data": None, "target": None, "routespec": routespec}
-
-        service_node = traefik_config["http"]["services"].get(service_alias, None)
-        if service_node is not None:
-            # Will this ever cause a KeyError?
-            result["target"] = service_node["loadBalancer"]["servers"][0]["url"]
-
-        jupyter_router = jupyterhub_config["routers"].get(router_alias)
-        if jupyter_router is not None:
-            result["data"] = jupyter_router["data"]
-
-        if result["data"] is None and result["target"] is None:
-            self.log.warning(f"No route for {routespec} found!")
-            result = None
-        return result
-
-    async def _get_jupyterhub_data(self):
+    async def _get_jupyterhub_dynamic_config(self):
         """Get the jupyterhub part of our dynamic config
 
         This houses serialization of routespecs, etc.
@@ -617,7 +594,7 @@ class TraefikProxy(Proxy):
             'data': the attached data dict for this route (as specified in add_route)
           }
         """
-        jupyterhub_config = await self._get_jupyterhub_data()
+        jupyterhub_config = await self._get_jupyterhub_dynamic_config()
 
         all_routes = {}
         for _key, route in jupyterhub_config.get("routes", {}).items():

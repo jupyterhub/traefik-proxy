@@ -159,7 +159,7 @@ class TKvProxy(TraefikProxy):
         self.log.debug("Route %s was deleted.", routespec)
 
     @_one_at_a_time
-    def _get_jupyterhub_data(self):
+    def _get_jupyterhub_dynamic_config(self):
         """jupyterhub data is in our kv store"""
         return self._kv_get_tree(self.kv_jupyterhub_prefix)
 
