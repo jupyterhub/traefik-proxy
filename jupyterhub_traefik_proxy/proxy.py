@@ -572,13 +572,6 @@ class TraefikProxy(Proxy):
             self.log.error(f"Traefik route for {routespec} never appeared.")
             raise
 
-    async def delete_route(self, routespec):
-        """Delete a route with a given routespec if it exists.
-
-        **Subclasses must define this method**
-        """
-        raise NotImplementedError()
-
     def _route_from_dynamic_config(self, routespec, traefik_config, jupyterhub_config):
         """Given jupyterhub config and traefik config,
         build the expected get_route result
@@ -634,28 +627,6 @@ class TraefikProxy(Proxy):
                 "target": route["target"],
             }
         return all_routes
-
-    async def get_route(self, routespec):
-        """Return the route info for a given routespec.
-
-        Args:
-            routespec (str):
-                A URI that was used to add this route,
-                e.g. `host.tld/path/`
-
-        Returns:
-            result (dict):
-                dict with the following keys::
-
-                'routespec': The normalized route specification passed in to add_route
-                    ([host]/path/)
-                'target': The target host for this route (proto://host)
-                'data': The arbitrary data dict that was passed in by JupyterHub when adding this
-                        route.
-
-            None: if there are no routes matching the given routespec
-        """
-        raise NotImplementedError()
 
     async def persist_dynamic_config(self):
         """Save the Traefik dynamic configuration, depending on the backend
