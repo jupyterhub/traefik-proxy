@@ -59,15 +59,15 @@ class TraefikConsulProxy(TKvProxy):
     )
 
     kv_url = Unicode("DEPRECATED", config=True).tag(
-        deprecated_in="0.4",
+        deprecated_in="1.0",
         deprecated_for="consul_url",
     )
     kv_username = Unicode("DEPRECATED", config=True).tag(
-        deprecated_in="0.4",
+        deprecated_in="1.0",
         deprecated_for="consul_username",
     )
     kv_password = Unicode("DEPRECATED", config=True).tag(
-        deprecated_in="0.4",
+        deprecated_in="1.0",
         deprecated_for="consul_password",
     )
 
