@@ -22,7 +22,6 @@ import base64
 import string
 from urllib.parse import urlparse
 
-import escapism
 from traitlets import Any, Unicode, default
 
 from .kv_proxy import TKvProxy
@@ -31,12 +30,10 @@ from .kv_proxy import TKvProxy
 class TraefikConsulProxy(TKvProxy):
     """JupyterHub Proxy implementation using traefik and Consul"""
 
+    provider_name = "consul"
+
     # Consul doesn't accept keys containing // or starting with / so we have to escape them
     key_safe_chars = string.ascii_letters + string.digits + "!@#$%^&*();<>-.+?:"
-
-    @default("provider_name")
-    def _provider_name(self):
-        return "consul"
 
     consul_client_ca_cert = Unicode(
         config=True,
@@ -100,7 +97,7 @@ class TraefikConsulProxy(TKvProxy):
             "Using traefik with consul is deprecated in jupyterhub-traefik-proxy 1.0 due to lack of support for the python-consul2 API client. Use etcd instead."
         )
 
-    def _define_kv_specific_static_config(self):
+    def _setup_traefik_static_config(self):
         provider_config = {
             "consul": {
                 "rootKey": self.kv_traefik_prefix,
@@ -113,6 +110,7 @@ class TraefikConsulProxy(TKvProxy):
             provider_config["consul"]["tls"] = {"ca": self.consul_client_ca_cert}
 
         self.static_config.update({"providers": provider_config})
+        return super()._setup_traefik_static_config()
 
     def _start_traefik(self):
         if self.consul_password:
@@ -124,10 +122,7 @@ class TraefikConsulProxy(TKvProxy):
                 self.traefik_env.setdefault("CONSUL_HTTP_TOKEN", self.consul_password)
         super()._start_traefik()
 
-    async def persist_dynamic_config(self):
-        data = self.flatten_dict_for_kv(
-            self.dynamic_config, prefix=self.kv_traefik_prefix
-        )
+    async def _kv_atomic_set(self, to_set):
         payload = []
 
         def append_payload(key, val):
@@ -141,172 +136,48 @@ class TraefikConsulProxy(TKvProxy):
                 }
             )
 
-        for k, v in data.items():
+        for k, v in to_set.items():
             append_payload(k, v)
 
         try:
-            results = await self.consul.txn.put(payload=payload)
-            status = 1
-            response = ""
-        except Exception as e:
-            status = 0
-            response = str(e)
-            self.log.exception(f"Error uploading payload to KV store!\n{response}")
+            await self.consul.txn.put(payload=payload)
+        except Exception:
+            self.log.exception("Error uploading payload to KV store!")
         else:
             self.log.debug("Successfully uploaded payload to KV store")
 
-        return status, response
-
-    async def _kv_atomic_add_route_parts(
-        self, jupyterhub_routespec, target, data, route_keys, rule
-    ):
-        jupyterhub_target = self.kv_separator.join(
-            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
-        )
-
+    async def _kv_atomic_delete(self, *to_delete):
         payload = []
 
-        def append_payload(key, value):
+        for key in to_delete:
+            if key.endswith(self.kv_separator):
+                verb = "delete-tree"
+            else:
+                verb = "delete"
             payload.append(
                 {
-                    "KV": {
-                        "Verb": "set",
-                        "Key": key,
-                        "Value": base64.b64encode(value.encode()).decode(),
-                    }
+                    "KV": {"Verb": verb, "Key": key},
                 }
             )
+        status, response = await self.consul.txn.put(payload=payload)
+        # check response?
 
-        append_payload(jupyterhub_routespec, target)
-        append_payload(jupyterhub_target, data)
-        append_payload(route_keys.service_url_path, target)
-        append_payload(route_keys.router_service_path, route_keys.service_alias)
-        append_payload(route_keys.router_rule_path, rule)
-
-        router_path = self.kv_separator.join(
-            ["traefik", "http", "routers", route_keys.router_alias]
-        )
-        if self.is_https:
-            tls_path = self.kv_separator.join([router_path, "tls"])
-            append_payload(tls_path, "true")
-            if self.traefik_cert_resolver:
-                tls_path = self.kv_separator.join([tls_path, "certResolver"])
-                append_payload(tls_path, self.traefik_cert_resolver)
-
-        # Specify the router's entryPoint
-        if not self.traefik_entrypoint:
-            self.traefik_entrypoint = await self._get_traefik_entrypoint()
-        entrypoint_path = self.kv_separator.join([router_path, "entryPoints", "0"])
-        append_payload(entrypoint_path, self.traefik_entrypoint)
-
-        self.log.debug("Uploading route to KV store. Payload: %r", payload)
-        try:
-            results = await self.consul.txn.put(payload=payload)
-            status = 1
-            response = ""
-        except Exception as e:
-            status = 0
-            response = str(e)
-
-        return status, response
-
-    async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
-        index, v = await self.consul.kv.get(jupyterhub_routespec)
-        if v is None:
-            self.log.warning(
-                "Route %s doesn't exist. Nothing to delete", jupyterhub_routespec
-            )
-            return True, None
-        target = v["Value"]
-        jupyterhub_target = self.kv_separator.join(
-            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
-        )
-
-        payload = [
-            {"KV": {"Verb": "delete", "Key": jupyterhub_routespec}},
-            {"KV": {"Verb": "delete", "Key": jupyterhub_target}},
-            {"KV": {"Verb": "delete", "Key": route_keys.service_url_path}},
-            {"KV": {"Verb": "delete", "Key": route_keys.router_service_path}},
-            {"KV": {"Verb": "delete", "Key": route_keys.router_rule_path}},
-        ]
-
-        if self.is_https:
-            tls_path = self.kv_separator.join(
-                ["traefik", "http", "routers", route_keys.router_alias, "tls"]
-            )
-            payload.append({"KV": {"Verb": "delete-tree", "Key": tls_path}})
-
-        # delete any configured entrypoints
-        payload.append(
-            {
-                "KV": {
-                    "Verb": "delete-tree",
-                    "Key": self.kv_separator.join(
-                        [
-                            "traefik",
-                            "http",
-                            "routers",
-                            route_keys.router_alias,
-                            "entryPoints",
-                        ]
-                    ),
-                }
-            }
-        )
-
-        try:
-            status, response = await self.consul.txn.put(payload=payload)
-            status = 1
-            response = ""
-        except Exception as e:
-            status = 0
-            response = str(e)
-
-        return status, response
-
-    async def _kv_get_target(self, jupyterhub_routespec):
-        _, res = await self.consul.kv.get(jupyterhub_routespec)
-        if res is None:
-            return None
-        return res["Value"].decode()
-
-    async def _kv_get_data(self, target):
-        _, res = await self.consul.kv.get(target)
-
-        if res is None:
-            return None
-        return res["Value"].decode()
-
-    async def _kv_get_route_parts(self, kv_entry):
-        key = escapism.unescape(kv_entry["KV"]["Key"])
-        value = kv_entry["KV"]["Value"]
-
-        # Strip the "jupyterhub/routes/" prefix from the routespec
-        sep = self.kv_separator
-        route_prefix = sep.join([self.kv_jupyterhub_prefix, "routes"])
-        routespec = key.replace(route_prefix + sep, "")
-
-        target = base64.b64decode(value.encode()).decode()
-        jupyterhub_target = sep.join(
-            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
-        )
-
-        data = await self._kv_get_data(jupyterhub_target)
-
-        return routespec, target, data
-
-    async def _kv_get_jupyterhub_prefixed_entries(self):
-        routes = await self.consul.txn.put(
+    async def _kv_get_tree(self, prefix):
+        response = await self.consul.txn.put(
             payload=[
                 {
                     "KV": {
                         "Verb": "get-tree",
-                        "Key": self.kv_separator.join(
-                            [self.kv_jupyterhub_prefix, "routes"]
-                        ),
+                        "Key": prefix,
                     }
                 }
             ]
         )
-
-        return routes["Results"]
+        kv_list = [
+            (
+                item["KV"]["Key"],
+                base64.b64decode(item["KV"]["Value"] or '').decode("utf8"),
+            )
+            for item in response["Results"]
+        ]
+        return self.unflatten_dict_from_kv(kv_list, root_key=prefix)

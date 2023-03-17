@@ -1,5 +1,5 @@
 [log]
- level = "debug"
+level = "debug"
 
 [api]
 
@@ -7,12 +7,11 @@
 providersThrottleDuration = "0s"
 
 [providers.file]
- directory = "./tests/config_files/dynamic_config"
- watch = true
+directory = "./tests/config_files/dynamic_config"
+watch = true
 
-[entryPoints]
- [entryPoints.my_web_ep]
-  address = "127.0.0.1:8000"
+[entryPoints.websecure]
+address = "127.0.0.1:8000"
 
- [entryPoints.enter_api]
-  address = "127.0.0.1:8099"
+[entryPoints.enter_api]
+address = "127.0.0.1:8099"

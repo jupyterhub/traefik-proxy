@@ -1,5 +1,6 @@
 import json
 import socket
+import ssl
 from urllib.parse import urlparse
 
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError, HTTPRequest
@@ -48,6 +49,9 @@ async def check_host_up_http(url):
         if e.code >= 599:
             # connection error
             return False
+    except (OSError, ssl.SSLError):
+        # Can occur if SSL isn't set up yet
+        return False
     return True
 
 
