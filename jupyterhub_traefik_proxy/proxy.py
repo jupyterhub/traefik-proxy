@@ -21,6 +21,7 @@ Route Specification:
 import asyncio
 import json
 import os
+import ssl
 from os.path import abspath
 from subprocess import Popen, TimeoutExpired
 from urllib.parse import urlparse, urlunparse
@@ -105,6 +106,14 @@ class TraefikProxy(Proxy):
             if trait.metadata.get("deprecated_in"):
                 self.observe(self._deprecated_trait, name)
         super().__init__(**kwargs)
+        # not calling .start, make sure we load our initial dynamic config
+        # and that our static config matches what we expect
+        # can't await here because we're not async,
+        # so await in our Proxy methods
+        if not self.should_start:
+            self._start_future = asyncio.ensure_future(self._start_external())
+        else:
+            self._start_future = None
 
     static_config = Dict()
     dynamic_config = Dict()
@@ -319,6 +328,9 @@ class TraefikProxy(Proxy):
             """Check if traefik loaded its static configuration yet"""
             try:
                 await self._traefik_api_request("/api/overview")
+                await self._traefik_api_request(
+                    f"/api/entrypoints/{self.traefik_entrypoint}"
+                )
             except ConnectionRefusedError:
                 self.log.debug(
                     f"Connection Refused waiting for traefik at {self.traefik_api_url}. It's probably starting up..."
@@ -331,12 +343,23 @@ class TraefikProxy(Proxy):
                     )
                     return False
                 if e.code == 404:
-                    self.log.debug(
-                        f"traefik api at {e.response.request.url} overview not ready yet"
-                    )
+                    if "/entrypoints/" in e.response.request.url:
+                        self.log.warning(
+                            f"c.{self.__class__.__name__}.traefik_entrypoint={self.traefik_entrypoint!r} not found in traefik. Is it correct?"
+                        )
+                    else:
+                        self.log.debug(
+                            f"traefik api at {e.response.request.url} overview not ready yet"
+                        )
                     return False
                 # unexpected
                 self.log.error(f"Error checking for traefik static configuration {e}")
+                return False
+            except (OSError, ssl.SSLError) as e:
+                # Can occur if SSL isn't set up yet
+                self.log.warning(
+                    f"SSL Error checking for traefik static configuration: {e}"
+                )
                 return False
 
             return True
@@ -459,6 +482,15 @@ class TraefikProxy(Proxy):
         self._start_traefik()
         await self._wait_for_static_config()
 
+    async def _start_external(self):
+        """Startup function called when `not self.should_start`
+
+        Ensures dynamic config is setup and static config is loaded
+        """
+        await self._setup_traefik_dynamic_config()
+        await self._wait_for_static_config()
+        self._start_future = None
+
     async def stop(self):
         """Stop the proxy.
 
@@ -557,6 +589,8 @@ class TraefikProxy(Proxy):
         The proxy implementation should also have a way to associate the fact that a
         route came from JupyterHub.
         """
+        if self._start_future and not self._start_future.done():
+            await self._start_future
         routespec = self.validate_routespec(routespec)
 
         traefik_config, jupyterhub_config = self._dynamic_config_for_route(
@@ -613,6 +647,11 @@ class TraefikProxy(Proxy):
         """
         raise NotImplementedError()
 
+    async def check_routes(self, *args, **kwargs):
+        if self._start_future and not self._start_future.done():
+            await self._start_future
+        return await super().check_routes(*args, **kwargs)
+
     async def get_all_routes(self):
         """Fetch and return all the routes associated by JupyterHub from the
         proxy.
@@ -628,6 +667,9 @@ class TraefikProxy(Proxy):
             'data': the attached data dict for this route (as specified in add_route)
           }
         """
+        if self._start_future and not self._start_future.done():
+            await self._start_future
+
         jupyterhub_config = await self._get_jupyterhub_dynamic_config()
 
         all_routes = {}

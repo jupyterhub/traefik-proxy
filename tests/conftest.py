@@ -11,6 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+import utils
 from consul.aio import Consul
 from jupyterhub.utils import exponential_backoff
 from traitlets.log import get_logger
@@ -76,6 +77,17 @@ def pytest_collection_modifyitems(items, config):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: marks tests as slow.")
+
+
+@pytest.fixture
+def dynamic_config_dir():
+    # matches traefik.toml
+    path = Path("/tmp/jupyterhub-traefik-proxy-test")
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir()
+    yield path
+    shutil.rmtree(path)
 
 
 @pytest.fixture
@@ -181,9 +193,9 @@ def traitlets_log():
 
 # There must be a way to parameterise this to run on both yaml and toml files?
 @pytest.fixture
-async def file_proxy_toml():
+async def file_proxy_toml(dynamic_config_dir):
     """Fixture returning a configured TraefikFileProviderProxy"""
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.toml")
+    dynamic_config_file = str(dynamic_config_dir / "rules.toml")
     static_config_file = "traefik.toml"
     proxy = _file_proxy(
         dynamic_config_file, static_config_file=static_config_file, should_start=True
@@ -194,8 +206,8 @@ async def file_proxy_toml():
 
 
 @pytest.fixture
-async def file_proxy_yaml():
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.yaml")
+async def file_proxy_yaml(dynamic_config_dir):
+    dynamic_config_file = str(dynamic_config_dir / "rules.yaml")
     static_config_file = "traefik.yaml"
     proxy = _file_proxy(
         dynamic_config_file, static_config_file=static_config_file, should_start=True
@@ -218,16 +230,16 @@ def _file_proxy(dynamic_config_file, **kwargs):
 
 
 @pytest.fixture
-async def external_file_proxy_yaml(launch_traefik_file):
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.yaml")
+async def external_file_proxy_yaml(launch_traefik_file, dynamic_config_dir):
+    dynamic_config_file = str(dynamic_config_dir / "rules.yaml")
     proxy = _file_proxy(dynamic_config_file, should_start=False)
     yield proxy
     os.remove(dynamic_config_file)
 
 
 @pytest.fixture
-async def external_file_proxy_toml(launch_traefik_file):
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.toml")
+async def external_file_proxy_toml(launch_traefik_file, dynamic_config_dir):
+    dynamic_config_file = str(dynamic_config_dir / "rules.toml")
     proxy = _file_proxy(dynamic_config_file, should_start=False)
     yield proxy
     os.remove(dynamic_config_file)
@@ -275,6 +287,36 @@ async def auth_external_etcd_proxy(
     proxy = _make_etcd_proxy(auth=True, should_start=False)
     yield proxy
     proxy.etcd.close()
+
+
+@pytest.fixture(
+    params=[
+        "no_auth_consul_proxy",
+        "auth_consul_proxy",
+        "no_auth_etcd_proxy",
+        "auth_etcd_proxy",
+        "file_proxy_toml",
+        "file_proxy_yaml",
+        "external_consul_proxy",
+        "auth_external_consul_proxy",
+        "external_etcd_proxy",
+        "auth_external_etcd_proxy",
+        "external_file_proxy_toml",
+        "external_file_proxy_yaml",
+    ]
+)
+def proxy(request):
+    """Parameterized fixture to run all the tests with every proxy implementation"""
+    proxy = request.getfixturevalue(request.param)
+    # wait for public endpoint to be reachable
+    asyncio.run(
+        exponential_backoff(
+            utils.check_host_up_http,
+            f"Proxy public url {proxy.public_url} cannot be reached",
+            url=proxy.public_url,
+        )
+    )
+    return proxy
 
 
 #########################################################################
