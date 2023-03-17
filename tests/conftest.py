@@ -11,6 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+import utils
 from consul.aio import Consul
 from jupyterhub.utils import exponential_backoff
 from traitlets.log import get_logger
@@ -286,6 +287,36 @@ async def auth_external_etcd_proxy(
     proxy = _make_etcd_proxy(auth=True, should_start=False)
     yield proxy
     proxy.etcd.close()
+
+
+@pytest.fixture(
+    params=[
+        "no_auth_consul_proxy",
+        "auth_consul_proxy",
+        "no_auth_etcd_proxy",
+        "auth_etcd_proxy",
+        "file_proxy_toml",
+        "file_proxy_yaml",
+        "external_consul_proxy",
+        "auth_external_consul_proxy",
+        "external_etcd_proxy",
+        "auth_external_etcd_proxy",
+        "external_file_proxy_toml",
+        "external_file_proxy_yaml",
+    ]
+)
+def proxy(request):
+    """Parameterized fixture to run all the tests with every proxy implementation"""
+    proxy = request.getfixturevalue(request.param)
+    # wait for public endpoint to be reachable
+    asyncio.run(
+        exponential_backoff(
+            utils.check_host_up_http,
+            f"Proxy public url {proxy.public_url} cannot be reached",
+            url=proxy.public_url,
+        )
+    )
+    return proxy
 
 
 #########################################################################
