@@ -138,36 +138,6 @@ def launch_backends():
         proc.wait()
 
 
-@pytest.fixture(
-    params=[
-        "no_auth_consul_proxy",
-        "auth_consul_proxy",
-        "no_auth_etcd_proxy",
-        "auth_etcd_proxy",
-        "file_proxy_toml",
-        "file_proxy_yaml",
-        "external_consul_proxy",
-        "auth_external_consul_proxy",
-        "external_etcd_proxy",
-        "auth_external_etcd_proxy",
-        "external_file_proxy_toml",
-        "external_file_proxy_yaml",
-    ]
-)
-def proxy(request):
-    """Parameterized fixture to run all the tests with every proxy implementation"""
-    proxy = request.getfixturevalue(request.param)
-    # wait for public endpoint to be reachable
-    asyncio.run(
-        exponential_backoff(
-            utils.check_host_up_http,
-            f"Proxy public url {proxy.public_url} cannot be reached",
-            url=proxy.public_url,
-        )
-    )
-    return proxy
-
-
 async def wait_for_services(urls):
     # Wait until traefik and the backend are ready
     await exponential_backoff(
@@ -228,6 +198,10 @@ def test_default_port():
                 "other.host/path/no/",
                 "other.host/path/no/slash/abc/",
             ],
+        ),
+        (
+            "/one/",
+            [],
         ),
     ],
 )
@@ -363,6 +337,10 @@ async def test_add_get_delete(
 
 
 async def test_get_all_routes(proxy, launch_backends):
+    # initial state: no routes
+    routes = await proxy.get_all_routes()
+    assert routes == {}
+
     routespecs = ["/proxy/path1", "/proxy/path2/", "/proxy/path3/"]
     targets = await launch_backends(len(routespecs))
     datas = [{"test": "test1"}, {}, {"test": "test2"}]
@@ -401,6 +379,11 @@ async def test_get_all_routes(proxy, launch_backends):
         pass
 
     assert_equal(routes, expected_output)
+
+    for routespec in routespecs:
+        await proxy.delete_route(routespec)
+    routes = await proxy.get_all_routes()
+    assert routes == {}
 
 
 async def test_host_origin_headers(proxy, launch_backends):

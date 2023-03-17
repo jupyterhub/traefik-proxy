@@ -1,44 +1,49 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from secrets import token_hex
 
-import numpy as np
+from starlette.applications import Starlette
+from starlette.responses import PlainTextResponse
+from starlette.routing import Route, WebSocketRoute
 
+messages = {
+    "small": "",
+    "large": token_hex(500_000),  # 1MiB
+}
 
-class DummyServer(BaseHTTPRequestHandler):
-    def _set_headers(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.send_header("Host", self.headers["Host"])
-        self.send_header("Origin", self.headers["Origin"])
-        self.end_headers()
-
-    def generate(self, number_of_bytes):
-        return np.random.bytes(number_of_bytes)
-
-    def do_GET(self):
-        self._set_headers()
-        data = None
-        if self.headers["RequestSize"] == "large":
-            data = self.generate(10000000)  # 10MB
-        else:
-            data = self.generate(1)  # 1B
-        self.wfile.write(data)
+ws_chunk_size = 100_000
 
 
-def run(port=9000):
-    dummy_server = HTTPServer(("localhost", port), DummyServer)
+async def ws(websocket):
+    await websocket.accept()
+    size = websocket.path_params["size"]
+    message = messages[size]
+    await websocket.send_text(message)
+    # for offset in range(0, len(message), ws_chunk_size):
+    #     chunk = message[offset : offset + ws_chunk_size]
+    #     await websocket.send_text(chunk)
+    await websocket.send_text("")
+    await websocket.close()
 
-    try:
-        dummy_server.serve_forever()
-    except KeyboardInterrupt:
-        pass
 
-    dummy_server.server_close()
+async def echo(request):
+    size = request.headers["Request-Size"]
+    return PlainTextResponse(messages[size])
+
+
+async def index(request):
+    return PlainTextResponse('ok')
+
+
+routes = [
+    Route("/", endpoint=index),
+    WebSocketRoute(r"/{path:path}/ws/{size}", endpoint=ws),
+    # WebSocketRoute(r"/{path:path}/ws/large", endpoint=ws_large),
+    Route("/{path:path}", endpoint=echo),
+]
+
+app = Starlette(routes=routes)
 
 
 if __name__ == "__main__":
-    from sys import argv
+    import uvicorn
 
-    if len(argv) == 2:
-        run(port=int(argv[1]))
-    else:
-        run()
+    uvicorn.run(app, port=9000, log_level="info")

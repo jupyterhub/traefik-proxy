@@ -1,0 +1,10 @@
+test_id,throughput,proxy,kind,size,total_requests,concurrency
+0,282.9128585814199,file,http,large,1000,1
+1,291.10981347553485,file,http,large,1000,1
+2,289.873080387781,file,http,large,1000,1
+0,1925.6811624339603,file,http,large,1000,10
+1,2237.492567022454,file,http,large,1000,10
+2,2217.7582248281383,file,http,large,1000,10
+0,2495.7229298733287,file,http,large,1000,20
+1,2736.77018063897,file,http,large,1000,20
+2,3033.0462368040367,file,http,large,1000,20

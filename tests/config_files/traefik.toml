@@ -1,19 +1,17 @@
 [log]
- level = "debug"
+level = "debug"
 
 [api]
- dashboard = true
 
-[wss]
- protocol = "http"
+[providers]
+providersThrottleDuration = "0s"
 
 [providers.file]
- directory = "./tests/config_files/dynamic_config"
- watch = true
+directory = "/tmp/jupyterhub-traefik-proxy-test"
+watch = true
 
-[entryPoints]
- [entryPoints.my_web_ep]
-  address = "127.0.0.1:8000"
+[entryPoints.websecure]
+address = "127.0.0.1:8000"
 
- [entryPoints.enter_api]
-  address = "127.0.0.1:8099"
+[entryPoints.enter_api]
+address = "127.0.0.1:8099"

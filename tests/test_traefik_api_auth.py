@@ -7,20 +7,6 @@ from tornado.httpclient import AsyncHTTPClient
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.fixture(
-    params=[
-        "file_proxy_toml",
-        "file_proxy_yaml",
-        "no_auth_etcd_proxy",
-        "auth_etcd_proxy",
-        "no_auth_consul_proxy",
-        "auth_consul_proxy",
-    ]
-)
-def proxy(request):
-    return request.getfixturevalue(request.param)
-
-
 @pytest.mark.parametrize(
     "username, password, expected_rc",
     [("api_admin", "admin", 200), ("api_admin", "1234", 401), ("", "", 401)],

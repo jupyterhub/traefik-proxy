@@ -76,23 +76,23 @@ See [our definition of contributors](https://github-activity.readthedocs.io/en/l
 
 @alexleach ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aalexleach+updated%3A2021-10-18..2023-03-10&type=Issues)) | @consideRatio ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2021-10-18..2023-03-10&type=Issues)) | @devnull-mr ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adevnull-mr+updated%3A2021-10-18..2023-03-10&type=Issues)) | @dolfinus ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adolfinus+updated%3A2021-10-18..2023-03-10&type=Issues)) | @GeorgianaElena ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AGeorgianaElena+updated%3A2021-10-18..2023-03-10&type=Issues)) | @manics ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amanics+updated%3A2021-10-18..2023-03-10&type=Issues)) | @maulikjs ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amaulikjs+updated%3A2021-10-18..2023-03-10&type=Issues)) | @minrk ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2021-10-18..2023-03-10&type=Issues)) | @pre-commit-ci ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Apre-commit-ci+updated%3A2021-10-18..2023-03-10&type=Issues)) | @twalcari ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Atwalcari+updated%3A2021-10-18..2023-03-10&type=Issues))
 
-### [0.3.0](https://github.com/jupyterhub/traefik-proxy/compare/0.2.0...0.3.0) 2021-10-18
+## [0.3.0](https://github.com/jupyterhub/traefik-proxy/compare/0.2.0...0.3.0) 2021-10-18
 
-#### Enhancements made
+### Enhancements made
 
 - Support ARM in binary package installs [#129](https://github.com/jupyterhub/traefik-proxy/pull/129) ([@yuvipanda](https://github.com/yuvipanda))
 
-#### Bugs fixed
+### Bugs fixed
 
 - Fix handling default server routes in TraefikTomlProxy [#131](https://github.com/jupyterhub/traefik-proxy/pull/131) ([@dolfinus](https://github.com/dolfinus))
 - Make etcd3 & python-consul2 soft dependencies [#127](https://github.com/jupyterhub/traefik-proxy/pull/127) ([@yuvipanda](https://github.com/yuvipanda))
 
-#### Continuous integration
+### Continuous integration
 
 - ci: don't run tests if docs change [#139](https://github.com/jupyterhub/traefik-proxy/pull/139) ([@consideRatio](https://github.com/consideRatio))
 - ci/docs: install autodocs-traits as a PyPI package & pin sphinx [#138](https://github.com/jupyterhub/traefik-proxy/pull/138) ([@consideRatio](https://github.com/consideRatio))
 
-#### Contributors to this release
+### Contributors to this release
 
 ([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2021-02-24&to=2021-10-18&type=c))
 

@@ -1,0 +1,12 @@
+altair
+jupyter_server
+jupyterhub
+# usually get proxy via `-e .`, but this avoids triggering reinstall every time
+jupyterhub_traefik_proxy
+matplotlib
+numpy
+pandas
+pytest
+starlette
+uvicorn[standard]
+websockets

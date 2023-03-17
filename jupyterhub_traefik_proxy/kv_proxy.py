@@ -19,11 +19,10 @@ Route Specification:
 # Distributed under the terms of the Modified BSD License.
 
 import asyncio
-import json
-from collections.abc import MutableMapping
+from collections.abc import Mapping
 from functools import wraps
+from numbers import Number
 
-import escapism
 from traitlets import Unicode
 
 from . import traefik_utils
@@ -82,243 +81,75 @@ class TKvProxy(TraefikProxy):
         help="""The separator used for the path in the KV store""",
     )
 
-    def _define_kv_specific_static_config(self):
-        """Define the traefik static configuration that configures
-        traefik's communication with the key-value store.
+    # these should be the only three methods a KV provider needs to define
 
-        Will be called during startup if should_start is True.
+    async def _kv_atomic_set(self, to_set: dict):
+        """Set a collection of keys and values
 
-        **Subclasses must define this method**
-        if the proxy is to be started by the Hub.
-
-        In order to be picked up by the proxy, the static configuration must be
-        stored into `proxy.static_config` dict under the `provider_name` key.
-        """
-        raise NotImplementedError()
-
-    async def _kv_atomic_add_route_parts(
-        self, jupyterhub_routespec, target, data, route_keys, rule
-    ):
-        """Add the key-value pairs associated with a route within a
-        key-value store transaction.
-
-        **Subclasses must define this method**
-
-        Will be called during add_route.
-
-        When retrieving or deleting a route, the parts of a route
-        are expected to have the following structure:
-        [ key: jupyterhub_routespec            , value: target ]
-        [ key: target                          , value: data   ]
-        [ key: route_keys.service_url_path     , value: target ]
-        [ key: route_keys.router_rule_path   , value: rule   ]
-        [ key: route_keys.router_service_path, value:
-                                       route_keys.service_alias]
-        [ key: route_keys.service_weight_path  , value: w(int) ]
-            (where `w` is the weight of the service to be used during load balancing)
-
-        Returns:
-            result (tuple):
-                'status'(int): The transaction status
-                    (0: failure, positive: success)
-                'response'(str): The transaction response
-        """
-        raise NotImplementedError()
-
-    async def _kv_atomic_delete_route_parts(self, jupyterhub_routespec, route_keys):
-        """Delete the key-value pairs associated with a route within a
-        key-value store transaction (if the route exists).
-
-        **Subclasses must define this method**
-
-        Will be called during delete_route.
-
-        The keys associated with a route are:
-            jupyterhub_routespec,
-            target,
-            route_keys.service_url_path,
-            route_keys.router_rule_path,
-            route_keys.router_service_path,
-            route_keys.service_weight_path,
-
-        Returns:
-            result (tuple):
-                'status'(int): The transaction status
-                    (0: failure, positive: success).
-                'response'(str): The transaction response.
-        """
-        raise NotImplementedError()
-
-    async def _kv_get_target(self, jupyterhub_routespec):
-        """Retrive the target from the key-value store.
-        The target is the value associated with `jupyterhub_routespec` key.
-
-        **Subclasses must define this method**
-
-        Returns:
-            target (str): The full URL associated with this route.
-        """
-        raise NotImplementedError()
-
-    async def _kv_get_data(self, target):
-        """Retrive the data associated with the `target` from the key-value store.
-
-        **Subclasses must define this method**
-
-        Returns:
-            data (dict): A JSONable dict that holds extra info about the route
-        """
-        raise NotImplementedError()
-
-    async def _kv_get_route_parts(self, kv_entry):
-        """Retrive all the parts that make up a route (i.e. routespec, target, data)
-        from the key-value store given a `kv_entry`.
-
-        A `kv_entry` is a key-value store entry where the key starts with
-        `proxy.kv_jupyterhub_prefix`. It is expected that only the routespecs
-        will be prefixed with `proxy.kv_jupyterhub_prefix` when added to the kv store.
-
-        **Subclasses must define this method**
-
-        Returns:
-            'routespec': The normalized route specification passed in to add_route
-                ([host]/path/)
-            'target': The target host for this route (proto://host)
-            'data': The arbitrary data dict that was passed in by JupyterHub when adding this
-                route.
-        """
-        raise NotImplementedError()
-
-    async def _kv_get_jupyterhub_prefixed_entries(self):
-        """Retrive from the kv store all the key-value pairs where the key starts with
-        `proxy.kv_jupyterhub_prefix`.
-        It is expected that only the routespecs will be prefixed with `proxy.kv_jupyterhub_prefix`
-        when added to the kv store.
-
-        **Subclasses must define this method**
-
-        Returns:
-            'routes': A list of key-value store entries where the keys start
-                with `proxy.kv_jupyterhub_prefix`.
-        """
-
-        raise NotImplementedError()
-
-    async def _setup_traefik_static_config(self):
-        self._define_kv_specific_static_config()
-        await super()._setup_traefik_static_config()
-
-    async def _setup_traefik_dynamic_config(self):
-        await super()._setup_traefik_dynamic_config()
-        await self.persist_dynamic_config()
-
-    async def add_route(self, routespec, target, data):
-        """Add a route to the proxy.
+        Should be done atomically (i.e. in a transaction),
+        setting nothing on failure.
 
         Args:
-            routespec (str): A URL prefix ([host]/path/) for which this route will be matched,
-                e.g. host.name/path/
-            target (str): A full URL that will be the target of this route.
-            data (dict): A JSONable dict that will be associated with this route, and will
-                be returned when retrieving information about this route.
 
-        Will raise an appropriate Exception (FIXME: find what?) if the route could
-        not be added.
-
-        This proxy implementation prefixes the routespec with `proxy.kv_jupyterhub_prefix` when
-        adding it to the kv store in orde to associate the fact that the route came from JupyterHub.
-        Everything traefik related is prefixed with `proxy.traefik_prefix`.
+        to_set (dict): key/value pairs to set
+            Will always be a flattened dict
+            of single key-value pairs,
+            not a nested structure.
         """
-        self.log.debug("Adding route for %s to %s.", routespec, target)
+        raise NotImplementedError()
 
-        routespec = self.validate_routespec(routespec)
-        route_keys = traefik_utils.generate_route_keys(
-            self, routespec, separator=self.kv_separator
-        )
+    async def _kv_atomic_delete(self, *keys):
+        """Delete one or more keys
 
-        # Store the data dict passed in by JupyterHub
-        data = json.dumps(data)
-        # Generate the routing rule
-        rule = traefik_utils.generate_rule(routespec)
-
-        # To be able to delete the route when only routespec is provided
-        jupyterhub_routespec = self.kv_separator.join(
-            [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
-        )
-
-        async with self.semaphore:
-            status, response = await self._kv_atomic_add_route_parts(
-                jupyterhub_routespec, target, data, route_keys, rule
-            )
-
-        if status:
-            self.log.debug(
-                "Added service %s with the alias %s.", target, route_keys.service_alias
-            )
-            self.log.debug(
-                "Added router %s for service %s with the following routing rule %s.",
-                route_keys.router_alias,
-                route_keys.service_alias,
-                routespec,
-            )
-        else:
-            self.log.error(
-                "Couldn't add route for %s. Response: %s", routespec, response
-            )
-            raise RuntimeError(f"Couldn't add route for {routespec}")
-        async with self.semaphore:
-            await self._wait_for_route(routespec)
-
-    async def delete_route(self, routespec):
-        """Delete a route and all the traefik related info associated given a routespec,
-        (if it exists).
+        If a key ends with `self.kv_separator`, it should be a recursive delete
         """
-        routespec = self.validate_routespec(routespec)
-        jupyterhub_routespec = self.kv_separator.join(
-            [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
-        )
-        route_keys = traefik_utils.generate_route_keys(
-            self, routespec, separator=self.kv_separator
-        )
+        raise NotImplementedError()
 
+    async def _kv_get_tree(self, prefix):
+        """Return all data under prefix as a dict
+
+        Should probably use `unflatten_dict_from_kv`
+        """
+        raise NotImplementedError()
+
+    # now: implement methods required by TraefikProxy base class
+
+    async def _apply_dynamic_config(self, dynamic_config, jupyterhub_config=None):
+        """Apply dynamic config (and optional jupyterhub info) atomically"""
+        to_set = self.flatten_dict_for_kv(dynamic_config, prefix=self.kv_traefik_prefix)
+        if jupyterhub_config:
+            to_set.update(
+                self.flatten_dict_for_kv(
+                    jupyterhub_config, prefix=self.kv_jupyterhub_prefix
+                )
+            )
+        self.log.debug("Setting key-value config %s", to_set)
+        await self._kv_atomic_set(to_set)
+
+    async def _delete_dynamic_config(self, traefik_keys, jupyterhub_keys):
+        """Delete keys from dynamic configuration
+
+        Translate key paths to flat kv keys
+        """
+        to_delete = [
+            self.kv_separator.join([self.kv_traefik_prefix] + key_path + [""])
+            for key_path in traefik_keys
+        ]
+        to_delete.extend(
+            self.kv_separator.join([self.kv_jupyterhub_prefix] + key_path + [""])
+            for key_path in jupyterhub_keys
+        )
         async with self.semaphore:
-            status, response = await self._kv_atomic_delete_route_parts(
-                jupyterhub_routespec, route_keys
-            )
-        if status:
-            self.log.debug("Routespec %s was deleted.", routespec)
-        else:
-            self.log.error(
-                "Couldn't delete route %s. Response: %s", routespec, response
-            )
+            try:
+                await self._kv_atomic_delete(*to_delete)
+            except Exception as e:
+                self.log.error("Couldn't delete config %s: %s", to_delete, e)
+                raise
 
     @_one_at_a_time
-    async def get_all_routes(self):
-        """Fetch and return all the routes associated by JupyterHub from the
-        proxy.
-
-        Returns a dictionary of routes, where the keys are
-        routespecs and each value is a dict of the form::
-
-          {
-            'routespec': the route specification ([host]/path/)
-            'target': the target host URL (proto://host) for this route
-            'data': the attached data dict for this route (as specified in add_route)
-          }
-        """
-        all_routes = {}
-        routes = await self._kv_get_jupyterhub_prefixed_entries()
-
-        for kv_entry in routes:
-            traefik_routespec, target, data = await self._kv_get_route_parts(kv_entry)
-            routespec = self.validate_routespec(traefik_routespec)
-            all_routes[routespec] = {
-                "routespec": routespec,
-                "target": target,
-                "data": None if data is None else json.loads(data),
-            }
-
-        return all_routes
+    async def _get_jupyterhub_dynamic_config(self):
+        """jupyterhub data is in our kv store"""
+        return await self._kv_get_tree(self.kv_jupyterhub_prefix)
 
     async def get_route(self, routespec):
         """Return the route info for a given routespec.
@@ -341,25 +172,33 @@ class TKvProxy(TraefikProxy):
             None: if there are no routes matching the given routespec
         """
         routespec = self.validate_routespec(routespec)
-        jupyterhub_routespec = self.kv_separator.join(
-            [self.kv_jupyterhub_prefix, "routes", escapism.escape(routespec)]
+        router_alias = traefik_utils.generate_alias(routespec, "router")
+        route_key = self.kv_separator.join(
+            [self.kv_jupyterhub_prefix, "routes", router_alias]
         )
-
-        target = await self._kv_get_target(jupyterhub_routespec)
-        if target is None:
+        route = await self._kv_get_tree(route_key)
+        if not route:
             return None
-        traefik_target = self.kv_separator.join(
-            [self.kv_jupyterhub_prefix, "targets", escapism.escape(target)]
-        )
-        data = await self._kv_get_data(traefik_target)
+        return {key: route[key] for key in ("routespec", "data", "target")}
 
-        return {
-            "routespec": routespec,
-            "target": target,
-            "data": None if data is None else json.loads(data),
-        }
+    # deep/flat dict translation
 
-    def flatten_dict_for_kv(self, data, prefix='traefik'):
+    def _kv_to_str(self, value):
+        """KV stores only store strings
+
+        serialize numbers and booleans to strings that traefik will recognize
+        """
+        if isinstance(value, str):
+            return value
+        elif isinstance(value, bool):
+            return str(value).lower()
+        elif isinstance(value, Number):
+            return str(value)
+        else:
+            # don't coerce unrecognized types, TypeError will be raised later
+            return value
+
+    def flatten_dict_for_kv(self, data, prefix=''):
         """Flatten a dictionary of `data` for storage in the KV store,
         prefixing each key with `prefix` and joining each key with
         :attr:`TKvProxy.kv_separator`.
@@ -399,16 +238,115 @@ class TKvProxy(TraefikProxy):
         Inspired by `this answer on StackOverflow <https://stackoverflow.com/a/6027615>`_
         """
         sep = self.kv_separator
+        # if it's a list, cast to dict of str keys, i.e. ["x"] -> {"0": "x"}
+        # if isinstance(data, list):
+        #     data = {str(i): item for i, item in enumerate(data)}
+
         items = {}
         for k, v in data.items():
-            new_key = prefix + sep + k if prefix else k
-            if isinstance(v, MutableMapping):
-                items.update(self.flatten_dict_for_kv(v, prefix=new_key))
-            elif isinstance(v, str):
-                items.update({new_key: v})
-            elif isinstance(v, list):
-                for n, item in enumerate(v):
-                    items.update({f"{new_key}{sep}{n}": item})
+            if prefix:
+                new_key = f"{prefix}{sep}{k}"
             else:
-                raise ValueError(f"Cannot upload {v} of type {type(v)} to kv store")
+                new_key = k
+
+            if isinstance(v, list):
+                # if it's a list, cast to dict of str keys, i.e. ["x"] -> {"0": "x"}
+                v = {str(i): item for i, item in enumerate(v)}
+
+            # two cases:
+            # 1. Mapping (dict)
+            # 2. scalar (cast to str)
+            if isinstance(v, Mapping):
+                if not v:
+                    self.log.warning(
+                        f"Not setting anything for empty dict at {new_key}"
+                    )
+                items.update(self.flatten_dict_for_kv(v, prefix=new_key))
+            else:
+                # cast _known_ types to str
+                v = self._kv_to_str(v)
+                # if cast didn't coerce, we can't handle it
+                if not isinstance(v, str):
+                    raise ValueError(
+                        f"Cannot upload {new_key}: {v} of type {type(v)} to kv store"
+                    )
+                items[new_key] = v
         return items
+
+    def unflatten_dict_from_kv(self, kv_list, root_key=""):
+        """Reconstruct tree dict from list of key/value pairs
+
+        This is the inverse of flatten_dict_for_kv,
+        not including str coercion.
+
+        Args:
+
+        kv_list (list):
+            list of (key, value) pairs.
+            keys and values should all be strings.
+        root_key (str, optional):
+            The key representing the root of the tree,
+            if not the root of the key-value store.
+
+        Returns:
+
+        tree (dict):
+            The reconstructed dictionary.
+            All values will still be strings,
+            even those that originated as numbers or booleans.
+        """
+
+        sep = self.kv_separator
+
+        def by_depth(item):
+            """sort-key function to get shallow items first
+
+            Ensures
+
+            So that we know that we always see an item
+            before its children
+            """
+            key, value = item
+            key_path = key.split(sep)
+            for i, label in enumerate(key_path):
+                # ensure
+                if label.isdigit():
+                    key_path[i] = int(label)
+            return len(key.split(sep))
+
+        tree = {}
+        for key, value in sorted(kv_list, key=by_depth):
+            key_path = key.split(sep)
+            d = tree
+            for parent_key, key in zip(key_path[:-1], key_path[1:]):
+                if parent_key not in d:
+                    # create container
+                    if key.isdigit():
+                        # integer keys mean it's a list
+                        d[parent_key] = []
+                    else:
+                        d[parent_key] = {}
+                # walk down to the next level
+                d = d[parent_key]
+            if isinstance(d, list):
+                # validate list keys
+                if len(d) != int(key):
+                    raise IndexError(
+                        f"Got invalid list key {key_path}, missing previous items in {d}"
+                    )
+                d.append(value)
+            else:
+                d[key] = value
+
+        if root_key:
+            original_tree = tree
+            # get the root of the tree,
+            # rather than starting from root
+            for key in root_key.strip(self.kv_separator).split(self.kv_separator):
+                if key not in tree:
+                    self.log.warning(
+                        f"Root key {root_key!r} not found in {original_tree}"
+                    )
+                    return {}
+                tree = tree[key]
+        return tree

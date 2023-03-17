@@ -1,8 +1,7 @@
 # JupyterHub Traefik Proxy
 
 [![Documentation build status](https://img.shields.io/readthedocs/jupyterhub-traefik-proxy?logo=read-the-docs)](https://jupyterhub-traefik-proxy.readthedocs.org/en/latest/)
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/jupyterhub/traefik-proxy/Run%20tests?logo=github)](https://github.com/jupyterhub/traefik-proxy/actions)
-[![CircleCI build status](https://img.shields.io/circleci/build/github/jupyterhub/jupyterhub?logo=circleci)](https://circleci.com/gh/jupyterhub/jupyterhub)
+[![GitHub Workflow Status](https://github.com/jupyterhub/traefik-proxy/actions/workflows/test.yml/badge.svg)](https://github.com/jupyterhub/traefik-proxy/actions/workflows/test.yml)
 [![Latest PyPI version](https://img.shields.io/pypi/v/jupyterhub-traefik-proxy?logo=pypi)](https://pypi.python.org/pypi/jupyterhub-traefik-proxy)
 [![GitHub](https://img.shields.io/badge/issue_tracking-github-blue?logo=github)](https://github.com/jupyterhub/traefik-proxy/issues)
 [![Discourse](https://img.shields.io/badge/help_forum-discourse-blue?logo=discourse)](https://discourse.jupyter.org/c/jupyterhub)

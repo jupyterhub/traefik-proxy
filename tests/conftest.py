@@ -11,6 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+import utils
 from consul.aio import Consul
 from jupyterhub.utils import exponential_backoff
 from traitlets.log import get_logger
@@ -79,6 +80,17 @@ def pytest_configure(config):
 
 
 @pytest.fixture
+def dynamic_config_dir():
+    # matches traefik.toml
+    path = Path("/tmp/jupyterhub-traefik-proxy-test")
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir()
+    yield path
+    shutil.rmtree(path)
+
+
+@pytest.fixture
 async def no_auth_consul_proxy(launch_consul):
     """
     Fixture returning a configured TraefikConsulProxy.
@@ -91,6 +103,7 @@ async def no_auth_consul_proxy(launch_consul):
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
         should_start=True,
+        traefik_log_level="DEBUG",
     )
     await proxy.start()
     yield proxy
@@ -105,7 +118,7 @@ async def auth_consul_proxy(launch_consul_auth):
     """
     proxy = TraefikConsulProxy(
         public_url=Config.public_url,
-        consul_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         consul_password=Config.consul_token,
@@ -147,6 +160,7 @@ def _make_etcd_proxy(auth=False, **extra_kwargs):
         traefik_api_password=Config.traefik_api_pass,
         traefik_api_username=Config.traefik_api_user,
         check_route_timeout=45,
+        traefik_log_level="DEBUG",
     )
     if auth:
         kwargs.update(
@@ -179,9 +193,9 @@ def traitlets_log():
 
 # There must be a way to parameterise this to run on both yaml and toml files?
 @pytest.fixture
-async def file_proxy_toml():
+async def file_proxy_toml(dynamic_config_dir):
     """Fixture returning a configured TraefikFileProviderProxy"""
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.toml")
+    dynamic_config_file = str(dynamic_config_dir / "rules.toml")
     static_config_file = "traefik.toml"
     proxy = _file_proxy(
         dynamic_config_file, static_config_file=static_config_file, should_start=True
@@ -192,8 +206,8 @@ async def file_proxy_toml():
 
 
 @pytest.fixture
-async def file_proxy_yaml():
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.yaml")
+async def file_proxy_yaml(dynamic_config_dir):
+    dynamic_config_file = str(dynamic_config_dir / "rules.yaml")
     static_config_file = "traefik.yaml"
     proxy = _file_proxy(
         dynamic_config_file, static_config_file=static_config_file, should_start=True
@@ -210,24 +224,23 @@ def _file_proxy(dynamic_config_file, **kwargs):
         traefik_api_username=Config.traefik_api_user,
         dynamic_config_file=dynamic_config_file,
         check_route_timeout=60,
+        traefik_log_level="DEBUG",
         **kwargs,
     )
 
 
 @pytest.fixture
-async def external_file_proxy_yaml(launch_traefik_file):
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.yaml")
+async def external_file_proxy_yaml(launch_traefik_file, dynamic_config_dir):
+    dynamic_config_file = str(dynamic_config_dir / "rules.yaml")
     proxy = _file_proxy(dynamic_config_file, should_start=False)
-    await proxy._wait_for_static_config()
     yield proxy
     os.remove(dynamic_config_file)
 
 
 @pytest.fixture
-async def external_file_proxy_toml(launch_traefik_file):
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.toml")
+async def external_file_proxy_toml(launch_traefik_file, dynamic_config_dir):
+    dynamic_config_file = str(dynamic_config_dir / "rules.toml")
     proxy = _file_proxy(dynamic_config_file, should_start=False)
-    await proxy._wait_for_static_config()
     yield proxy
     os.remove(dynamic_config_file)
 
@@ -242,7 +255,6 @@ async def external_consul_proxy(launch_traefik_consul):
         check_route_timeout=45,
         should_start=False,
     )
-    await proxy._wait_for_static_config()
     yield proxy
 
 
@@ -256,15 +268,14 @@ async def auth_external_consul_proxy(launch_traefik_consul_auth):
         consul_password=Config.consul_token,
         check_route_timeout=45,
         should_start=False,
+        traefik_log_level="DEBUG",
     )
-    await proxy._wait_for_static_config()
     yield proxy
 
 
 @pytest.fixture
 async def external_etcd_proxy(launch_traefik_etcd):
     proxy = _make_etcd_proxy(auth=False, should_start=False)
-    await proxy._wait_for_static_config()
     yield proxy
     proxy.etcd.close()
 
@@ -274,9 +285,38 @@ async def auth_external_etcd_proxy(
     launch_traefik_etcd_auth,
 ):
     proxy = _make_etcd_proxy(auth=True, should_start=False)
-    await proxy._wait_for_static_config()
     yield proxy
     proxy.etcd.close()
+
+
+@pytest.fixture(
+    params=[
+        "no_auth_consul_proxy",
+        "auth_consul_proxy",
+        "no_auth_etcd_proxy",
+        "auth_etcd_proxy",
+        "file_proxy_toml",
+        "file_proxy_yaml",
+        "external_consul_proxy",
+        "auth_external_consul_proxy",
+        "external_etcd_proxy",
+        "auth_external_etcd_proxy",
+        "external_file_proxy_toml",
+        "external_file_proxy_yaml",
+    ]
+)
+def proxy(request):
+    """Parameterized fixture to run all the tests with every proxy implementation"""
+    proxy = request.getfixturevalue(request.param)
+    # wait for public endpoint to be reachable
+    asyncio.run(
+        exponential_backoff(
+            utils.check_host_up_http,
+            f"Proxy public url {proxy.public_url} cannot be reached",
+            url=proxy.public_url,
+        )
+    )
+    return proxy
 
 
 #########################################################################
@@ -338,6 +378,7 @@ def _launch_traefik_cli(*extra_args, env=None):
     default_args = (
         "--api",
         "--log.level=debug",
+        "--providers.providersThrottleDuration=0s",
         # "--entrypoints.web.address=:8000",
         "--entrypoints.websecure.address=:8000",
         "--entrypoints.enter_api.address=:8099",
