@@ -79,6 +79,17 @@ def pytest_configure(config):
 
 
 @pytest.fixture
+def dynamic_config_dir():
+    # matches traefik.toml
+    path = Path("/tmp/jupyterhub-traefik-proxy-test")
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir()
+    yield path
+    shutil.rmtree(path)
+
+
+@pytest.fixture
 async def no_auth_consul_proxy(launch_consul):
     """
     Fixture returning a configured TraefikConsulProxy.
@@ -181,9 +192,9 @@ def traitlets_log():
 
 # There must be a way to parameterise this to run on both yaml and toml files?
 @pytest.fixture
-async def file_proxy_toml():
+async def file_proxy_toml(dynamic_config_dir):
     """Fixture returning a configured TraefikFileProviderProxy"""
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.toml")
+    dynamic_config_file = str(dynamic_config_dir / "rules.toml")
     static_config_file = "traefik.toml"
     proxy = _file_proxy(
         dynamic_config_file, static_config_file=static_config_file, should_start=True
@@ -194,8 +205,8 @@ async def file_proxy_toml():
 
 
 @pytest.fixture
-async def file_proxy_yaml():
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.yaml")
+async def file_proxy_yaml(dynamic_config_dir):
+    dynamic_config_file = str(dynamic_config_dir / "rules.yaml")
     static_config_file = "traefik.yaml"
     proxy = _file_proxy(
         dynamic_config_file, static_config_file=static_config_file, should_start=True
@@ -218,16 +229,16 @@ def _file_proxy(dynamic_config_file, **kwargs):
 
 
 @pytest.fixture
-async def external_file_proxy_yaml(launch_traefik_file):
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.yaml")
+async def external_file_proxy_yaml(launch_traefik_file, dynamic_config_dir):
+    dynamic_config_file = str(dynamic_config_dir / "rules.yaml")
     proxy = _file_proxy(dynamic_config_file, should_start=False)
     yield proxy
     os.remove(dynamic_config_file)
 
 
 @pytest.fixture
-async def external_file_proxy_toml(launch_traefik_file):
-    dynamic_config_file = os.path.join(config_files, "dynamic_config", "rules.toml")
+async def external_file_proxy_toml(launch_traefik_file, dynamic_config_dir):
+    dynamic_config_file = str(dynamic_config_dir / "rules.toml")
     proxy = _file_proxy(dynamic_config_file, should_start=False)
     yield proxy
     os.remove(dynamic_config_file)

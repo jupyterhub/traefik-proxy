@@ -7,7 +7,7 @@ level = "debug"
 providersThrottleDuration = "0s"
 
 [providers.file]
-directory = "./tests/config_files/dynamic_config"
+directory = "/tmp/jupyterhub-traefik-proxy-test"
 watch = true
 
 [entryPoints.websecure]
