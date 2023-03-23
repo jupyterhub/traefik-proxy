@@ -198,7 +198,7 @@ class TraefikProxy(Proxy):
     traefik_entrypoint = Unicode(
         help="""The traefik entrypoint name to use.
 
-        By default, will be `web` if http or `websecure` if https.
+        By default, will be `http` if http or `https` if https.
 
         If running traefik externally with your own specified entrypoint name,
         set this value.
@@ -210,9 +210,19 @@ class TraefikProxy(Proxy):
     def _default_traefik_entrypoint(self):
         """Find the traefik entrypoint that matches our :attrib:`self.public_url`"""
         if self.is_https:
-            return "websecure"
+            return "https"
         else:
-            return "web"
+            return "http"
+
+    traefik_api_entrypoint = Unicode(
+        "auth_api",
+        help="""The traefik entrypoint name to use for API access.
+
+        Separate from traefik_entrypoint,
+        because this is usually only on localhost.
+        """,
+        config=True,
+    )
 
     @default("traefik_api_password")
     def _warn_empty_password(self):
@@ -415,7 +425,7 @@ class TraefikProxy(Proxy):
             self.traefik_entrypoint: {
                 "address": urlparse(self.public_url).netloc,
             },
-            "enter_api": {
+            self.traefik_api_entrypoint: {
                 "address": urlparse(self.traefik_api_url).netloc,
             },
         }
@@ -444,7 +454,7 @@ class TraefikProxy(Proxy):
         routers = http.setdefault("routers", {})
         routers["route_api"] = {
             "rule": f"Host(`{api_url.hostname}`) && PathPrefix(`{api_path}`)",
-            "entryPoints": ["enter_api"],
+            "entryPoints": [self.traefik_api_entrypoint],
             "service": "api@internal",
             "middlewares": ["auth_api"],
         }
