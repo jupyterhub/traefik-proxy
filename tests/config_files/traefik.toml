@@ -10,8 +10,8 @@ providersThrottleDuration = "0s"
 directory = "/tmp/jupyterhub-traefik-proxy-test"
 watch = true
 
-[entryPoints.websecure]
+[entryPoints.https]
 address = "127.0.0.1:8000"
 
-[entryPoints.enter_api]
+[entryPoints.auth_api]
 address = "127.0.0.1:8099"
