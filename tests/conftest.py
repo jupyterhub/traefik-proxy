@@ -379,9 +379,9 @@ def _launch_traefik_cli(*extra_args, env=None):
         "--api",
         "--log.level=debug",
         "--providers.providersThrottleDuration=0s",
-        # "--entrypoints.web.address=:8000",
-        "--entrypoints.websecure.address=:8000",
-        "--entrypoints.enter_api.address=:8099",
+        # "--entrypoints.http.address=:8000",
+        "--entrypoints.https.address=:8000",
+        "--entrypoints.auth_api.address=:8099",
     )
     args = default_args + extra_args
     return _launch_traefik(*args, env=env)

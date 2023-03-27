@@ -187,7 +187,7 @@ This is an example setup for using JupyterHub and TraefikFileProviderProxy manag
    address = ":8000"
 
    # the port on localhost where the traefik api should be found
-   [entryPoints.enter_api]
+   [entryPoints.auth_api]
    address = "localhost:8099"
 
    # the dynamic configuration directory

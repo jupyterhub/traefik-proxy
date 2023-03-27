@@ -161,7 +161,7 @@ If TraefikConsulProxy is used as an externally managed service, then make sure y
     address = ":8000"
 
     # the port on localhost where the traefik api should be found
-    [entryPoints.enter_api]
+    [entryPoints.auth_api]
     address = "localhost:8099"
 
     [providers.consul]
@@ -237,7 +237,7 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
    address = ":8000"
 
    # the port on localhost where the traefik api should be found
-   [entryPoints.enter_api]
+   [entryPoints.auth_api]
    address = "localhost:8099"
 
    [providers.consul]
