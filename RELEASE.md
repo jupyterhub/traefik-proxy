@@ -11,7 +11,7 @@ For you to follow along according to these instructions, you need:
 
 ## Steps to make a release
 
-1. Create a PR updating `docs/source/changelog.md` with [github-activity][] and
+1. Create a PR updating `docs/source/changelog.md` with [github-activity] and
    continue only when its merged.
 
    ```shell
@@ -37,7 +37,7 @@ For you to follow along according to these instructions, you need:
    tbump ${VERSION}
    ```
 
-   Following this, the [CI system][] will build and publish a release.
+   Following this, the [CI system] will build and publish a release.
 
 1. Reset the version back to dev, e.g. `2.1.0.dev` after releasing `2.0.0`
 
