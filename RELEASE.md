@@ -11,49 +11,39 @@ For you to follow along according to these instructions, you need:
 
 ## Steps to make a release
 
+1. Create a PR updating `docs/source/changelog.md` with [github-activity] and
+   continue only when its merged.
+
+   ```shell
+   pip install github-activity
+
+   github-activity --heading-level=3 jupyterhub/traefik-proxy
+   ```
+
 1. Checkout main and make sure it is up to date.
 
    ```shell
-   ORIGIN=${ORIGIN:-origin} # set to the canonical remote, e.g. 'upstream' if 'origin' is not the official repo
    git checkout main
-   git fetch $ORIGIN main
-   # WARNING! These next commands discard any changes or uncommitted files!
-   git reset --hard $ORIGIN/main
-   git clean -xfd
+   git fetch origin main
+   git reset --hard origin/main
    ```
 
-1. Update [changelog.md](docs/source/changelog.md) and add it to
-   the working tree.
+1. Update the version, make commits, and push a git tag with `tbump`.
 
    ```shell
-   git add traefik-proxy/docs/source/changelog.md
+   pip install tbump
+   tbump --dry-run ${VERSION}
+
+   tbump ${VERSION}
    ```
 
-   Tip: Identifying the changes can be made easier with the help of the
-   [choldgraf/github-activity](https://github.com/choldgraf/github-activity)
-   utility.
+   Following this, the [CI system] will build and publish a release.
 
-1. Set a shell variable to be the new version you want to release.
-   The actual project version will be detected automatically by versioneer
-   from git tags inspection. The versioneer script will be run by setup.py
-   when packaging is occurring.
+1. Reset the version back to dev, e.g. `2.1.0.dev` after releasing `2.0.0`
 
    ```shell
-   VERSION=...  # e.g. 1.2.3
-   git commit -m "release $VERSION"
+   tbump --no-tag ${NEXT_VERSION}.dev
    ```
 
-   Tip: You can get the current project version by checking the [latest
-   tag on GitHub](https://github.com/jupyterhub/traefik-proxy/tags).
-
-1. Create a git tag for the release commit and push them both.
-
-   ```shell
-   git tag -a $VERSION -m "release $VERSION"
-
-   # then verify you tagged the right commit
-   git log
-
-   # then push it
-   git push $ORIGIN --atomic --follow-tags
-   ```
+[ci system]: https://github.com/jupyterhub/traefik-proxy/actions
+[github-activity]: https://github.com/executablebooks/github-activity
