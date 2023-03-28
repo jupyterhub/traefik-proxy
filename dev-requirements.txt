@@ -13,5 +13,4 @@ pytest
 pytest-asyncio
 pytest-cov
 python-consul2
-tbump
 websockets
