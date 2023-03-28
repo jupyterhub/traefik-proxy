@@ -42,9 +42,9 @@ Performance and responsiveness is also greatly improved.
 
 ### Enhancements made
 
+- reduce requirements of KV store implementations and custom methods [#185](https://github.com/jupyterhub/traefik-proxy/pull/185) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
 - Improve performance, scaling [#165](https://github.com/jupyterhub/traefik-proxy/pull/165) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
 - Improve error message on traefik api access error [#140](https://github.com/jupyterhub/traefik-proxy/pull/140) ([@twalcari](https://github.com/twalcari), [@minrk](https://github.com/minrk))
-- reduce requirements of KV store implementations and custom methods [#185](https://github.com/jupyterhub/traefik-proxy/pull/185) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
 
 ### Bugs fixed
 
@@ -52,6 +52,8 @@ Performance and responsiveness is also greatly improved.
 
 ### Maintenance and upkeep improvements
 
+- trade versioneer for tbump [#193](https://github.com/jupyterhub/traefik-proxy/pull/193) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
+- make api endpoint configurable, restore previous entrypoint names [#192](https://github.com/jupyterhub/traefik-proxy/pull/192) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
 - set providersThrottleDuration=0s in tests [#190](https://github.com/jupyterhub/traefik-proxy/pull/190) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
 - fix heading level in 0.3 changelog [#188](https://github.com/jupyterhub/traefik-proxy/pull/188) ([@minrk](https://github.com/minrk))
 - run rst2md on remaining rst files [#187](https://github.com/jupyterhub/traefik-proxy/pull/187) ([@minrk](https://github.com/minrk))
@@ -80,6 +82,7 @@ Performance and responsiveness is also greatly improved.
 
 - doc: update sample configuration for v2 [#189](https://github.com/jupyterhub/traefik-proxy/pull/189) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
 - Fix CI README badges [#177](https://github.com/jupyterhub/traefik-proxy/pull/177) ([@manics](https://github.com/manics), [@consideRatio](https://github.com/consideRatio))
+- changelog for 1.0 [#176](https://github.com/jupyterhub/traefik-proxy/pull/176) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena), [@manics](https://github.com/manics))
 - docs: update link to traefik API [#175](https://github.com/jupyterhub/traefik-proxy/pull/175) ([@minrk](https://github.com/minrk), [@manics](https://github.com/manics))
 - Update performance benchmarks for v2 [#163](https://github.com/jupyterhub/traefik-proxy/pull/163) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena), [@manics](https://github.com/manics))
 
@@ -88,9 +91,9 @@ Performance and responsiveness is also greatly improved.
 The following people contributed discussions, new ideas, code and documentation contributions, and review.
 See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/#how-does-this-tool-define-contributions-in-the-reports).
 
-([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2021-10-18&to=2023-03-17&type=c))
+([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2021-10-18&to=2023-03-28&type=c))
 
-@alexleach ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aalexleach+updated%3A2021-10-18..2023-03-17&type=Issues)) | @consideRatio ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2021-10-18..2023-03-17&type=Issues)) | @dependabot ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adependabot+updated%3A2021-10-18..2023-03-17&type=Issues)) | @devnull-mr ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adevnull-mr+updated%3A2021-10-18..2023-03-17&type=Issues)) | @dolfinus ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adolfinus+updated%3A2021-10-18..2023-03-17&type=Issues)) | @GeorgianaElena ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AGeorgianaElena+updated%3A2021-10-18..2023-03-17&type=Issues)) | @manics ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amanics+updated%3A2021-10-18..2023-03-17&type=Issues)) | @maulikjs ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amaulikjs+updated%3A2021-10-18..2023-03-17&type=Issues)) | @minrk ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2021-10-18..2023-03-17&type=Issues)) | @pre-commit-ci ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Apre-commit-ci+updated%3A2021-10-18..2023-03-17&type=Issues)) | @twalcari ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Atwalcari+updated%3A2021-10-18..2023-03-17&type=Issues))
+@alexleach ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aalexleach+updated%3A2021-10-18..2023-03-28&type=Issues)) | @consideRatio ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2021-10-18..2023-03-28&type=Issues)) | @dependabot ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adependabot+updated%3A2021-10-18..2023-03-28&type=Issues)) | @devnull-mr ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adevnull-mr+updated%3A2021-10-18..2023-03-28&type=Issues)) | @dolfinus ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adolfinus+updated%3A2021-10-18..2023-03-28&type=Issues)) | @GeorgianaElena ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AGeorgianaElena+updated%3A2021-10-18..2023-03-28&type=Issues)) | @manics ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amanics+updated%3A2021-10-18..2023-03-28&type=Issues)) | @maulikjs ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amaulikjs+updated%3A2021-10-18..2023-03-28&type=Issues)) | @minrk ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2021-10-18..2023-03-28&type=Issues)) | @pre-commit-ci ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Apre-commit-ci+updated%3A2021-10-18..2023-03-28&type=Issues)) | @twalcari ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Atwalcari+updated%3A2021-10-18..2023-03-28&type=Issues))
 
 ## [0.3.0](https://github.com/jupyterhub/traefik-proxy/compare/0.2.0...0.3.0) 2021-10-18
 
