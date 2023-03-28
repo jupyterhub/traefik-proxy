@@ -59,7 +59,7 @@ norecursedirs = "lib lib64"
 github_url = "https://github.com/jupyterhub/traefik-proxy"
 
 [tool.tbump.version]
-current = "1.0.0b1"
+current = "1.0.0b2"
 
 regex = '''
   (?P<major>\d+)

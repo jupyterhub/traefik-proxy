@@ -13,7 +13,7 @@ with open("README.md", encoding="utf8") as f:
 
 setup(
     name="jupyterhub-traefik-proxy",
-    version="1.0.0b1",
+    version="1.0.0b2",
     install_requires=open("requirements.txt").read().splitlines(),
     python_requires=">=3.6",
     author="Project Jupyter Contributors",
