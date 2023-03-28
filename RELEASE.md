@@ -17,7 +17,7 @@ For you to follow along according to these instructions, you need:
    ```shell
    pip install github-activity
 
-   github-activity --heading-level=3 jupyterhub/jupyterhub
+   github-activity --heading-level=3 jupyterhub/traefik-proxy
    ```
 
 1. Checkout main and make sure it is up to date.
