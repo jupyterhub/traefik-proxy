@@ -5,45 +5,15 @@ Usage:
     pip install [-e] .
 """
 
-import os
-import sys
 
 from setuptools import find_packages, setup
-from setuptools.command.bdist_egg import bdist_egg
-
-# ensure cwd is on sys.path
-# workaround bug in pip 19.0
-here = os.path.dirname(__file__)
-if here not in sys.path:
-    sys.path.insert(0, here)
-
-import versioneer
-
-cmdclass = versioneer.get_cmdclass()
-
-
-class bdist_egg_disabled(bdist_egg):
-    """Disabled version of bdist_egg
-
-    Prevents setup.py install from performing setuptools' default easy_install,
-    which it should never ever do.
-    """
-
-    def run(self):
-        sys.exit(
-            "Aborting implicit building of eggs. Use `pip install .` to install from source."
-        )
-
-
-if "bdist_egg" not in sys.argv:
-    cmdclass["bdist_egg"] = bdist_egg_disabled
 
 with open("README.md", encoding="utf8") as f:
     readme = f.read()
 
 setup(
     name="jupyterhub-traefik-proxy",
-    version=versioneer.get_version(),
+    version="1.0.0b1",
     install_requires=open("requirements.txt").read().splitlines(),
     python_requires=">=3.6",
     author="Project Jupyter Contributors",
@@ -70,7 +40,6 @@ setup(
     ],
     packages=find_packages(),
     include_package_data=True,
-    cmdclass=cmdclass,
     entry_points={
         "jupyterhub.proxies": [
             "traefik_consul = jupyterhub_traefik_proxy.consul:TraefikConsulProxy",
