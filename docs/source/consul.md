@@ -157,7 +157,7 @@ If TraefikConsulProxy is used as an externally managed service, then make sure y
     [api]
 
     # the public port where traefik accepts http requests
-    [entryPoints.web]
+    [entryPoints.http]
     address = ":8000"
 
     # the port on localhost where the traefik api should be found
@@ -233,7 +233,7 @@ This is an example setup for using JupyterHub and TraefikConsulProxy managed by 
    [api]
 
    # the public port where traefik accepts http requests
-   [entryPoints.web]
+   [entryPoints.http]
    address = ":8000"
 
    # the port on localhost where the traefik api should be found
