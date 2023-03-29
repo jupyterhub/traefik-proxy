@@ -8,10 +8,10 @@ e.g. with multiple traefik-proxy instances.
 
 ## How-To install TraefikEtcdProxy
 
-3. Install **jupyterhub**
-4. Install **jupyterhub-traefik-proxy**
-5. Install **traefik**
-6. Install **etcd**
+1. Install **jupyterhub**
+2. Install **jupyterhub-traefik-proxy**
+3. Install **traefik**
+4. Install **etcd**
 
 - You can find the full installation guide and examples in the [installation section](install)
 
