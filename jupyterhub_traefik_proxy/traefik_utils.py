@@ -22,14 +22,33 @@ class KVStorePrefix(Unicode):
 
 
 def generate_rule(routespec):
+    # validate assumption that routespecs always end with '/'
+    assert routespec.endswith("/")
     routespec = unquote(routespec)
+
+    # traefik won't match /proxy/path to /proxy/path/
+    # so strip trailing slash for consistent behavior
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
-        rule = f"PathPrefix(`{routespec}`)"
+        host = ""
+        path = routespec
     else:
         # Host-based routing, e.g. host.tld/proxy/path/
-        host, path_prefix = routespec.split("/", 1)
-        rule = f"Host(`{host}`) && PathPrefix(`/{path_prefix}`)"
+        host, slash, path = routespec.partition("/")
+        path = slash + path
+
+    path_no_slash = path.rstrip("/")
+
+    path_rule = f"PathPrefix(`{path}`)"
+    if path_no_slash:
+        # include exact Path('/prefix') so that both /prefix/ and /prefix
+        # are served correctly
+        path_rule = f"( {path_rule} || Path(`{path_no_slash}`) )"
+
+    if host:
+        rule = f"Host(`{host}`) && {path_rule}"
+    else:
+        rule = path_rule
     return rule
 
 

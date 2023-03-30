@@ -58,18 +58,20 @@ async def check_host_up_http(url):
 async def get_responding_backend_port(traefik_url, path):
     """Check if traefik followed the configuration and routed the
     request to the right backend"""
-    if not path.endswith("/"):
-        path += "/"
+
+    headers = {}
 
     if not path.startswith("/"):
-        req = HTTPRequest(
-            traefik_url + "".join("/" + path.split("/", 1)[1]),
-            method="GET",
-            headers={"Host": path.split("/")[0]},
-            validate_cert=False,
-        )
-    else:
-        req = HTTPRequest(traefik_url + path, validate_cert=False)
+        host, slash, path = path.partition("/")
+        path = slash + path
+        headers["Host"] = host
+
+    req = HTTPRequest(
+        traefik_url + path,
+        headers=headers,
+        validate_cert=False,
+        follow_redirects=True,
+    )
 
     try:
         resp = await AsyncHTTPClient().fetch(req)

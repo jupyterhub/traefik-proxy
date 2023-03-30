@@ -76,3 +76,20 @@ def test_atomic_writing_recovery(tmpdir):
 
     # didn't leave any residue
     assert tmpdir.listdir() == [testfile]
+
+
+@pytest.mark.parametrize(
+    "routespec, expected_rule",
+    [
+        ("/", "PathPrefix(`/`)"),
+        ("/path/prefix/", "( PathPrefix(`/path/prefix/`) || Path(`/path/prefix`) )"),
+        ("host/", "Host(`host`) && PathPrefix(`/`)"),
+        (
+            "host/path/prefix/",
+            "Host(`host`) && ( PathPrefix(`/path/prefix/`) || Path(`/path/prefix`) )",
+        ),
+    ],
+)
+def test_generate_rule(routespec, expected_rule):
+    rule = traefik_utils.generate_rule(routespec)
+    assert rule == expected_rule

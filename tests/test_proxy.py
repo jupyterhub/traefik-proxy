@@ -336,6 +336,27 @@ async def test_add_get_delete(
         await test_route_exist(spec, extra_backends[i])
 
 
+async def test_trailing_slash(proxy, launch_backends):
+    proxy_url = proxy.public_url.rstrip("/")
+    routespec = "/path/prefix/"
+    default_backend, target_backend = await launch_backends(2)
+    target_port = urlparse(target_backend).port
+    default_port = urlparse(default_backend).port
+
+    await proxy.add_route("/", default_backend, {})
+    await proxy.add_route(routespec, target_backend, {})
+
+    port = await utils.get_responding_backend_port(proxy_url, "/path/prefix/")
+    assert port == target_port
+    port = await utils.get_responding_backend_port(proxy_url, "/path/prefix")
+    assert port == target_port
+    port = await utils.get_responding_backend_port(proxy_url, "/path/prefixnoslash")
+    assert port == default_port
+
+    for route in ["/", routespec]:
+        await proxy.delete_route(route)
+
+
 async def test_get_all_routes(proxy, launch_backends):
     # initial state: no routes
     routes = await proxy.get_all_routes()
