@@ -22,6 +22,18 @@ class KVStorePrefix(Unicode):
 
 
 def generate_rule(routespec):
+    """Generate a traefik routing rule for a jupyterhub routespec
+
+
+    - if a routespec doesn't start with a `/`, the first part is a hostname.
+    - routespecs always end with `/`
+    - routespecs are a path _prefix_, and should match anything under them
+    - the root of the route without the trailing slash should match the rule,
+      e.g. the routespec `/prefix/` should match `/prefix` and `/prefix/tree`
+
+    Traefik rule documentation: https://doc.traefik.io/traefik/routing/routers/#rule
+    """
+
     # validate assumption that routespecs always end with '/'
     if not routespec.endswith("/"):
         raise ValueError("routespec must end with /")
