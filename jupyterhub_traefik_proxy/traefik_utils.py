@@ -22,14 +22,46 @@ class KVStorePrefix(Unicode):
 
 
 def generate_rule(routespec):
+    """Generate a traefik routing rule for a jupyterhub routespec
+
+
+    - if a routespec doesn't start with a `/`, the first part is a hostname.
+    - routespecs always end with `/`
+    - routespecs are a path _prefix_, and should match anything under them
+    - the root of the route without the trailing slash should match the rule,
+      e.g. the routespec `/prefix/` should match `/prefix` and `/prefix/tree`
+
+    Traefik rule documentation: https://doc.traefik.io/traefik/routing/routers/#rule
+    """
+
+    # validate assumption that routespecs always end with '/'
+    if not routespec.endswith("/"):
+        raise ValueError("routespec must end with /")
     routespec = unquote(routespec)
+
+    # traefik won't match /proxy/path to /proxy/path/
+    # so strip trailing slash for consistent behavior
     if routespec.startswith("/"):
         # Path-based route, e.g. /proxy/path/
-        rule = f"PathPrefix(`{routespec}`)"
+        host = ""
+        path = routespec
     else:
         # Host-based routing, e.g. host.tld/proxy/path/
-        host, path_prefix = routespec.split("/", 1)
-        rule = f"Host(`{host}`) && PathPrefix(`/{path_prefix}`)"
+        host, slash, path = routespec.partition("/")
+        path = slash + path
+
+    path_no_slash = path.rstrip("/")
+
+    path_rule = f"PathPrefix(`{path}`)"
+    if path_no_slash:
+        # include exact Path('/prefix') so that both /prefix/ and /prefix
+        # are served correctly
+        path_rule = f"( {path_rule} || Path(`{path_no_slash}`) )"
+
+    if host:
+        rule = f"Host(`{host}`) && {path_rule}"
+    else:
+        rule = path_rule
     return rule
 
 
