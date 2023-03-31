@@ -23,7 +23,8 @@ class KVStorePrefix(Unicode):
 
 def generate_rule(routespec):
     # validate assumption that routespecs always end with '/'
-    assert routespec.endswith("/")
+    if not routespec.endswith("/"):
+        raise ValueError("routespec must end with /")
     routespec = unquote(routespec)
 
     # traefik won't match /proxy/path to /proxy/path/
