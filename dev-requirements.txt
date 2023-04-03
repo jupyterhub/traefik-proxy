@@ -1,4 +1,5 @@
 black
+certipy
 codecov
 # etcd3 & python-consul2 are now soft dependencies
 # Adding them here prevents CI from failing

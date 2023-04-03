@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 import utils
+from certipy import Certipy
 from consul.aio import Consul
 from jupyterhub.utils import exponential_backoff
 from traitlets.log import get_logger
@@ -19,6 +20,7 @@ from traitlets.log import get_logger
 from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
 from jupyterhub_traefik_proxy.etcd import TraefikEtcdProxy
 from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
+from jupyterhub_traefik_proxy.traefik_utils import deep_merge
 
 HERE = Path(__file__).parent.resolve()
 config_files = os.path.join(HERE, "config_files")
@@ -90,20 +92,83 @@ def dynamic_config_dir():
     shutil.rmtree(path)
 
 
+@pytest.fixture(scope="session")
+def certipy():
+    with TemporaryDirectory() as td:
+        certipy = Certipy(store_dir=td)
+        certipy.create_ca("ca")
+        local_names = ["DNS:localhost", "IP:127.0.0.1"]
+        # etcd certs from certipy don't work for some reason?
+        # I don't understand why, but the originals do
+        # certipy.create_signed_pair("etcd", "ca", alt_names=local_names)
+        certipy.create_signed_pair("proxy-public", "ca", alt_names=local_names)
+        yield certipy
+
+
+# FIXME (later): certipy-issued certs aren't accepted in etcd
+# unclear why, but manually issued certs are okay
+@pytest.fixture(scope="session")
+def etcd_ssl_key_cert(certipy):
+    return (
+        str(HERE / "config_files/etcd/etcd.key"),
+        str(HERE / "config_files/etcd/etcd.crt"),
+    )
+
+
+@pytest.fixture(scope="session")
+def etcd_client_ca(certipy):
+    return str(HERE / "config_files/etcd/ca.crt")
+
+
+@pytest.fixture(scope="session")
+def proxy_ssl_key_cert(certipy):
+    record = certipy.store.get_record("proxy-public")
+    return record['files']['key'], record['files']['cert']
+
+
+@pytest.fixture(scope="session")
+def client_ca(certipy):
+    record = certipy.store.get_record("proxy-public")
+    from jupyterhub.utils import make_ssl_context
+    from tornado.httpclient import AsyncHTTPClient
+
+    ssl_context = make_ssl_context(
+        keyfile=record["files"]["key"],
+        certfile=record["files"]["cert"],
+        cafile=record["files"]["ca"],
+        # record["proxy-public"][self.internal_ssl_key,
+        # self.internal_ssl_cert,
+        # cafile=self.internal_ssl_ca,
+    )
+    AsyncHTTPClient.configure(None, defaults={"ssl_options": ssl_context})
+
+    print(record)
+    return record['files']['ca']
+
+
 @pytest.fixture
-async def no_auth_consul_proxy(launch_consul):
+def proxy_args(proxy_ssl_key_cert):
+    ssl_key, ssl_cert = proxy_ssl_key_cert
+    return dict(
+        public_url=Config.public_url,
+        traefik_api_password=Config.traefik_api_pass,
+        traefik_api_username=Config.traefik_api_user,
+        traefik_log_level="DEBUG",
+        ssl_key=ssl_key,
+        ssl_cert=ssl_cert,
+    )
+
+
+@pytest.fixture
+async def no_auth_consul_proxy(launch_consul, proxy_args):
     """
     Fixture returning a configured TraefikConsulProxy.
     Consul acl disabled.
     """
     proxy = TraefikConsulProxy(
-        public_url=Config.public_url,
         consul_url=f"http://127.0.0.1:{Config.consul_port}",
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
-        check_route_timeout=45,
         should_start=True,
-        traefik_log_level="DEBUG",
+        **proxy_args,
     )
     await proxy.start()
     yield proxy
@@ -111,19 +176,16 @@ async def no_auth_consul_proxy(launch_consul):
 
 
 @pytest.fixture
-async def auth_consul_proxy(launch_consul_auth):
+async def auth_consul_proxy(launch_consul_auth, proxy_args):
     """
     Fixture returning a configured TraefikConsulProxy.
     Consul acl enabled.
     """
     proxy = TraefikConsulProxy(
-        public_url=Config.public_url,
         consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
         consul_password=Config.consul_token,
-        check_route_timeout=45,
         should_start=True,
+        **proxy_args,
     )
     await proxy.start()
     yield proxy
@@ -131,51 +193,59 @@ async def auth_consul_proxy(launch_consul_auth):
 
 
 @pytest.fixture
-async def no_auth_etcd_proxy(launch_etcd):
+async def no_auth_etcd_proxy(launch_etcd, proxy_args):
     """
     Fixture returning a configured TraefikEtcdProxy.
     No etcd authentication.
     """
-    proxy = _make_etcd_proxy(auth=False)
+    proxy = _make_etcd_proxy(auth=False, **proxy_args)
     await proxy.start()
     yield proxy
     await proxy.stop()
 
 
 @pytest.fixture
-async def auth_etcd_proxy(launch_etcd_auth):
+async def auth_etcd_proxy(launch_etcd_auth, etcd_client_ca, proxy_args):
     """
     Fixture returning a configured TraefikEtcdProxy
     Etcd has credentials set up
     """
-    proxy = _make_etcd_proxy(auth=True)
+    proxy = _make_etcd_proxy(auth=True, client_ca=etcd_client_ca, **proxy_args)
     await proxy.start()
     yield proxy
     await proxy.stop()
 
 
-def _make_etcd_proxy(auth=False, **extra_kwargs):
-    kwargs = dict(
-        public_url=Config.public_url,
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
-        check_route_timeout=45,
-        traefik_log_level="DEBUG",
-    )
+def _make_etcd_proxy(*, auth=False, client_ca=None, **extra_kwargs):
+    kwargs = {}
     if auth:
         kwargs.update(
             dict(
-                grpc_options=[
-                    ("grpc.ssl_target_name_override", "localhost"),
-                    ("grpc.default_authority", "localhost"),
-                ],
                 etcd_url="https://localhost:2379",
-                etcd_client_ca_cert=f"{config_files}/fake-ca-cert.crt",
-                etcd_insecure_skip_verify=True,
                 etcd_username=Config.etcd_user,
                 etcd_password=Config.etcd_password,
+                etcd_client_kwargs=dict(
+                    grpc_options=[
+                        ("grpc.ssl_target_name_override", "localhost"),
+                        ("grpc.default_authority", "localhost"),
+                    ],
+                    ca_cert=client_ca,
+                ),
             )
         )
+        extra_static = kwargs.setdefault("extra_static_config", {})
+        etcd_config = {
+            "providers": {
+                "etcd": {
+                    "tls": {
+                        "ca": client_ca,
+                        "insecureSkipVerify": True,
+                    }
+                }
+            }
+        }
+        deep_merge(extra_static, etcd_config)
+
     kwargs.update(extra_kwargs)
     proxy = TraefikEtcdProxy(**kwargs)
     return proxy
@@ -193,98 +263,146 @@ def traitlets_log():
 
 # There must be a way to parameterise this to run on both yaml and toml files?
 @pytest.fixture
-async def file_proxy_toml(dynamic_config_dir):
+async def file_proxy_toml(dynamic_config_dir, proxy_args):
     """Fixture returning a configured TraefikFileProviderProxy"""
     dynamic_config_file = str(dynamic_config_dir / "rules.toml")
     static_config_file = "traefik.toml"
-    proxy = _file_proxy(
-        dynamic_config_file, static_config_file=static_config_file, should_start=True
+    proxy = TraefikFileProviderProxy(
+        dynamic_config_file=dynamic_config_file,
+        static_config_file=static_config_file,
+        should_start=True,
+        **proxy_args,
     )
     await proxy.start()
     yield proxy
     await proxy.stop()
 
 
+def _check_ssl(proxy, client_ca):
+    import pprint
+
+    pprint.pprint(proxy.dynamic_config)
+    pprint.pprint(proxy.static_config)
+
+    # check ssl
+    import socket
+    import ssl
+
+    # ssl_dateformat = r'%b %d %H:%M:%S %Y %Z'
+
+    context = ssl.create_default_context(
+        purpose=ssl.Purpose.SERVER_AUTH,
+        cafile=client_ca,
+    )
+    context.check_hostname = True
+    context.verify_mode = ssl.VerifyMode.CERT_REQUIRED
+    context.load_cert_chain(proxy.ssl_cert, proxy.ssl_key)
+    from urllib.parse import urlparse
+
+    url = urlparse(Config.public_url)
+    cert = ssl.get_server_certificate((url.hostname, url.port))
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+
+    certDecoded = x509.load_pem_x509_certificate(str.encode(cert), default_backend())
+    print(certDecoded)
+    print(certDecoded.issuer)
+    print(certDecoded.subject)
+    print(certDecoded.not_valid_after)
+    print(certDecoded.not_valid_before)
+
+    conn = context.wrap_socket(
+        socket.socket(socket.AF_INET),
+        server_hostname=url.hostname,
+    )
+    # 5 second timeout
+    conn.settimeout(5.0)
+    conn.connect((url.hostname, url.port))
+    ssl_info = conn.getpeercert()
+    print(ssl_info, type(ssl_info))
+    # assert ssl_info == None
+
+
 @pytest.fixture
-async def file_proxy_yaml(dynamic_config_dir):
+async def file_proxy_yaml(
+    dynamic_config_dir, proxy_ssl_key_cert, client_ca, proxy_args
+):
+    ssl_key, ssl_cert = proxy_ssl_key_cert
     dynamic_config_file = str(dynamic_config_dir / "rules.yaml")
     static_config_file = "traefik.yaml"
-    proxy = _file_proxy(
-        dynamic_config_file, static_config_file=static_config_file, should_start=True
-    )
-    await proxy.start()
-    yield proxy
-    await proxy.stop()
-
-
-def _file_proxy(dynamic_config_file, **kwargs):
-    return TraefikFileProviderProxy(
-        public_url=Config.public_url,
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
+    proxy = TraefikFileProviderProxy(
         dynamic_config_file=dynamic_config_file,
-        check_route_timeout=60,
-        traefik_log_level="DEBUG",
-        **kwargs,
+        static_config_file=static_config_file,
+        should_start=True,
+        **proxy_args,
     )
+
+    await proxy.start()
+
+    try:
+        _check_ssl(proxy, client_ca)
+        yield proxy
+    finally:
+        await proxy.stop()
 
 
 @pytest.fixture
-async def external_file_proxy_yaml(launch_traefik_file, dynamic_config_dir):
+async def external_file_proxy_yaml(launch_traefik_file, dynamic_config_dir, proxy_args):
     dynamic_config_file = str(dynamic_config_dir / "rules.yaml")
-    proxy = _file_proxy(dynamic_config_file, should_start=False)
+    proxy = TraefikFileProviderProxy(
+        dynamic_config_file=dynamic_config_file,
+        should_start=False,
+        **proxy_args,
+    )
+    await proxy._start_future
     yield proxy
     os.remove(dynamic_config_file)
 
 
 @pytest.fixture
-async def external_file_proxy_toml(launch_traefik_file, dynamic_config_dir):
+async def external_file_proxy_toml(launch_traefik_file, dynamic_config_dir, proxy_args):
     dynamic_config_file = str(dynamic_config_dir / "rules.toml")
-    proxy = _file_proxy(dynamic_config_file, should_start=False)
+    proxy = TraefikFileProviderProxy(
+        dynamic_config_file=dynamic_config_file,
+        should_start=False,
+        **proxy_args,
+    )
     yield proxy
+    await proxy._start_future
     os.remove(dynamic_config_file)
 
 
 @pytest.fixture
-async def external_consul_proxy(launch_traefik_consul):
+async def external_consul_proxy(launch_traefik_consul, proxy_args):
     proxy = TraefikConsulProxy(
-        public_url=Config.public_url,
         consul_url=f"http://127.0.0.1:{Config.consul_port}",
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
-        check_route_timeout=45,
         should_start=False,
+        **proxy_args,
     )
     yield proxy
 
 
 @pytest.fixture
-async def auth_external_consul_proxy(launch_traefik_consul_auth):
+async def auth_external_consul_proxy(launch_traefik_consul_auth, proxy_args):
     proxy = TraefikConsulProxy(
-        public_url=Config.public_url,
         consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
-        traefik_api_password=Config.traefik_api_pass,
-        traefik_api_username=Config.traefik_api_user,
         consul_password=Config.consul_token,
-        check_route_timeout=45,
         should_start=False,
-        traefik_log_level="DEBUG",
+        **proxy_args,
     )
     yield proxy
 
 
 @pytest.fixture
-async def external_etcd_proxy(launch_traefik_etcd):
-    proxy = _make_etcd_proxy(auth=False, should_start=False)
+async def external_etcd_proxy(launch_traefik_etcd, proxy_args):
+    proxy = _make_etcd_proxy(auth=False, should_start=False, **proxy_args)
     yield proxy
     proxy.etcd.close()
 
 
 @pytest.fixture
-async def auth_external_etcd_proxy(
-    launch_traefik_etcd_auth,
-):
-    proxy = _make_etcd_proxy(auth=True, should_start=False)
+async def auth_external_etcd_proxy(launch_traefik_etcd_auth, proxy_args):
+    proxy = _make_etcd_proxy(auth=True, should_start=False, **proxy_args)
     yield proxy
     proxy.etcd.close()
 
@@ -305,9 +423,10 @@ async def auth_external_etcd_proxy(
         "external_file_proxy_yaml",
     ]
 )
-def proxy(request):
+def proxy(request, client_ca, proxy_ssl_key_cert):
     """Parameterized fixture to run all the tests with every proxy implementation"""
     proxy = request.getfixturevalue(request.param)
+    ssl_key, ssl_cert = proxy_ssl_key_cert
     # wait for public endpoint to be reachable
     asyncio.run(
         exponential_backoff(
@@ -343,10 +462,10 @@ def launch_traefik_etcd(launch_etcd):
 
 
 @pytest.fixture
-def launch_traefik_etcd_auth(launch_etcd_auth):
+def launch_traefik_etcd_auth(launch_etcd_auth, etcd_client_ca):
     extra_args = (
         "--providers.etcd.tls.insecureSkipVerify=true",
-        "--providers.etcd.tls.ca=" + f"{config_files}/fake-ca-cert.crt",
+        "--providers.etcd.tls.ca=" + etcd_client_ca,
         "--providers.etcd.username=" + Config.etcd_user,
         "--providers.etcd.password=" + Config.etcd_password,
     )
@@ -441,14 +560,18 @@ def _enable_auth_in_etcd(*common_args):
 
 
 @pytest.fixture
-async def launch_etcd_auth():
+async def launch_etcd_auth(etcd_ssl_key_cert, etcd_client_ca):
+    key, cert = etcd_ssl_key_cert
+    print(f"{key=} {cert=}")
+    os.system(f"openssl x509 -nooout -text -in {cert}")
     etcd_proc = subprocess.Popen(
         [
             "etcd",
             "--log-level=debug",
             "--peer-auto-tls",
-            f"--cert-file={config_files}/test-cert.crt",
-            f"--key-file={config_files}/test-key.key",
+            f"--peer-trusted-ca-file={etcd_client_ca}",
+            f"--cert-file={cert}",
+            f"--key-file={key}",
             "--initial-cluster=default=https://localhost:2380",
             "--initial-advertise-peer-urls=https://localhost:2380",
             "--listen-peer-urls=https://localhost:2380",
@@ -458,8 +581,10 @@ async def launch_etcd_auth():
         ],
     )
     etcdctl_args = [
+        "--endpoints=localhost:2379",
         "--user",
         f"{Config.etcd_user}:{Config.etcd_password}",
+        f"--cacert={etcd_client_ca}",
         "--insecure-skip-tls-verify=true",
         "--insecure-transport=false",
         "--debug",
@@ -468,6 +593,20 @@ async def launch_etcd_auth():
         await _wait_for_etcd(*etcdctl_args)
         _enable_auth_in_etcd(*etcdctl_args)
         _config_etcd(*etcdctl_args)
+        import etcd3
+
+        c = etcd3.client(
+            user=Config.etcd_user,
+            password=Config.etcd_password,
+            host="localhost",
+            port=2379,
+            grpc_options=[
+                ("grpc.ssl_target_name_override", "localhost"),
+                ("grpc.default_authority", "localhost"),
+            ],
+            ca_cert=etcd_client_ca,
+        )
+        print("get", list(c.get_prefix("/")))
         yield etcd_proc
     finally:
         shutdown_etcd(etcd_proc)
