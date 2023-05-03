@@ -139,7 +139,7 @@ class TraefikProxy(Proxy):
     dynamic_config = Dict()
 
     traefik_providers_throttle_duration = Unicode(
-        "0s",
+        "0.1s",
         config=True,
         help="""
             throttle traefik reloads of configuration.
@@ -300,7 +300,9 @@ class TraefikProxy(Proxy):
             json.loads(resp.body)
         except HTTPClientError as e:
             if e.code == 404:
-                self.log.debug(f"traefik {expected} not yet in {kind}")
+                self.log.debug(
+                    "Traefik route for %s: %s not yet in %s", routespec, expected, kind
+                )
                 return False
             self.log.exception(f"Error checking traefik api for {kind} {routespec}")
             return False
@@ -312,7 +314,7 @@ class TraefikProxy(Proxy):
         return True
 
     async def _wait_for_route(self, routespec):
-        self.log.debug("Waiting for %s to register with traefik", routespec)
+        self.log.debug("Traefik route for %s: waiting to register", routespec)
 
         async def _check_traefik_dynamic_conf_ready():
             """Check if traefik loaded its dynamic configuration yet"""
@@ -325,10 +327,11 @@ class TraefikProxy(Proxy):
 
         await exponential_backoff(
             _check_traefik_dynamic_conf_ready,
-            f"Traefik route for {routespec} configuration not available",
+            f"Traefik route for {routespec}: not ready",
             scale_factor=1.2,
             timeout=self.check_route_timeout,
         )
+        self.log.debug("Treafik route for %s: registered", routespec)
 
     async def _traefik_api_request(self, path):
         """Make an API request to traefik"""
@@ -494,7 +497,6 @@ class TraefikProxy(Proxy):
                 "middlewares": {},
             }
         }
-        dynamic_config["http"]
         routers = dynamic_config["http"]["routers"]
         middlewares = dynamic_config["http"]["middlewares"]
         routers["route_api"] = {

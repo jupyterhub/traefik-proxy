@@ -92,6 +92,7 @@ class TraefikFileProviderProxy(TraefikProxy):
                     http.pop(key)
             if not http:
                 dynamic_config.pop("http")
+        self.log.debug("Writing dynamic config %s", dynamic_config)
         self.dynamic_config_handler.atomic_dump(dynamic_config)
 
     async def _setup_traefik_dynamic_config(self):
