@@ -4,17 +4,20 @@ import asyncio
 import logging
 import os
 import shutil
+import socket
+import ssl
 import subprocess
 import sys
-import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.parse import urlparse
 
 import pytest
 import utils
 from certipy import Certipy
 from consul.aio import Consul
 from jupyterhub.utils import exponential_backoff
+from passlib.hash import apr_md5_crypt
 from traitlets.log import get_logger
 
 from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
@@ -23,7 +26,7 @@ from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
 from jupyterhub_traefik_proxy.traefik_utils import deep_merge
 
 HERE = Path(__file__).parent.resolve()
-config_files = os.path.join(HERE, "config_files")
+config_files = HERE / "config_files"
 
 
 class Config:
@@ -57,6 +60,15 @@ class Config:
     public_url = "https://127.0.0.1:8000"
 
 
+# initial kv config for the API for external kv-stores
+_kv_config = {
+    "traefik/http/middlewares/auth_api/basicAuth/users/0": f"{Config.traefik_api_user}:{apr_md5_crypt(Config.traefik_api_pass)}",
+    "traefik/http/routers/route_api/entryPoints/0": "auth_api",
+    "traefik/http/routers/route_api/middlewares/0": "auth_api",
+    "traefik/http/routers/route_api/rule": "(Host(`127.0.0.1`) || Host(`localhost`)) && PathPrefix(`/api`)",
+    "traefik/http/routers/route_api/service": "api@internal",
+}
+
 # Define a "slow" test marker so that we can run the slow tests at the end
 
 
@@ -82,9 +94,9 @@ def pytest_configure(config):
 
 
 @pytest.fixture
-def dynamic_config_dir():
+def dynamic_config_dir(tmp_path):
     # matches traefik.toml
-    path = Path("/tmp/jupyterhub-traefik-proxy-test")
+    path = tmp_path / "dynamic"
     if path.exists():
         shutil.rmtree(path)
     path.mkdir()
@@ -141,8 +153,6 @@ def client_ca(certipy):
         # cafile=self.internal_ssl_ca,
     )
     AsyncHTTPClient.configure(None, defaults={"ssl_options": ssl_context})
-
-    print(record)
     return record['files']['ca']
 
 
@@ -219,6 +229,8 @@ async def auth_etcd_proxy(launch_etcd_auth, etcd_client_ca, proxy_args):
 def _make_etcd_proxy(*, auth=False, client_ca=None, **extra_kwargs):
     kwargs = {}
     if auth:
+        assert client_ca is not None
+        client_ca = str(client_ca)
         kwargs.update(
             dict(
                 etcd_url="https://localhost:2379",
@@ -279,17 +291,6 @@ async def file_proxy_toml(dynamic_config_dir, proxy_args):
 
 
 def _check_ssl(proxy, client_ca):
-    import pprint
-
-    pprint.pprint(proxy.dynamic_config)
-    pprint.pprint(proxy.static_config)
-
-    # check ssl
-    import socket
-    import ssl
-
-    # ssl_dateformat = r'%b %d %H:%M:%S %Y %Z'
-
     context = ssl.create_default_context(
         purpose=ssl.Purpose.SERVER_AUTH,
         cafile=client_ca,
@@ -297,7 +298,6 @@ def _check_ssl(proxy, client_ca):
     context.check_hostname = True
     context.verify_mode = ssl.VerifyMode.CERT_REQUIRED
     context.load_cert_chain(proxy.ssl_cert, proxy.ssl_key)
-    from urllib.parse import urlparse
 
     url = urlparse(Config.public_url)
     cert = ssl.get_server_certificate((url.hostname, url.port))
@@ -367,8 +367,8 @@ async def external_file_proxy_toml(launch_traefik_file, dynamic_config_dir, prox
         should_start=False,
         **proxy_args,
     )
-    yield proxy
     await proxy._start_future
+    yield proxy
     os.remove(dynamic_config_file)
 
 
@@ -379,6 +379,7 @@ async def external_consul_proxy(launch_traefik_consul, proxy_args):
         should_start=False,
         **proxy_args,
     )
+    await proxy._start_future
     yield proxy
 
 
@@ -390,19 +391,28 @@ async def auth_external_consul_proxy(launch_traefik_consul_auth, proxy_args):
         should_start=False,
         **proxy_args,
     )
+    await proxy._start_future
     yield proxy
 
 
 @pytest.fixture
-async def external_etcd_proxy(launch_traefik_etcd, proxy_args):
-    proxy = _make_etcd_proxy(auth=False, should_start=False, **proxy_args)
+async def external_etcd_proxy(launch_traefik_etcd, etcd_client_ca, proxy_args):
+    proxy = _make_etcd_proxy(
+        auth=False, should_start=False, client_ca=etcd_client_ca, **proxy_args
+    )
+    await proxy._start_future
     yield proxy
     proxy.etcd.close()
 
 
 @pytest.fixture
-async def auth_external_etcd_proxy(launch_traefik_etcd_auth, proxy_args):
-    proxy = _make_etcd_proxy(auth=True, should_start=False, **proxy_args)
+async def auth_external_etcd_proxy(
+    launch_traefik_etcd_auth, etcd_client_ca, proxy_args
+):
+    proxy = _make_etcd_proxy(
+        auth=True, should_start=False, client_ca=etcd_client_ca, **proxy_args
+    )
+    await proxy._start_future
     yield proxy
     proxy.etcd.close()
 
@@ -445,72 +455,70 @@ def proxy(request, client_ca, proxy_ssl_key_cert):
 
 
 @pytest.fixture
-def launch_traefik_file():
-    args = ("--configfile", os.path.join(config_files, "traefik.toml"))
-    print(f"\nLAUNCHING TRAEFIK with args: {args}\n")
-    proc = _launch_traefik(*args)
-    yield proc
-    shutdown_traefik(proc)
+def launch_traefik_file(dynamic_config_dir, launch_traefik):
+    return launch_traefik(
+        f"--providers.file.directory={dynamic_config_dir}",
+        "--providers.file.watch=true",
+    )
 
 
 @pytest.fixture
-def launch_traefik_etcd(launch_etcd):
-    env = Config.etcdctl_env
-    proc = _launch_traefik_cli("--providers.etcd", env=env)
-    yield proc
-    shutdown_traefik(proc)
+def launch_traefik_etcd(launch_traefik, launch_etcd):
+    return launch_traefik("--providers.etcd", env=Config.etcdctl_env)
 
 
 @pytest.fixture
-def launch_traefik_etcd_auth(launch_etcd_auth, etcd_client_ca):
-    extra_args = (
+def launch_traefik_etcd_auth(launch_traefik, launch_etcd_auth, etcd_client_ca):
+    return launch_traefik(
         "--providers.etcd.tls.insecureSkipVerify=true",
         "--providers.etcd.tls.ca=" + etcd_client_ca,
         "--providers.etcd.username=" + Config.etcd_user,
         "--providers.etcd.password=" + Config.etcd_password,
     )
-    proc = _launch_traefik_cli(*extra_args, env=Config.etcdctl_env)
-    yield proc
-    shutdown_traefik(proc)
 
 
 @pytest.fixture
-def launch_traefik_consul(launch_consul):
-    proc = _launch_traefik_cli("--providers.consul")
-    yield proc
-    shutdown_traefik(proc)
+def launch_traefik_consul(launch_traefik, launch_consul):
+    return launch_traefik("--providers.consul")
 
 
 @pytest.fixture
-def launch_traefik_consul_auth(launch_consul_auth):
-    extra_args = (
+def launch_traefik_consul_auth(launch_traefik, launch_consul_auth):
+    return launch_traefik(
         f"--providers.consul.endpoints=http://127.0.0.1:{Config.consul_auth_port}",
+        env={"CONSUL_HTTP_TOKEN": Config.consul_token},
     )
-    traefik_env = os.environ.copy()
-    traefik_env.update({"CONSUL_HTTP_TOKEN": Config.consul_token})
-    proc = _launch_traefik_cli(*extra_args, env=traefik_env)
-    yield proc
-    shutdown_traefik(proc)
 
 
-def _launch_traefik_cli(*extra_args, env=None):
-    default_args = (
-        "--api",
-        "--log.level=debug",
-        "--providers.providersThrottleDuration=0s",
-        # "--entrypoints.http.address=:8000",
-        "--entrypoints.https.address=:8000",
-        "--entrypoints.auth_api.address=:8099",
-    )
-    args = default_args + extra_args
-    return _launch_traefik(*args, env=env)
+@pytest.fixture
+def launch_traefik(request):
+    """Fixture returns a _callable_ to launch traefik
 
+    Traefik will be shut down during teardown
+    """
 
-def _launch_traefik(*extra_args, env=None):
-    traefik_launch_command = ("traefik",) + extra_args
-    print("launching", traefik_launch_command)
-    proc = subprocess.Popen(traefik_launch_command, env=env)
-    return proc
+    def _launch_traefik(*extra_args, env=None):
+        default_args = (
+            "--api",
+            "--accessLog",
+            "--log.level=debug",
+            "--providers.providersThrottleDuration=0.1s",
+            "--entrypoints.https.address=:8000",
+            "--entrypoints.https.http.tls.options=default",
+            "--entrypoints.auth_api.address=:8099",
+        )
+        args = default_args + extra_args
+        traefik_launch_command = ("traefik",) + args
+        print("LAUNCHING", traefik_launch_command)
+        traefik_env = dict(os.environ)
+        if env:
+            traefik_env.update(env)
+
+        proc = subprocess.Popen(traefik_launch_command, env=traefik_env)
+        request.addfinalizer(lambda: shutdown_traefik(proc))
+        return proc
+
+    return _launch_traefik
 
 
 #########################################################################
@@ -519,23 +527,6 @@ def _launch_traefik(*extra_args, env=None):
 
 # Etcd Launchers and configurers #
 ##################################
-
-
-def _config_etcd(*extra_args):
-    data_store_cmd = ("etcdctl", "txn", "--debug") + extra_args
-    # Load a pre-baked dynamic configuration into the etcd store.
-    # This essentially puts authentication on the traefik api handler.
-    with open(os.path.join(config_files, "traefik_etcd_txns.txt")) as fd:
-        txns = fd.read()
-    proc = subprocess.Popen(
-        data_store_cmd, stdin=subprocess.PIPE, env=Config.etcdctl_env
-    )
-    # need two trailing newlines for etcdctl txn to complete
-    proc.communicate(txns.encode() + b'\n\n')
-    proc.wait()
-    assert (
-        proc.returncode == 0
-    ), f"{data_store_cmd} exited with status {proc.returncode}"
 
 
 def _enable_auth_in_etcd(*common_args):
@@ -592,7 +583,6 @@ async def launch_etcd_auth(etcd_ssl_key_cert, etcd_client_ca):
     try:
         await _wait_for_etcd(*etcdctl_args)
         _enable_auth_in_etcd(*etcdctl_args)
-        _config_etcd(*etcdctl_args)
         import etcd3
 
         c = etcd3.client(
@@ -621,7 +611,6 @@ async def launch_etcd():
         )
         try:
             await _wait_for_etcd("--debug=true")
-            _config_etcd()
             yield etcd_proc
         finally:
             shutdown_etcd(etcd_proc)
@@ -672,7 +661,6 @@ def launch_consul():
             asyncio.run(
                 _wait_for_consul(token=Config.consul_token, port=Config.consul_port)
             )
-            _config_consul()
             yield consul_proc
         finally:
             shutdown_consul(consul_proc)
@@ -709,8 +697,6 @@ def launch_consul_auth():
                     token=Config.consul_token, port=Config.consul_auth_port
                 )
             )
-
-            _config_consul(secret=Config.consul_token, port=Config.consul_auth_port)
             yield consul_proc
         finally:
             shutdown_consul(
@@ -742,37 +728,6 @@ async def _wait_for_consul(token=None, **kwargs):
         "Consul not available",
         timeout=20,
     )
-
-
-def _config_consul(secret=None, port=8500):
-    proc_env = None
-    if secret is not None:
-        proc_env = os.environ.copy()
-        proc_env.update({"CONSUL_HTTP_TOKEN": secret})
-
-    consul_import_cmd = [
-        "consul",
-        "kv",
-        "import",
-        f"-http-addr=http://127.0.0.1:{port}",
-        f"@{config_files}/traefik_consul_config.json",
-    ]
-
-    """
-    Try storing the static config to the kv store.
-    Stop if the kv store isn't ready in 60s.
-    """
-    timeout = time.perf_counter() + 60
-    while True:
-        if time.perf_counter() > timeout:
-            raise Exception("KV not ready! 60s timeout expired!")
-        try:
-            # Put static config from file in kv store.
-            proc = subprocess.check_call(consul_import_cmd, env=proc_env)
-            break
-        except subprocess.CalledProcessError as e:
-            print("Error setting up consul")
-            time.sleep(3)
 
 
 #########################################################################
