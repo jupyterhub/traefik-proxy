@@ -45,11 +45,10 @@ async def check_host_up_http(url, **req_kwargs):
     A socket listening may not be enough
     """
     u = urlparse(url)
-    # first, check the scket
+    # first, check the socket
     socket_open = is_open(u.hostname, u.port or 80)
     if not socket_open:
         return False
-    # req_kwargs.setdefault("validate_cert", False)
     req = HTTPRequest(url, **req_kwargs)
     print(req)
     try:

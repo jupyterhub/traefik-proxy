@@ -98,7 +98,6 @@ class TraefikEtcdProxy(TKvProxy):
             )
         if self.etcd_client_kwargs:
             kwargs.update(self.etcd_client_kwargs)
-        print(f"Creating etcd with {kwargs=}")
         return etcd3.client(**kwargs)
 
     def _cleanup(self):
@@ -168,11 +167,6 @@ class TraefikEtcdProxy(TKvProxy):
         if url.scheme == "https":
             # If etcd is running over TLS, then traefik needs to know
             etcd_config["tls"] = {}
-            # tls_conf = {}
-            # if self.etcd_client_ca_cert is not None:
-            #     tls_conf["ca"] = self.etcd_client_ca_cert
-            # tls_conf["insecureSkipVerify"] = self.etcd_insecure_skip_verify
-            # self.static_config["providers"]["etcd"]["tls"] = tls_conf
 
         if self.etcd_username and self.etcd_password:
             etcd_config.update(

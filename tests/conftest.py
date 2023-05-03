@@ -17,7 +17,6 @@ import utils
 from certipy import Certipy
 from consul.aio import Consul
 from jupyterhub.utils import exponential_backoff
-from passlib.hash import apr_md5_crypt
 from traitlets.log import get_logger
 
 from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
@@ -59,15 +58,6 @@ class Config:
     # Putting here, can easily change between http and https
     public_url = "https://127.0.0.1:8000"
 
-
-# initial kv config for the API for external kv-stores
-_kv_config = {
-    "traefik/http/middlewares/auth_api/basicAuth/users/0": f"{Config.traefik_api_user}:{apr_md5_crypt(Config.traefik_api_pass)}",
-    "traefik/http/routers/route_api/entryPoints/0": "auth_api",
-    "traefik/http/routers/route_api/middlewares/0": "auth_api",
-    "traefik/http/routers/route_api/rule": "(Host(`127.0.0.1`) || Host(`localhost`)) && PathPrefix(`/api`)",
-    "traefik/http/routers/route_api/service": "api@internal",
-}
 
 # Define a "slow" test marker so that we can run the slow tests at the end
 
@@ -300,16 +290,16 @@ def _check_ssl(proxy, client_ca):
     context.load_cert_chain(proxy.ssl_cert, proxy.ssl_key)
 
     url = urlparse(Config.public_url)
-    cert = ssl.get_server_certificate((url.hostname, url.port))
-    from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
+    ssl.get_server_certificate((url.hostname, url.port))
 
-    certDecoded = x509.load_pem_x509_certificate(str.encode(cert), default_backend())
-    print(certDecoded)
-    print(certDecoded.issuer)
-    print(certDecoded.subject)
-    print(certDecoded.not_valid_after)
-    print(certDecoded.not_valid_before)
+    # from cryptography import x509
+    # from cryptography.hazmat.backends import default_backend
+    # certDecoded = x509.load_pem_x509_certificate(str.encode(cert), default_backend())
+    # print(certDecoded)
+    # print(certDecoded.issuer)
+    # print(certDecoded.subject)
+    # print(certDecoded.not_valid_after)
+    # print(certDecoded.not_valid_before)
 
     conn = context.wrap_socket(
         socket.socket(socket.AF_INET),
@@ -318,9 +308,7 @@ def _check_ssl(proxy, client_ca):
     # 5 second timeout
     conn.settimeout(5.0)
     conn.connect((url.hostname, url.port))
-    ssl_info = conn.getpeercert()
-    print(ssl_info, type(ssl_info))
-    # assert ssl_info == None
+    conn.getpeercert()
 
 
 @pytest.fixture
@@ -553,8 +541,6 @@ def _enable_auth_in_etcd(*common_args):
 @pytest.fixture
 async def launch_etcd_auth(etcd_ssl_key_cert, etcd_client_ca):
     key, cert = etcd_ssl_key_cert
-    print(f"{key=} {cert=}")
-    os.system(f"openssl x509 -nooout -text -in {cert}")
     etcd_proc = subprocess.Popen(
         [
             "etcd",
