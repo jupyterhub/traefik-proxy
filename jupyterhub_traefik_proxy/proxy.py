@@ -139,7 +139,7 @@ class TraefikProxy(Proxy):
     dynamic_config = Dict()
 
     traefik_providers_throttle_duration = Unicode(
-        "0.1s",
+        "0s",
         config=True,
         help="""
             throttle traefik reloads of configuration.

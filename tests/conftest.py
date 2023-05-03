@@ -490,7 +490,7 @@ def launch_traefik(request):
             "--api",
             "--accessLog",
             "--log.level=debug",
-            "--providers.providersThrottleDuration=0.1s",
+            "--providers.providersThrottleDuration=0s",
             "--entrypoints.https.address=:8000",
             "--entrypoints.https.http.tls.options=default",
             "--entrypoints.auth_api.address=:8099",
