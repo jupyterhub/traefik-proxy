@@ -378,12 +378,23 @@ class TraefikProxy(Proxy):
                 # unexpected
                 self.log.error(f"Error checking for traefik static configuration {e}")
                 return False
-            except (OSError, ssl.SSLError) as e:
+            except ssl.SSLError as e:
                 # Can occur if SSL isn't set up yet
                 self.log.warning(
                     f"SSL Error checking for traefik static configuration: {e}"
                 )
                 return False
+            except OSError as e:
+                # OSError can occur during SSL setup,
+                # e.g. if socket is listening, but SSL isn't ready
+                if self.traefik_api_url.startswith("https:"):
+                    self.log.warning(
+                        f"Error checking for traefik static configuration: {e}"
+                    )
+                    return False
+                else:
+                    # other OSErrors should be fatal
+                    raise
 
             return True
 
