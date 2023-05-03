@@ -319,13 +319,22 @@ class TKvProxy(TraefikProxy):
             key_path = key.split(sep)
             d = tree
             for parent_key, key in zip(key_path[:-1], key_path[1:]):
-                if parent_key not in d:
+                if parent_key.isdigit():
+                    parent_key = int(parent_key)
+                if isinstance(d, dict) and parent_key not in d:
                     # create container
                     if key.isdigit():
                         # integer keys mean it's a list
                         d[parent_key] = []
                     else:
                         d[parent_key] = {}
+                elif isinstance(d, list):
+                    if key.isdigit():
+                        # integer keys mean it's a list
+                        next_d = []
+                    else:
+                        next_d = {}
+                    d.append(next_d)
                 # walk down to the next level
                 d = d[parent_key]
             if isinstance(d, list):

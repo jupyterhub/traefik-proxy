@@ -81,6 +81,11 @@ def test_flatten_dict_error(orig, expected):
             "key/deeper",
             {"anddeeper": "false"},
         ),
+        (
+            [("key/0/x", "true"), ("key/1/y", "false")],
+            "",
+            {"key": [{"x": "true"}, {"y": "false"}]},
+        ),
     ],
 )
 def test_unflatten_dict(flat, root_key, expected):
