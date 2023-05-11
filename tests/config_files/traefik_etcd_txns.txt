@@ -1,6 +1,0 @@
-
-put traefik/http/middlewares/auth_api/basicAuth/users/0 "api_admin:$apr1$eS/j3kum$q/X2khsIEG/bBGsteP.x./"
-put traefik/http/routers/route_api/entryPoints/0 "auth_api"
-put traefik/http/routers/route_api/middlewares/0 "auth_api"
-put traefik/http/routers/route_api/rule "Host(`localhost`) && PathPrefix(`/api`)"
-put traefik/http/routers/route_api/service "api@internal"

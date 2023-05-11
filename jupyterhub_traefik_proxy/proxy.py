@@ -32,6 +32,7 @@ from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from traitlets import Any, Bool, Dict, Integer, Unicode, default, observe, validate
 
 from . import traefik_utils
+from .traefik_utils import deep_merge
 
 
 class TraefikProxy(Proxy):
@@ -63,6 +64,25 @@ class TraefikProxy(Proxy):
 
     static_config_file = Unicode(
         "traefik.toml", config=True, help="""traefik's static configuration file"""
+    )
+
+    extra_static_config = Dict(
+        config=True,
+        help="""Extra static configuration for treafik.
+
+        Merged with the default static config before writing to `.static_config_file`.
+
+        Has no effect if `Proxy.should_start` is False.
+        """,
+    )
+    extra_dynamic_config = Dict(
+        config=True,
+        help="""Extra dynamic configuration for treafik.
+
+        Merged with the default dynamic config during startup.
+
+        Always takes effect.
+        """,
     )
 
     toml_static_config_file = Unicode(
@@ -188,13 +208,6 @@ class TraefikProxy(Proxy):
             url = urlunparse(parsed)
         return url
 
-    traefik_cert_resolver = Unicode(
-        config=True,
-        help="""The traefik certificate Resolver to use for requesting certificates""",
-    )
-
-    # FIXME: How best to enable TLS on routers assigned to only select
-    # entrypoints defined here?
     traefik_entrypoint = Unicode(
         help="""The traefik entrypoint name to use.
 
@@ -287,7 +300,9 @@ class TraefikProxy(Proxy):
             json.loads(resp.body)
         except HTTPClientError as e:
             if e.code == 404:
-                self.log.debug(f"traefik {expected} not yet in {kind}")
+                self.log.debug(
+                    "Traefik route for %s: %s not yet in %s", routespec, expected, kind
+                )
                 return False
             self.log.exception(f"Error checking traefik api for {kind} {routespec}")
             return False
@@ -299,7 +314,7 @@ class TraefikProxy(Proxy):
         return True
 
     async def _wait_for_route(self, routespec):
-        self.log.debug("Waiting for %s to register with traefik", routespec)
+        self.log.debug("Traefik route for %s: waiting to register", routespec)
 
         async def _check_traefik_dynamic_conf_ready():
             """Check if traefik loaded its dynamic configuration yet"""
@@ -312,10 +327,11 @@ class TraefikProxy(Proxy):
 
         await exponential_backoff(
             _check_traefik_dynamic_conf_ready,
-            f"Traefik route for {routespec} configuration not available",
+            f"Traefik route for {routespec}: not ready",
             scale_factor=1.2,
             timeout=self.check_route_timeout,
         )
+        self.log.debug("Treafik route for %s: registered", routespec)
 
     async def _traefik_api_request(self, path):
         """Make an API request to traefik"""
@@ -365,12 +381,23 @@ class TraefikProxy(Proxy):
                 # unexpected
                 self.log.error(f"Error checking for traefik static configuration {e}")
                 return False
-            except (OSError, ssl.SSLError) as e:
+            except ssl.SSLError as e:
                 # Can occur if SSL isn't set up yet
                 self.log.warning(
                     f"SSL Error checking for traefik static configuration: {e}"
                 )
                 return False
+            except OSError as e:
+                # OSError can occur during SSL setup,
+                # e.g. if socket is listening, but SSL isn't ready
+                if self.traefik_api_url.startswith("https:"):
+                    self.log.warning(
+                        f"Error checking for traefik static configuration: {e}"
+                    )
+                    return False
+                else:
+                    # other OSErrors should be fatal
+                    raise
 
             return True
 
@@ -414,14 +441,16 @@ class TraefikProxy(Proxy):
         Subclasses should specify any traefik providers themselves, in
         :attrib:`self.static_config["providers"]`
         """
-        self.static_config["providers"][
-            "providersThrottleDuration"
-        ] = self.traefik_providers_throttle_duration
-
+        static_config = {
+            "api": {},
+            "providers": {
+                "providersThrottleDuration": self.traefik_providers_throttle_duration,
+            },
+        }
         if self.traefik_log_level:
-            self.static_config["log"] = {"level": self.traefik_log_level}
+            static_config["log"] = {"level": self.traefik_log_level}
 
-        entrypoints = {
+        entrypoints = static_config["entryPoints"] = {
             self.traefik_entrypoint: {
                 "address": urlparse(self.public_url).netloc,
             },
@@ -430,8 +459,20 @@ class TraefikProxy(Proxy):
             },
         }
 
-        self.static_config["entryPoints"] = entrypoints
-        self.static_config["api"] = {}
+        if self.is_https:
+            entrypoints[self.traefik_entrypoint]["http"] = {
+                "tls": {
+                    "options": "default",
+                }
+            }
+
+        # load what we just defined at _lower_ priority
+        # than anything added to self.static_config in a subclass before this
+        self.static_config = deep_merge(static_config, self.static_config)
+        if self.extra_static_config:
+            self.static_config = deep_merge(
+                self.static_config, self.extra_static_config
+            )
 
         self.log.info(f"Writing traefik static config: {self.static_config}")
 
@@ -446,29 +487,45 @@ class TraefikProxy(Proxy):
         self.log.debug("Setting up traefik's dynamic config...")
         self._generate_htpassword()
         api_url = urlparse(self.traefik_api_url)
-        api_path = api_url.path if api_url.path else '/api'
+        api_path = api_url.path if api_url.path.strip("/") else '/api'
         api_credentials = (
             f"{self.traefik_api_username}:{self.traefik_api_hashed_password}"
         )
-        http = self.dynamic_config.setdefault("http", {})
-        routers = http.setdefault("routers", {})
+        dynamic_config = {
+            "http": {
+                "routers": {},
+                "middlewares": {},
+            }
+        }
+        routers = dynamic_config["http"]["routers"]
+        middlewares = dynamic_config["http"]["middlewares"]
         routers["route_api"] = {
             "rule": f"Host(`{api_url.hostname}`) && PathPrefix(`{api_path}`)",
             "entryPoints": [self.traefik_api_entrypoint],
             "service": "api@internal",
             "middlewares": ["auth_api"],
         }
-        middlewares = http.setdefault("middlewares", {})
         middlewares["auth_api"] = {"basicAuth": {"users": [api_credentials]}}
+
+        # add default ssl cert/keys
         if self.ssl_cert and self.ssl_key:
-            tls = self.dynamic_config.setdefault("tls", {})
-            stores = tls.setdefault("stores", {})
-            stores["default"] = {
-                "defaultCertificate": {
-                    "certFile": self.ssl_cert,
-                    "keyFile": self.ssl_key,
+            dynamic_config["tls"] = {
+                "stores": {
+                    "default": {
+                        "defaultCertificate": {
+                            "certFile": self.ssl_cert,
+                            "keyFile": self.ssl_key,
+                        }
+                    }
                 }
             }
+
+        self.dynamic_config = deep_merge(dynamic_config, self.dynamic_config)
+        if self.extra_dynamic_config:
+            self.dynamic_config = deep_merge(
+                self.dynamic_config, self.extra_dynamic_config
+            )
+
         await self._apply_dynamic_config(self.dynamic_config, None)
 
     def validate_routespec(self, routespec):
@@ -555,19 +612,6 @@ class TraefikProxy(Proxy):
         traefik_config["http"]["services"][service_alias] = {
             "loadBalancer": {"servers": [{"url": target}], "passHostHeader": True}
         }
-
-        # Enable TLS on this router if globally enabled
-        if self.is_https:
-            tls_config = {}
-            if self.traefik_cert_resolver:
-                tls_config["certResolver"] = self.traefik_cert_resolver
-            else:
-                # we need _some_ key to be set
-                # because key-value stores can't store empty dicts.
-                # put a default value here
-                tls_config["options"] = "default"
-
-            router["tls"] = tls_config
 
         # Add the data node to a separate top-level node, so traefik doesn't see it.
         # key needs to be key-value safe (no '/')

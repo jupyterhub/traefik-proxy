@@ -22,9 +22,10 @@ import base64
 import string
 from urllib.parse import urlparse
 
-from traitlets import Any, Unicode, default
+from traitlets import Any, Dict, Unicode, default
 
 from .kv_proxy import TKvProxy
+from .traefik_utils import deep_merge
 
 
 class TraefikConsulProxy(TKvProxy):
@@ -35,11 +36,9 @@ class TraefikConsulProxy(TKvProxy):
     # Consul doesn't accept keys containing // or starting with / so we have to escape them
     key_safe_chars = string.ascii_letters + string.digits + "!@#$%^&*();<>-.+?:"
 
-    consul_client_ca_cert = Unicode(
+    consul_client_kwargs = Dict(
         config=True,
-        allow_none=True,
-        default_value=None,
-        help="""Consul client root certificates""",
+        help="Extra consul client constructor arguments",
     )
 
     consul_url = Unicode(
@@ -85,10 +84,11 @@ class TraefikConsulProxy(TKvProxy):
         kwargs = {
             "host": consul_service.hostname,
             "port": consul_service.port,
-            "cert": self.consul_client_ca_cert,
         }
         if self.consul_password:
             kwargs.update({"token": self.consul_password})
+        if self.consul_client_kwargs:
+            kwargs.update(self.consul_client_kwargs)
         return consul.aio.Consul(**kwargs)
 
     def __init__(self, **kwargs):
@@ -105,11 +105,9 @@ class TraefikConsulProxy(TKvProxy):
             }
         }
 
-        # FIXME: Same with the tls info
-        if self.consul_client_ca_cert:
-            provider_config["consul"]["tls"] = {"ca": self.consul_client_ca_cert}
-
-        self.static_config.update({"providers": provider_config})
+        self.static_config = deep_merge(
+            self.static_config, {"providers": provider_config}
+        )
         return super()._setup_traefik_static_config()
 
     def _start_traefik(self):

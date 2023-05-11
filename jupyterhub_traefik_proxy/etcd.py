@@ -22,9 +22,10 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
 from tornado.concurrent import run_on_executor
-from traitlets import Any, Bool, List, Unicode, default
+from traitlets import Any, Dict, Unicode, default
 
 from .kv_proxy import TKvProxy
+from .traefik_utils import deep_merge
 
 
 class TraefikEtcdProxy(TKvProxy):
@@ -34,42 +35,9 @@ class TraefikEtcdProxy(TKvProxy):
 
     provider_name = "etcd"
 
-    etcd_client_ca_cert = Unicode(
+    etcd_client_kwargs = Dict(
         config=True,
-        allow_none=True,
-        default_value=None,
-        help="""Etcd client root certificates""",
-    )
-
-    etcd_client_cert_crt = Unicode(
-        config=True,
-        allow_none=True,
-        default_value=None,
-        help="""Etcd client certificate chain
-            (etcd_client_cert_key must also be specified)""",
-    )
-
-    etcd_client_cert_key = Unicode(
-        config=True,
-        allow_none=True,
-        default_value=None,
-        help="""Etcd client private key
-            (etcd_client_cert_crt must also be specified)""",
-    )
-
-    # The grpc client (used by the Python etcd library) doesn't allow untrusted
-    # etcd certificates, although traefik does allow them.
-    etcd_insecure_skip_verify = Bool(
-        False,
-        config=True,
-        help="""Traefik will by default validate SSL certificate of etcd backend""",
-    )
-
-    grpc_options = List(
-        config=True,
-        allow_none=True,
-        default_value=None,
-        help="""Any grpc options that need to be passed to the etcd client""",
+        help="""Extra keyword arguments to pass to the etcd Python client constructor""",
     )
 
     @default("executor")
@@ -120,10 +88,6 @@ class TraefikEtcdProxy(TKvProxy):
         kwargs = {
             'host': etcd_service.hostname,
             'port': etcd_service.port,
-            'ca_cert': self.etcd_client_ca_cert,
-            'cert_cert': self.etcd_client_cert_crt,
-            'cert_key': self.etcd_client_cert_key,
-            'grpc_options': self.grpc_options,
         }
         if self.etcd_password:
             kwargs.update(
@@ -132,6 +96,8 @@ class TraefikEtcdProxy(TKvProxy):
                     "password": self.etcd_password,
                 }
             )
+        if self.etcd_client_kwargs:
+            kwargs.update(self.etcd_client_kwargs)
         return etcd3.client(**kwargs)
 
     def _cleanup(self):
@@ -194,29 +160,22 @@ class TraefikEtcdProxy(TKvProxy):
     def _setup_traefik_static_config(self):
         self.log.debug("Setting up the etcd provider in the static config")
         url = urlparse(self.etcd_url)
-        self.static_config.update(
-            {
-                "providers": {
-                    "etcd": {
-                        "endpoints": [url.netloc],
-                        "rootKey": self.kv_traefik_prefix,
-                    }
-                }
-            }
-        )
+        etcd_config = {
+            "endpoints": [url.netloc],
+            "rootKey": self.kv_traefik_prefix,
+        }
         if url.scheme == "https":
             # If etcd is running over TLS, then traefik needs to know
-            tls_conf = {}
-            if self.etcd_client_ca_cert is not None:
-                tls_conf["ca"] = self.etcd_client_ca_cert
-            tls_conf["insecureSkipVerify"] = self.etcd_insecure_skip_verify
-            self.static_config["providers"]["etcd"]["tls"] = tls_conf
+            etcd_config["tls"] = {}
 
         if self.etcd_username and self.etcd_password:
-            self.static_config["providers"]["etcd"].update(
+            etcd_config.update(
                 {
                     "username": self.etcd_username,
                     "password": self.etcd_password,
                 }
             )
+        self.static_config = deep_merge(
+            self.static_config, {"providers": {"etcd": etcd_config}}
+        )
         return super()._setup_traefik_static_config()

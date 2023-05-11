@@ -216,6 +216,7 @@ async def test_add_get_delete(
     extra_backends = backends[1:]
 
     proxy_url = proxy.public_url.rstrip("/")
+    assert 'https:' in proxy_url
 
     def normalize_spec(spec):
         return proxy.validate_routespec(spec)

@@ -1,11 +1,18 @@
 import json
 import socket
 import ssl
+from pathlib import Path
 from urllib.parse import urlparse
 
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError, HTTPRequest
 
-_ports = {"default_backend": 9000, "first_backend": 9090, "second_backend": 9099}
+_ports = {
+    "default_backend": 9000,
+    "first_backend": 9090,
+    "second_backend": 9099,
+}
+
+HERE = Path(__file__).parent.resolve()
 
 
 def get_port(service_name):
@@ -32,17 +39,18 @@ async def check_host_up(ip, port):
     return is_open(ip, port)
 
 
-async def check_host_up_http(url):
+async def check_host_up_http(url, **req_kwargs):
     """Check if an HTTP endpoint is ready
 
     A socket listening may not be enough
     """
     u = urlparse(url)
-    # first, check the scket
+    # first, check the socket
     socket_open = is_open(u.hostname, u.port or 80)
     if not socket_open:
         return False
-    req = HTTPRequest(url, validate_cert=False)
+    req = HTTPRequest(url, **req_kwargs)
+    print(req)
     try:
         await AsyncHTTPClient().fetch(req)
     except HTTPClientError as e:
@@ -55,7 +63,7 @@ async def check_host_up_http(url):
     return True
 
 
-async def get_responding_backend_port(traefik_url, path):
+async def get_responding_backend_port(traefik_url, path, **kwargs):
     """Check if traefik followed the configuration and routed the
     request to the right backend"""
 
@@ -69,7 +77,6 @@ async def get_responding_backend_port(traefik_url, path):
     req = HTTPRequest(
         traefik_url + path,
         headers=headers,
-        validate_cert=False,
         follow_redirects=True,
     )
 
