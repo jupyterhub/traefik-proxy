@@ -71,15 +71,23 @@ To configure traefik to use let's encrypt, first we need to register a [certific
 ```toml
 # static configuration
 
-# need an http endpoint, not just https
-[entrypoints.http]
+# redirect all http requests to https
+[entrypoints.httponly]
 address = ":80"
+[entryPoints.httponly.http.redirections.entryPoint]
+to = "https"
+scheme = "https"
 
-[certificateResolvers.letsencrypt.acme]
+# configure
+[certificatesResolvers.letsencrypt.acme]
 email = "you@example.com"
 storage = "acme.json" # file where certificates are stored
-[certificateResolvers.letsencrypt.acme.httpChallenge]
-entryPoint = "http"
+# use the staging server to test your deployment
+# uncomment this when you are ready for production
+caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
+
+# tlsChallenge means you don't need an http endpoint
+[certificatesResolvers.letsencrypt.acme.tlsChallenge]
 ```
 
 And in your extra dynamic configuration, specify the domain(s) you want certificates for:
@@ -110,22 +118,19 @@ c.TraefikProxy.extra_static_config = {
             "http": {
                 "tls": {
                     "options": "default"
-                }
-            }
+                },
+            },
         },
     },
-    "certificateResolvers": {
+    "certificatesResolvers": {
         "letsencrypt": {
             "acme": {
                 "email": "you@example.com",
                 "storage": "acme.json",
             },
-            "httpChallenge": {
-                "entryPoint": "https"
-            }
-        }
-
-    }
+            "tlsChallenge": {},
+        },
+    },
 }
 
 
@@ -137,10 +142,10 @@ c.TraefikProxy.extra_dynamic_config = {
                     "resolver": "letsencrypt",
                     "domain": {
                         "main": "hub.example.com",
-                    }
-                }
-            }
-        }
+                    },
+                },
+            },
+        },
     },
 }
 ```
