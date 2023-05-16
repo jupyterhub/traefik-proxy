@@ -116,29 +116,14 @@ If TraefikFileProviderProxy is used as an externally managed service, then make 
    # c.TraefikFileProviderProxy.traefik_api_validate_cert = True
 
    # jupyterhub will configure traefik for itself, using this Host name
-   # (and optional path) on the router rule:-
-   c.JupyterHub.bind_url = 'https://hub.contoso.com'
+   # (and optional path) on the router rule:
+   c.JupyterHub.bind_url = 'http://hub.contoso.com'
 
    # jupyterhub will also configure traefik's 'service' url, so this needs
    # to be accessible from traefik. By default, jupyterhub will bind to
    # 'localhost', but this will bind jupyterhub to its hostname
+   # (only necessary when traefik is in a different machine or container)
    c.JupyterHub.hub_bind_url = 'http://:8000'
-
-   # jupyterhub will only allow path-based routing by default. To stop
-   # jupyterhub from serving all requests, i.e. it will add a global router
-   # rule of just PathPrefix(`/`) by default, we must configure jupyterhub as
-   # a subdomain host.
-   c.JupyterHub.subdomain_host = "https://hub.contoso.com"
-
-   # traefik can automatically request certificates from an ACME CA.
-   # JupyterHub needs to know the name of traefik's certificateResolver
-   c.TraefikFileProviderProxy.traefik_cert_resolver = "leresolver"
-
-   # For jupyterhub to let traefik manage certificates, 'ssl_cert' needs a
-   # value. (This gets around a validate rule on 'proxy.bind_url', which
-   # forces the protocol to 'http' unless there is a value in ssl_cert).
-   c.JupyterHub.ssl_cert = 'externally managed'
-
    ```
 
 3. Ensure **traefik.toml** / **traefik.yaml**

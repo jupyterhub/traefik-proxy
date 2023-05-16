@@ -32,6 +32,7 @@ install
 ```{toctree}
 :maxdepth: 1
 
+https
 file
 etcd
 consul
