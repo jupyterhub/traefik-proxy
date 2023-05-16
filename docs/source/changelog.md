@@ -4,7 +4,7 @@ For detailed changes from the prior release, click on the version number
 and its link will bring up a GitHub listing of changes. Use `git log` on
 the command line for details.
 
-## 1.0.0
+## 1.0.0 - 2023-05-16
 
 1.0.0 is a big release for jupyterhub-traefik-proxy!
 It updates support for traefik to version 2.x (current: 2.9.8).
@@ -42,6 +42,7 @@ Performance and responsiveness is also greatly improved.
 
 ### Enhancements made
 
+- update default bootstrapped traefik to 2.10.1 [#206](https://github.com/jupyterhub/traefik-proxy/pull/206) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
 - simplify ssl, passthrough configuration [#199](https://github.com/jupyterhub/traefik-proxy/pull/199) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
 - reduce requirements of KV store implementations and custom methods [#185](https://github.com/jupyterhub/traefik-proxy/pull/185) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
 - Improve performance, scaling [#165](https://github.com/jupyterhub/traefik-proxy/pull/165) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
