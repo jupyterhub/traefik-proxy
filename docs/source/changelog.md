@@ -4,7 +4,7 @@ For detailed changes from the prior release, click on the version number
 and its link will bring up a GitHub listing of changes. Use `git log` on
 the command line for details.
 
-## 1.0.0 (prerelease)
+## 1.0.0
 
 1.0.0 is a big release for jupyterhub-traefik-proxy!
 It updates support for traefik to version 2.x (current: 2.9.8).
