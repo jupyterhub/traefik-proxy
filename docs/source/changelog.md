@@ -7,7 +7,7 @@ the command line for details.
 ## 1.0.0 (prerelease)
 
 1.0.0 is a big release for jupyterhub-traefik-proxy!
-It updates support for traefik to version 2.x (current: 2.9.8).
+It updates support for traefik to version 2.x (current default: 2.10.1).
 Traefik versions < 2.0 are no longer supported.
 If you have custom traefik configuration,
 make sure to checkout [traefik's v1 to v2 migration guide](https://doc.traefik.io/traefik/migration/v1-to-v2/),
@@ -24,7 +24,7 @@ Major changes:
   Replace `traefik_toml` with `traefik_file` in your configuration.
 - `python3 -m jupyterhub_traefik_proxy.install` will now only install traefik, not any key-value-store providers.
   You can follow your KV store's own installation instructions.
-- `python3 -m jupyterhub_traefik_proxy.install` now supports fetching any published traefik version on any architecture,
+- `python3 -m jupyterhub_traefik_proxy.install --traefik-version x.y.z` now supports fetching any published traefik version on any architecture,
   instead of a few preset versions.
 
 Performance and responsiveness is also greatly improved.
