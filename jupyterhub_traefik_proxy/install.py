@@ -146,7 +146,7 @@ def main():
     parser.add_argument(
         "--traefik-version",
         dest="traefik_version",
-        default="2.9.8",
+        default="2.10.1",
         help=textwrap.dedent(
             """\
             The version of traefik to download.
