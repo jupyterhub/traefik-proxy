@@ -13,7 +13,6 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlparse
 
 import pytest
-import utils
 from certipy import Certipy
 from consul.aio import Consul
 from jupyterhub.utils import exponential_backoff
@@ -23,6 +22,8 @@ from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
 from jupyterhub_traefik_proxy.etcd import TraefikEtcdProxy
 from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
 from jupyterhub_traefik_proxy.traefik_utils import deep_merge
+
+from . import utils
 
 HERE = Path(__file__).parent.resolve()
 config_files = HERE / "config_files"
