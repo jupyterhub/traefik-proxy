@@ -24,7 +24,6 @@ from jupyterhub_traefik_proxy.proxy import TraefikProxy
 
 from . import utils
 
-
 # Mark all tests in this file as slow
 pytestmark = [pytest.mark.slow]
 
