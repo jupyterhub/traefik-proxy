@@ -23,7 +23,7 @@ from tornado.httpclient import AsyncHTTPClient, HTTPClientError, HTTPRequest
 from jupyterhub_traefik_proxy.proxy import TraefikProxy
 
 from . import utils
-
+from .conftest import Config
 
 # Mark all tests in this file as slow
 pytestmark = [pytest.mark.slow]
@@ -49,7 +49,7 @@ class MockSpawner:
         self.proxy_spec = url_path_join(self.user.proxy_spec, name, "/")
 
     def start(self):
-        self.server = Server.from_url("http://127.0.0.1:%i" % randint(1025, 65535))
+        self.server = Server.from_url(f"http://{Config.localhost}:{randint(1025, 65535)}")
 
     def stop(self):
         self.server = None
@@ -118,7 +118,7 @@ def launch_backends():
         already_available = len(running_backends)
         for i in range(already_available, n):
             port = base_port + i
-            url = f"http://127.0.0.1:{port}"
+            url = f"http://{Config.localhost}:{port}"
             print(f"Launching backend on {url}")
             backend = subprocess.Popen([sys.executable, dummy_server_path, str(port)])
             running_backends.append(backend)
