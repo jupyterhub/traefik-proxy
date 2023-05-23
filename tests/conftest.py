@@ -1,6 +1,5 @@
 """General pytest fixtures"""
 
-import os
 import asyncio
 import logging
 import os

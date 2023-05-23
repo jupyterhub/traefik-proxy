@@ -14,6 +14,7 @@ import websockets
 
 from .conftest import Config
 
+
 async def process_request(path, request_headers, port):
     if path.endswith("/ws"):
         return None

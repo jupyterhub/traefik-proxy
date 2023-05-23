@@ -49,7 +49,9 @@ class MockSpawner:
         self.proxy_spec = url_path_join(self.user.proxy_spec, name, "/")
 
     def start(self):
-        self.server = Server.from_url(f"http://{Config.localhost}:{randint(1025, 65535)}")
+        self.server = Server.from_url(
+            f"http://{Config.localhost}:{randint(1025, 65535)}"
+        )
 
     def stop(self):
         self.server = None
