@@ -111,7 +111,7 @@ def certipy():
     with TemporaryDirectory() as td:
         certipy = Certipy(store_dir=td)
         certipy.create_ca("ca")
-        local_names = ["DNS:localhost", f"IP:{Config.localhost}"]
+        local_names = ["DNS:localhost", "IP:127.0.0.1"]
         # etcd certs from certipy don't work for some reason?
         # I don't understand why, but the originals do
         # certipy.create_signed_pair("etcd", "ca", alt_names=local_names)
