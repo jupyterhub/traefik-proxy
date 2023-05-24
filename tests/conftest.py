@@ -13,7 +13,6 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlparse
 
 import pytest
-import utils
 from certipy import Certipy
 from consul.aio import Consul
 from jupyterhub.utils import exponential_backoff
@@ -23,6 +22,8 @@ from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
 from jupyterhub_traefik_proxy.etcd import TraefikEtcdProxy
 from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
 from jupyterhub_traefik_proxy.traefik_utils import deep_merge
+
+from . import utils
 
 HERE = Path(__file__).parent.resolve()
 config_files = HERE / "config_files"
@@ -53,6 +54,17 @@ class Config:
     # Traefik api auth login credentials
     traefik_api_user = "api_admin"
     traefik_api_pass = "admin"
+
+    # a single location for overloading the domain part of test URLs, e.g.
+    # to force ipv4
+    #
+    #   JHTP_TEST_LOCALHOST="127.0.0.1" python -m pytest tests ...
+    #
+    # or ipv6
+    #
+    #   JHTP_TEST_LOCALHOST="::1" python -m pytest tests ...
+    #
+    localhost = os.environ.get("JHTP_TEST_LOCALHOST", "localhost")
 
     # The URL that should be proxied to jupyterhub
     # Putting here, can easily change between http and https
@@ -166,7 +178,7 @@ async def no_auth_consul_proxy(launch_consul, proxy_args):
     Consul acl disabled.
     """
     proxy = TraefikConsulProxy(
-        consul_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://{Config.localhost}:{Config.consul_port}",
         should_start=True,
         **proxy_args,
     )
@@ -182,7 +194,7 @@ async def auth_consul_proxy(launch_consul_auth, proxy_args):
     Consul acl enabled.
     """
     proxy = TraefikConsulProxy(
-        consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
+        consul_url=f"http://{Config.localhost}:{Config.consul_auth_port}",
         consul_password=Config.consul_token,
         should_start=True,
         **proxy_args,
@@ -223,13 +235,13 @@ def _make_etcd_proxy(*, auth=False, client_ca=None, **extra_kwargs):
         client_ca = str(client_ca)
         kwargs.update(
             dict(
-                etcd_url="https://localhost:2379",
+                etcd_url=f"https://{Config.localhost}:2379",
                 etcd_username=Config.etcd_user,
                 etcd_password=Config.etcd_password,
                 etcd_client_kwargs=dict(
                     grpc_options=[
-                        ("grpc.ssl_target_name_override", "localhost"),
-                        ("grpc.default_authority", "localhost"),
+                        ("grpc.ssl_target_name_override", Config.localhost),
+                        ("grpc.default_authority", Config.localhost),
                     ],
                     ca_cert=client_ca,
                 ),
@@ -363,7 +375,7 @@ async def external_file_proxy_toml(launch_traefik_file, dynamic_config_dir, prox
 @pytest.fixture
 async def external_consul_proxy(launch_traefik_consul, proxy_args):
     proxy = TraefikConsulProxy(
-        consul_url=f"http://127.0.0.1:{Config.consul_port}",
+        consul_url=f"http://{Config.localhost}:{Config.consul_port}",
         should_start=False,
         **proxy_args,
     )
@@ -374,7 +386,7 @@ async def external_consul_proxy(launch_traefik_consul, proxy_args):
 @pytest.fixture
 async def auth_external_consul_proxy(launch_traefik_consul_auth, proxy_args):
     proxy = TraefikConsulProxy(
-        consul_url=f"http://127.0.0.1:{Config.consul_auth_port}",
+        consul_url=f"http://{Config.localhost}:{Config.consul_auth_port}",
         consul_password=Config.consul_token,
         should_start=False,
         **proxy_args,
@@ -473,7 +485,7 @@ def launch_traefik_consul(launch_traefik, launch_consul):
 @pytest.fixture
 def launch_traefik_consul_auth(launch_traefik, launch_consul_auth):
     return launch_traefik(
-        f"--providers.consul.endpoints=http://127.0.0.1:{Config.consul_auth_port}",
+        f"--providers.consul.endpoints=http://{Config.localhost}:{Config.consul_auth_port}",
         env={"CONSUL_HTTP_TOKEN": Config.consul_token},
     )
 
@@ -549,16 +561,16 @@ async def launch_etcd_auth(etcd_ssl_key_cert, etcd_client_ca):
             f"--peer-trusted-ca-file={etcd_client_ca}",
             f"--cert-file={cert}",
             f"--key-file={key}",
-            "--initial-cluster=default=https://localhost:2380",
-            "--initial-advertise-peer-urls=https://localhost:2380",
-            "--listen-peer-urls=https://localhost:2380",
-            "--listen-client-urls=https://localhost:2379",
-            "--advertise-client-urls=https://localhost:2379",
+            f"--initial-cluster=default=https://{Config.localhost}:2380",
+            f"--initial-advertise-peer-urls=https://{Config.localhost}:2380",
+            f"--listen-peer-urls=https://{Config.localhost}:2380",
+            f"--listen-client-urls=https://{Config.localhost}:2379",
+            f"--advertise-client-urls=https://{Config.localhost}:2379",
             "--log-level=debug",
         ],
     )
     etcdctl_args = [
-        "--endpoints=localhost:2379",
+        f"--endpoints={Config.localhost}:2379",
         "--user",
         f"{Config.etcd_user}:{Config.etcd_password}",
         f"--cacert={etcd_client_ca}",
@@ -574,11 +586,11 @@ async def launch_etcd_auth(etcd_ssl_key_cert, etcd_client_ca):
         c = etcd3.client(
             user=Config.etcd_user,
             password=Config.etcd_password,
-            host="localhost",
+            host=Config.localhost,
             port=2379,
             grpc_options=[
-                ("grpc.ssl_target_name_override", "localhost"),
-                ("grpc.default_authority", "localhost"),
+                ("grpc.ssl_target_name_override", Config.localhost),
+                ("grpc.default_authority", Config.localhost),
             ],
             ca_cert=etcd_client_ca,
         )

@@ -1,2 +1,3 @@
 include versioneer.py
 include jupyterhub_traefik_proxy/_version.py
+include requirements.txt

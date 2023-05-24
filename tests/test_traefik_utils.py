@@ -5,6 +5,8 @@ import pytest
 
 from jupyterhub_traefik_proxy import traefik_utils
 
+from .conftest import Config
+
 
 # Mark all tests in this file as asyncio
 def test_roundtrip_routes():
@@ -12,7 +14,9 @@ def test_roundtrip_routes():
     routes = {
         "backends": {
             "backend1": {
-                "servers": {"server1": {"url": "http://127.0.0.1:9009", "weight": 1}}
+                "servers": {
+                    "server1": {"url": f"http://{Config.localhost}:9009", "weight": 1}
+                }
             }
         },
         "frontends": {

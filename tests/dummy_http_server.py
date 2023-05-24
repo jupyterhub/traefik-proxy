@@ -12,6 +12,8 @@ from http import HTTPStatus
 
 import websockets
 
+from .conftest import Config
+
 
 async def process_request(path, request_headers, port):
     if path.endswith("/ws"):
@@ -31,7 +33,7 @@ async def send_port(websocket, path):
 async def main(port):
     async with websockets.serve(
         send_port,
-        host="127.0.0.1",
+        host=Config.localhost,
         port=port,
         process_request=partial(process_request, port=port),
     ):
