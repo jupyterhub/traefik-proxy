@@ -68,7 +68,7 @@ class Config:
 
     # The URL that should be proxied to jupyterhub
     # Putting here, can easily change between http and https
-    public_url = f"https://127.0.0.1:8000"
+    public_url = "https://127.0.0.1:8000"
 
 
 # Define a "slow" test marker so that we can run the slow tests at the end
