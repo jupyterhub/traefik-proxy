@@ -4,6 +4,26 @@ For detailed changes from the prior release, click on the version number
 and its link will bring up a GitHub listing of changes. Use `git log` on
 the command line for details.
 
+## 1.0.1 - 2023-05-25
+
+1.0.1 fixes some packing issues in the 1.0 release.
+No changes to actual behavior.
+
+([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/1.0.0...1.0.1))
+
+### Maintenance and upkeep improvements
+
+- ensure `requirements.txt` is included in the sdist, exclude `performance` and importable `tests` [#207](https://github.com/jupyterhub/traefik-proxy/pull/207) ([@bollwyvl](https://github.com/bollwyvl), [@minrk](https://github.com/minrk))
+
+### Contributors to this release
+
+The following people contributed discussions, new ideas, code and documentation contributions, and review.
+See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/#how-does-this-tool-define-contributions-in-the-reports).
+
+([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2023-05-16&to=2023-05-25&type=c))
+
+@bollwyvl ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Abollwyvl+updated%3A2023-05-16..2023-05-25&type=Issues)) | @minrk ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2023-05-16..2023-05-25&type=Issues))
+
 ## 1.0.0 - 2023-05-16
 
 1.0.0 is a big release for jupyterhub-traefik-proxy!
