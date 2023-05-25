@@ -14,7 +14,6 @@ from unittest.mock import Mock
 from urllib.parse import quote, urlparse
 
 import pytest
-import utils
 import websockets
 from jupyterhub.objects import Hub, Server
 from jupyterhub.user import User
@@ -22,6 +21,8 @@ from jupyterhub.utils import exponential_backoff, url_path_join
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError, HTTPRequest
 
 from jupyterhub_traefik_proxy.proxy import TraefikProxy
+
+from . import utils
 
 # Mark all tests in this file as slow
 pytestmark = [pytest.mark.slow]

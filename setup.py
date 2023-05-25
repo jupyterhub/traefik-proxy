@@ -38,7 +38,7 @@ setup(
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    packages=find_packages(),
+    packages=find_packages(exclude=["performance", "tests"]),
     include_package_data=True,
     entry_points={
         "jupyterhub.proxies": [
