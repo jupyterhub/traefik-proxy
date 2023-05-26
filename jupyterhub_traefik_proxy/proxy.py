@@ -91,17 +91,18 @@ class TraefikProxy(Proxy):
         config=True,
         help="""
         Whether to initialize the traefik dynamic configuration
-        from JupyterHub configuration.
+        from JupyterHub configuration, when should_start is False
+        (dynamic configuration is always applied when should_start is True).
 
         Creates the traefik API router and TLS setup, if any.
         When True, only traefik static configuration must be managed by the external service
         (configuration of the endpoints and provider).
+        The traefik api router should not already be configured via other dynamic configuration providers.
 
-        When False, initial dynamic configuration must be handled externally,
+        When False, initial dynamic configuration must be handled externally
         and match TraefikProxy configuration, such as `traefik_api_url`,
         traefik_api_username` and `traefik_api_password`.
-
-        Only used when should_start is False.
+        Choose this if the traefik api router is already configured via dynamic configuration elsewhere.
 
         .. versionadded:: 1.1
         """,
