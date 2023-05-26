@@ -75,13 +75,35 @@ class TraefikProxy(Proxy):
         Has no effect if `Proxy.should_start` is False.
         """,
     )
+
     extra_dynamic_config = Dict(
         config=True,
         help="""Extra dynamic configuration for treafik.
 
         Merged with the default dynamic config during startup.
 
-        Always takes effect.
+        Always takes effect unless should_start and enable_setup_dynamic_config are both False.
+        """,
+    )
+
+    enable_setup_dynamic_config = Bool(
+        True,
+        config=True,
+        help="""
+        Whether to initialize the traefik dynamic configuration
+        from JupyterHub configuration.
+
+        Creates the traefik API router and TLS setup, if any.
+        When True, only traefik static configuration must be managed by the external service
+        (configuration of the endpoints and provider).
+
+        When False, initial dynamic configuration must be handled externally,
+        and match TraefikProxy configuration, such as `traefik_api_url`,
+        traefik_api_username` and `traefik_api_password`.
+
+        Only used when should_start is False.
+
+        .. versionadded:: 1.1
         """,
     )
 
@@ -554,7 +576,13 @@ class TraefikProxy(Proxy):
 
         Ensures dynamic config is setup and static config is loaded
         """
-        await self._setup_traefik_dynamic_config()
+        if self.enable_setup_dynamic_config:
+            await self._setup_traefik_dynamic_config()
+        else:
+            self.log.info(
+                "Assuming traefik dynamic configuration for API at %s is set up already.",
+                self.traefik_api_url,
+            )
         await self._wait_for_static_config()
         self._start_future = None
 
