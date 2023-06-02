@@ -4,6 +4,23 @@ For detailed changes from the prior release, click on the version number
 and its link will bring up a GitHub listing of changes. Use `git log` on
 the command line for details.
 
+## 1.1.0
+
+([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/1.0.1...1.1.0))
+
+### New features added
+
+- add TraefikProxy.enable_setup_dynamic_config for opt-out of dynamic config setup [#210](https://github.com/jupyterhub/traefik-proxy/pull/210) ([@minrk](https://github.com/minrk), [@alexleach](https://github.com/alexleach))
+
+### Contributors to this release
+
+The following people contributed discussions, new ideas, code and documentation contributions, and review.
+See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/#how-does-this-tool-define-contributions-in-the-reports).
+
+([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2023-05-25&to=2023-06-02&type=c))
+
+@alexleach ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aalexleach+updated%3A2023-05-25..2023-06-02&type=Issues)) | @consideRatio ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2023-05-25..2023-06-02&type=Issues)) | @minrk ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2023-05-25..2023-06-02&type=Issues))
+
 ## 1.0.1 - 2023-05-25
 
 1.0.1 fixes some packing issues in the 1.0 release.
