@@ -4,7 +4,7 @@ For detailed changes from the prior release, click on the version number
 and its link will bring up a GitHub listing of changes. Use `git log` on
 the command line for details.
 
-## 1.1.0
+## 1.1.0 - 2023-06-06
 
 ([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/1.0.1...1.1.0))
 
