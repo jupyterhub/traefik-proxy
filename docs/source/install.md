@@ -8,7 +8,7 @@
    $ python3 -m pip install jupyterhub
    ```
 
-2. Install **jupyterhub-traefik-proxy**, which is available now as pre-release:
+2. Install **jupyterhub-traefik-proxy**:
 
    ```
    python3 -m pip install jupyterhub-traefik-proxy
