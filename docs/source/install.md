@@ -8,7 +8,7 @@
    $ python3 -m pip install jupyterhub
    ```
 
-2. Install **jupyterhub-traefik-proxy**, which is available now as pre-release:
+2. Install **jupyterhub-traefik-proxy**:
 
    ```
    python3 -m pip install jupyterhub-traefik-proxy
@@ -84,7 +84,7 @@ you can load a specific config file and start JupyterHub using:
 $ jupyterhub -f /path/to/jupyterhub_config.py
 ```
 
-There is an example configuration file [here](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/examples/jupyterhub_config.py) that configures JupyterHub to run with _TraefikEtcdProxy_ as the proxy and uses dummyauthenticator and simplespawner to enable testing without administrative privileges.
+There is an example configuration file [here](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/examples/jupyterhub_config_etcd.py) that configures JupyterHub to run with _TraefikEtcdProxy_ as the proxy and uses dummyauthenticator and simplespawner to enable testing without administrative privileges.
 
 In _jupyterhub_config.py_:
 
