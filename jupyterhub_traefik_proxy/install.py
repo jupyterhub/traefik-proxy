@@ -11,6 +11,7 @@ from urllib.request import HTTPError, urlopen, urlretrieve
 
 machine_map = {
     "x86_64": "amd64",
+    "aarch64" : "arm64",
 }
 
 
