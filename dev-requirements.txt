@@ -11,8 +11,7 @@ codecov
 etcdpy
 notebook>=4.0
 pytest
-# FIXME: unpin pytest-asyncio
-pytest-asyncio>=0.17,<0.23
+pytest-asyncio
 pytest-cov
 python-consul2
 websockets
