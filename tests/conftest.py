@@ -21,6 +21,7 @@ from traitlets.log import get_logger
 from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
 from jupyterhub_traefik_proxy.etcd import TraefikEtcdProxy
 from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
+from jupyterhub_traefik_proxy.redis import TraefikRedisProxy
 from jupyterhub_traefik_proxy.traefik_utils import deep_merge
 
 from . import utils
@@ -50,6 +51,11 @@ class Config:
     consul_token = "secret"
     consul_port = 8500
     consul_auth_port = 8501
+
+    # redis auth credentials
+    redis_port = 9988
+    redis_username = "redisuser"
+    redis_password = "redispass"
 
     # Traefik api auth login credentials
     traefik_api_user = "api_admin"
@@ -168,6 +174,23 @@ async def no_auth_consul_proxy(launch_consul, proxy_args):
     """
     proxy = TraefikConsulProxy(
         consul_url=f"http://127.0.0.1:{Config.consul_port}",
+        should_start=True,
+        **proxy_args,
+    )
+    await proxy.start()
+    yield proxy
+    await proxy.stop()
+
+
+@pytest.fixture
+async def redis_proxy(launch_redis, proxy_args):
+    """
+    Fixture returning a configured TraefikRedisProxy.
+    """
+    proxy = TraefikRedisProxy(
+        redis_url=f"redis://127.0.0.1:{Config.redis_port}",
+        redis_username=Config.redis_username,
+        redis_password=Config.redis_password,
         should_start=True,
         **proxy_args,
     )
@@ -385,6 +408,19 @@ async def auth_external_consul_proxy(launch_traefik_consul_auth, proxy_args):
 
 
 @pytest.fixture
+async def external_redis_proxy(launch_traefik_redis, proxy_args):
+    proxy = TraefikRedisProxy(
+        redis_url=f"redis://127.0.0.1:{Config.redis_port}",
+        redis_username=Config.redis_username,
+        redis_password=Config.redis_password,
+        should_start=False,
+        **proxy_args,
+    )
+    await proxy._start_future
+    yield proxy
+
+
+@pytest.fixture
 async def external_etcd_proxy(launch_traefik_etcd, etcd_client_ca, proxy_args):
     proxy = _make_etcd_proxy(
         auth=False, should_start=False, client_ca=etcd_client_ca, **proxy_args
@@ -420,6 +456,8 @@ async def auth_external_etcd_proxy(
         "auth_external_etcd_proxy",
         "external_file_proxy_toml",
         "external_file_proxy_yaml",
+        "redis_proxy",
+        "external_redis_proxy",
     ]
 )
 def proxy(request, client_ca, proxy_ssl_key_cert):
@@ -463,6 +501,16 @@ def launch_traefik_etcd_auth(launch_traefik, launch_etcd_auth, etcd_client_ca):
         "--providers.etcd.tls.ca=" + etcd_client_ca,
         "--providers.etcd.username=" + Config.etcd_user,
         "--providers.etcd.password=" + Config.etcd_password,
+    )
+
+
+@pytest.fixture
+def launch_traefik_redis(launch_traefik, launch_redis):
+    return launch_traefik(
+        "--providers.redis",
+        f"--providers.redis.endpoints=127.0.0.1:{Config.redis_port}",
+        f"--providers.redis.username={Config.redis_username}",
+        f"--providers.redis.password={Config.redis_password}",
     )
 
 
@@ -713,6 +761,61 @@ async def _wait_for_consul(token=None, **kwargs):
     await exponential_backoff(
         _check_consul,
         "Consul not available",
+        timeout=20,
+    )
+
+
+# Redis launch
+
+
+@pytest.fixture(scope="module")
+def launch_redis():
+    with TemporaryDirectory() as path:
+        print(f"Launching redis in {path}")
+        redis_proc = subprocess.Popen(
+            [
+                "redis-server",
+                "--port",
+                str(Config.redis_port),
+                "--",
+                "user",
+                Config.redis_username,
+                f">{Config.redis_password}",
+                "allcommands",
+                "allkeys",
+                "on",
+            ],
+            cwd=path,
+        )
+        try:
+            # asyncio.run instead of await because this fixture's scope
+            # is module-scoped, while event_loop is 'function'-scoped
+            asyncio.run(_wait_for_redis())
+            yield redis_proc
+        finally:
+            terminate_process(redis_proc)
+
+
+async def _wait_for_redis():
+    import redis
+    from redis.asyncio import Redis
+
+    async def _check_redis():
+        try:
+            r = Redis(
+                port=Config.redis_port,
+                username=Config.redis_username,
+                password=Config.redis_password,
+            )
+            await r.get("x")
+        except redis.exceptions.ConnectionError as e:
+            print(e)
+            return False
+        return True
+
+    await exponential_backoff(
+        _check_redis,
+        "Redis not available",
         timeout=20,
     )
 

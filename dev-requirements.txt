@@ -15,4 +15,5 @@ pytest
 pytest-asyncio>=0.17,<0.23
 pytest-cov
 python-consul2
+redis
 websockets
