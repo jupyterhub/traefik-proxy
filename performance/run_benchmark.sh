@@ -1,6 +1,6 @@
 #!/bin/sh
 # no -e to allow data generation, only losing failed results
-set -xuo pipefail
+set -exuo pipefail
 
 echo $0
 cd $(dirname "$0")
@@ -9,7 +9,7 @@ export PYTHONPATH="$PWD/.."
 iterations=${iterations:-3}
 routes=${routes:-500}
 
-proxies="${proxies:-chp file etcd consul}"
+proxies="${proxies:-chp file etcd consul redis}"
 # add/remove route API performance
 for proxy in $proxies; do
   for concurrency in 1 10 20 50; do

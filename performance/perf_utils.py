@@ -20,6 +20,7 @@ from jupyterhub.utils import wait_for_http_server
 from jupyterhub_traefik_proxy.consul import TraefikConsulProxy
 from jupyterhub_traefik_proxy.etcd import TraefikEtcdProxy
 from jupyterhub_traefik_proxy.fileprovider import TraefikFileProviderProxy
+from jupyterhub_traefik_proxy.redis import TraefikRedisProxy
 
 aiohttp.TCPConnector.__init__.__kwdefaults__['limit'] = 10
 
@@ -171,6 +172,33 @@ def etcd():
 
 
 @contextmanager
+def redis():
+    """Context manager for running redis-server"""
+    from redis import Redis
+
+    with TemporaryDirectory() as td:
+        p = Popen(['redis-server'], cwd=td)
+        for i in range(5):
+            try:
+                r = Redis()
+                r.get("x")
+            except Exception as e:
+                print(e, file=sys.stderr)
+                time.sleep(1)
+            else:
+                print("redis ready")
+                break
+        try:
+            yield
+        finally:
+            try:
+                with p:
+                    p.terminate()
+            except Exception as e:
+                print(f"Error stopping {p}: {e}", file=sys.stderr)
+
+
+@contextmanager
 def consul():
     """Context manager for running consul"""
     with TemporaryDirectory() as td:
@@ -262,6 +290,21 @@ async def no_auth_etcd_proxy():
     return proxy
 
 
+async def no_auth_redis_proxy():
+    """
+    Function returning a configured TraefikRedisProxy.
+    No etcd authentication.
+    """
+    proxy = TraefikRedisProxy(
+        public_url="http://127.0.0.1:8000",
+        traefik_api_password="admin",
+        traefik_api_username="admin",
+        should_start=True,
+    )
+    await proxy.start()
+    return proxy
+
+
 async def file_proxy():
     """Function returning a configured TraefikFileProviderProxy"""
     proxy = TraefikFileProviderProxy(
@@ -303,6 +346,9 @@ async def get_proxy(proxy_class):
     elif proxy_class == "etcd":
         proxy_f = no_auth_etcd_proxy
         parent_context = etcd
+    elif proxy_class == "redis":
+        proxy_f = no_auth_redis_proxy
+        parent_context = redis
     elif proxy_class == "consul":
         proxy_f = no_auth_consul_proxy
         parent_context = consul
