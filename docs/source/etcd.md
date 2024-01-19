@@ -1,10 +1,19 @@
 # Using TraefikEtcdProxy
 
+:::{warning}
+While it works today (2024), there does not appear to be a maintained, documented Python client for the etcd API.
+We will keep an eye on etcd API clients,
+but in the meantime we recommend using [redis](redis) as the backend.
+:::
+
 [Etcd](https://coreos.com/etcd/)
 is a distributed key-value store.
-This and TraefikConsulProxy is the choice to use when using jupyterhub-traefik-proxy
-in a distributed setup, such as a Kubernetes cluster,
-e.g. with multiple traefik-proxy instances.
+With it, you can use JupyterHub with _distributed_ instances of traefik,
+e.g. multiple replicas in kubernetes.
+
+:::{seealso}
+[TraefikRedisProxy](redis)
+:::
 
 ## How-To install TraefikEtcdProxy
 

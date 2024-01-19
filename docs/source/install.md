@@ -61,7 +61,9 @@
 
 If you want to use a key-value store to mediate configuration
 (mainly for use in distributed deployments, such as containers),
-you can get etcd or consul via their respective release pages:
+you can get The key-value stores via their respective installation pages:
+
+- Install [`redis-server`](https://redis.io/docs/install/install-redis/)
 
 - Install [`etcd`](https://github.com/etcd-io/etcd/releases)
 
@@ -70,6 +72,7 @@ you can get etcd or consul via their respective release pages:
 Or, more likely, select the appropriate container image.
 You will also need to install a Python client for the Key-Value store of your choice:
 
+- `redis`
 - `etcdpy`
 - `python-consul2`
 
