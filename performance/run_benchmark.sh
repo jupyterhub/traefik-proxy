@@ -16,7 +16,7 @@ for proxy in $proxies; do
     python3 -m performance.check_perf methods --proxy=$proxy --iterations=$iterations --concurrency=$concurrency --routes=$routes --output=./results/${proxy}-methods.csv
   done
 done
-
+exit 0
 
 # Throughput:
 
