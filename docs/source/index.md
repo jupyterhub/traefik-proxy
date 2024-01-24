@@ -9,7 +9,7 @@ Currently, the **default** proxy implementation for JupyterHub is [configurable-
 When using a proxy implementation based on traefik, you can run multiple instances of traefik by using a distributed key-value store like [redis](https://redis.io) to store the routing table. This makes the proxy **highly available** and improves the scalability and stability of the system.
 Moreover, traefik offers _HTTPS_ support through a straight-forward [ACME (Let's Encrypt)](https://docs.traefik.io/configuration/acme) configuration.
 
-There are three versions for the proxy, depending on how traefik stores the routes:
+There are three versions of the proxy, depending on how traefik stores the routes:
 
 - _for_ **smaller**, _single-node deployments_, use plain files:
   - TraefikFileProviderProxy

@@ -1,7 +1,7 @@
 # Using TraefikRedisProxy
 
 [Redis](https://redis.io) is a distributed key-value store.
-This should be the default choice use when using jupyterhub-traefik-proxy
+This should be the default choice when using jupyterhub-traefik-proxy
 in a distributed setup, such as a Kubernetes cluster with multiple traefik instances.
 
 ## How-To install TraefikRedisProxy
@@ -36,15 +36,15 @@ c.JupyterHub.proxy_class = "traefik_redis"
      traefik static configuration and pass it to traefik. Keep in mind that in order for the routes to be stored in **Redis**,
      this _toml_ file **must** specify redis as the provider.
 
-2. TraefikRedisProxy searches in the redis key-value store the keys starting with the **kv_traefik_prefix** prefix in order to build its static configuration.
+2. TraefikRedisProxy searches in the redis key-value store for keys starting with the **kv_traefik_prefix** prefix to build its static configuration.
 
-   Similarly, the dynamic configuration is built by searching the **kv_jupyterhub_prefix**.
+   Similarly, the dynamic configuration is built by searching for the **kv_jupyterhub_prefix**.
 
    ```{note}
-   If you want to change or add traefik's dynamic configuration options, you can add them to Redis under this prefix and traefik will pick them up.
+   If you want to change or add to traefik's dynamic configuration options, you can add them to Redis under this prefix and traefik will pick them up.
    ```
 
-   - The **default** values of this configurations options are:
+   - The **default** values of these configuration options are:
 
      ```python
      kv_traefik_prefix = "/traefik/"
@@ -117,7 +117,7 @@ If `traefik` is used as an externally managed service, then make sure you follow
    c.TraefikRedisProxy.should_start = False
 
    # if not the default:
-   c.TraefikRedisProxy.redis_url = "reds:/rRedis-host:2379"
+   c.TraefikRedisProxy.redis_url = "redis://redis-host:2379"
 
    # traefik api credentials
    c.TraefikRedisProxy.traefik_api_username = "abc"
@@ -133,7 +133,7 @@ If `traefik` is used as an externally managed service, then make sure you follow
    Before starting the traefik process, you must create a _toml_ file with the desired
    traefik static configuration and pass it to traefik when you launch the process.
    Keep in mind that in order for the routes to be stored in **Redis**,
-   this _toml_ file **must** specify Redis as the provider/
+   this _toml_ file **must** specify Redis as the provider.
 
    - **Keep in mind that the static configuration must configure at least:**
 
@@ -186,7 +186,7 @@ This is an example setup for using JupyterHub and TraefikRedisProxy managed by a
    c.JupyterHub.proxy_class = "traefik_redis"
    ```
 
-2. Start a single-note Redis cluster on the default port on localhost. e.g.:
+2. Start a single-node Redis cluster on the default port on localhost. e.g.:
 
    ```bash
    $ redis-server
