@@ -46,6 +46,7 @@ jobs:
           - python: "3.10"
             backend: "redis"
           - python: "3.11"
+          - python: "3.12"
     steps:
       # NOTE: In GitHub workflows, environment variables are set by writing
       #       assignment statements to a file. They will be set in the following
