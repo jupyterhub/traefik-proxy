@@ -1,6 +1,5 @@
 black
 certipy
-codecov
 # add backend packages
 jupyterhub-traefik-proxy[redis,etcd,consul]
 notebook>=4.0
