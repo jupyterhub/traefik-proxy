@@ -48,11 +48,11 @@ $ export ETCDCTL_API=3
 You can then run the all the test suite from the _traefik-proxy_ directory with:
 
 ```
-$ pytest -v ./tests
+$ pytest
 ```
 
 Or you can run a specific test file with:
 
 ```
-$ pytest -v ./tests/<test-file-name>
+$ pytest tests/<test-file-name>
 ```

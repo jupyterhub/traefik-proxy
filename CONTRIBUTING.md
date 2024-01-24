@@ -35,6 +35,6 @@ If it makes any changes, it'll let you know and you can make the commit again wi
 
 After doing a development install, you can run the tests with:
 
-    pytest -v
+    pytest
 
 in the repo directory.

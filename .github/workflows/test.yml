@@ -98,7 +98,6 @@ jobs:
 
       - name: Run tests
         run: |
-          # Using the "--slow-last" flag, should run the slow tests last
-          pytest -v --durations 10 --maxfail 3 --slow-last --color=yes --cov=jupyterhub_traefik_proxy tests
+          pytest
 
       - uses: codecov/codecov-action@v3
