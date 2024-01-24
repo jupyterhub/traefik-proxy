@@ -1,4 +1,3 @@
-black
 certipy
 # add backend packages
 jupyterhub-traefik-proxy[redis,etcd,consul]
