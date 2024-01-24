@@ -47,19 +47,11 @@ jobs:
             backend: "redis"
           - python: "3.11"
           - python: "3.12"
+          - python: "3.12"
+            traefik-version: v3.0.0-beta5
     steps:
-      # NOTE: In GitHub workflows, environment variables are set by writing
-      #       assignment statements to a file. They will be set in the following
-      #       steps as if would used `export MY_ENV=my-value`.
-      - name: Configure environment variables
-        run: |
-          echo "PATH=$PWD/bin:$PATH" >> $GITHUB_ENV
-
       - uses: actions/checkout@v4
-      # NOTE: actions/setup-python@v5 make use of a cache within the GitHub base
-      #       environment and setup in a fraction of a second.
-      - name: Install Python ${{ matrix.python }}
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
 
@@ -67,9 +59,26 @@ jobs:
         run: |
           pip install --upgrade setuptools pip
           pip install -r dev-requirements.txt -e .
-          python -m jupyterhub_traefik_proxy.install --output=./bin
 
+      - name: List Python dependencies
+        run: |
           pip freeze
+
+      - name: Add ./bin to PATH
+        run: |
+          echo "PATH=$PWD/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Install traefik
+        run: |
+          TRAEFIK_VERSION=
+          if [[ ! -z "${{ matrix.traefik-version }}" ]]; then
+            TRAEFIK_VERSION=--traefik-version=${{ matrix.traefik-version }}
+          fi
+
+          python -m jupyterhub_traefik_proxy.install --output=./bin ${TRAEFIK_VERSION}
+
+          traefik version
+
       - name: Install consul
         if: matrix.backend == 'consul'
         run: |
