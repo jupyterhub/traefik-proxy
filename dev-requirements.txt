@@ -1,19 +1,12 @@
 black
 certipy
 codecov
-# etcd3 & python-consul2 are now soft dependencies
-# Adding them here prevents CI from failing
-
-# python-etcd3 is unmaintained, but there are several forks
-# all the forks (at this point) install the same python module,
-# but with updated grpcio compatibility
-# watch this space to pick a winner...
-etcdpy
+# add backend packages
+jupyterhub-traefik-proxy[redis,etcd,consul]
 notebook>=4.0
 pytest
 # FIXME: unpin pytest-asyncio
 pytest-asyncio>=0.17,<0.23
 pytest-cov
-python-consul2
 redis
 websockets

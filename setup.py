@@ -15,6 +15,13 @@ setup(
     name="jupyterhub-traefik-proxy",
     version="1.1.0",
     install_requires=open("requirements.txt").read().splitlines(),
+    extras_require={
+        "redis": ["redis"],
+        # etcd, consul clients are moving targets
+        # see https://github.com/jupyterhub/traefik-proxy/issues/155 for more
+        "consul": ["python-consul2"],
+        "etcd": ["etcdpy"],
+    },
     python_requires=">=3.6",
     author="Project Jupyter Contributors",
     author_email="jupyter@googlegroups.com",

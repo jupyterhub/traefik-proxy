@@ -9,7 +9,7 @@ in a distributed setup, such as a Kubernetes cluster with multiple traefik insta
 1. Install **jupyterhub**
 2. Install **jupyterhub-traefik-proxy** and [redis Python client](inv:redis:std#index)
    ```
-   pip install jupyterhub-traefik-proxy redis
+   pip install jupyterhub-traefik-proxy[redis]
    ```
 3. Install **traefik**
 4. Install **Redis Server**
