@@ -147,7 +147,9 @@ def main():
     parser.add_argument(
         "--traefik-version",
         dest="traefik_version",
-        default="2.10.1",
+        # default version to install should be regularly updated, see
+        # https://github.com/traefik/traefik/releases
+        default="2.10.7",
         help=textwrap.dedent(
             """\
             The version of traefik to download.
