@@ -61,7 +61,9 @@
 
 If you want to use a key-value store to mediate configuration
 (mainly for use in distributed deployments, such as containers),
-you can get etcd or consul via their respective release pages:
+you can get the key-value stores via their respective installation pages:
+
+- Install [`redis-server`](https://redis.io/docs/install/install-redis/)
 
 - Install [`etcd`](https://github.com/etcd-io/etcd/releases)
 
@@ -70,12 +72,22 @@ you can get etcd or consul via their respective release pages:
 Or, more likely, select the appropriate container image.
 You will also need to install a Python client for the Key-Value store of your choice:
 
+- `redis`
 - `etcdpy`
 - `python-consul2`
 
+Starting with jupyterhub-traefik-proxy 1.2, these can be installed via `extras`:
+
+```shell
+python3 -m pip install jupyterhub-traefik-proxy[redis]
+# or [etcd] or [consul]
+```
+
 ## Enabling traefik-proxy in JupyterHub
 
-[TraefikFileProviderProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/fileprovider.py), [TraefikEtcdProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/etcd.py) and [TraefikConsulProxy](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/jupyterhub_traefik_proxy/consul.py) are custom proxy implementations that subclass [Proxy](https://github.com/jupyterhub/jupyterhub/blob/HEAD/jupyterhub/proxy.py) and can register in JupyterHub config using `c.JupyterHub.proxy_class` entrypoint.
+The `c.JupyterHub.proxy_class` option is how you tell JupyterHub to use a proxy implementation,
+which are typically identified by strings.
+You can import and assign the class, or more conveniently use the desired class's registration string, e.g. `traefik_redis` for TraefikRedisProxy.
 
 On startup, JupyterHub will look by default for a configuration file, _jupyterhub_config.py_, in the current working directory. If the configuration file is not in the current working directory,
 you can load a specific config file and start JupyterHub using:
@@ -84,21 +96,16 @@ you can load a specific config file and start JupyterHub using:
 $ jupyterhub -f /path/to/jupyterhub_config.py
 ```
 
-There is an example configuration file [here](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/examples/jupyterhub_config_etcd.py) that configures JupyterHub to run with _TraefikEtcdProxy_ as the proxy and uses dummyauthenticator and simplespawner to enable testing without administrative privileges.
+There is an example configuration file [here](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/examples/jupyterhub_config_redis.py) that configures JupyterHub to run with [TraefikRedisProxy](redis) as the proxy and uses dummyauthenticator and simplespawner to enable testing without administrative privileges.
 
 In _jupyterhub_config.py_:
 
-```
-c.JupyterHub.proxy_class = "traefik_file"
-# will configure JupyterHub to run with TraefikFileProviderProxy
-```
-
-```
-c.JupyterHub.proxy_class = "traefik_etcd"
-# will configure JupyterHub to run with TraefikEtcdProxy
-```
-
-```
-c.JupyterHub.proxy_class = "traefik_consul"
-# will configure JupyterHub to run with TraefikConsulProxy
+```python
+c.JupyterHub.proxy_class = "traefik_file" # TraefikFileProviderProxy
+# or
+c.JupyterHub.proxy_class = "traefik_redis" # TraefikRedisProxy
+# or
+c.JupyterHub.proxy_class = "traefik_etcd" # TraefikEtcdProxy
+# or
+c.JupyterHub.proxy_class = "traefik_consul" # eTraefikConsulProxy
 ```

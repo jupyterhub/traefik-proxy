@@ -32,7 +32,7 @@ env:
 jobs:
   # Run "pytest tests" for various Python versions
   pytest:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     strategy:
       # Keep running even if one variation of the job fail
@@ -45,6 +45,7 @@ jobs:
           - python: "3.9"
             backend: "consul"
           - python: "3.10"
+            backend: "redis"
           - python: "3.11"
     steps:
       # NOTE: In GitHub workflows, environment variables are set by writing
@@ -69,12 +70,22 @@ jobs:
           python -m jupyterhub_traefik_proxy.install --output=./bin
 
           pip freeze
-      - name: Install etcd, consul
+      - name: Install consul
+        if: matrix.backend == 'consul'
         run: |
           curl -L https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip > consul.zip
           unzip consul.zip -d ./bin consul
+
+      - name: Install etcd
+        if: matrix.backend == 'etcd'
+        run: |
           curl -L https://github.com/etcd-io/etcd/releases/download/v${ETCD_DOWNLOAD_VERSION}/etcd-v${ETCD_DOWNLOAD_VERSION}-linux-amd64.tar.gz   > etcd.tar.gz
           tar -xzf etcd.tar.gz -C ./bin --strip-components=1 --wildcards '*/etcd*'
+
+      - name: Install redis
+        if: matrix.backend == 'redis'
+        run: |
+          sudo apt-get -y install redis-server
 
       - name: Select tests
         run: |
@@ -82,8 +93,8 @@ jobs:
             # select backend subset
             echo "PYTEST_ADDOPTS=-k ${{ matrix.backend }}" >> "${GITHUB_ENV}"
           else
-            # default: select everything _but_ the etcd/consul backend tests
-            echo "PYTEST_ADDOPTS=-k 'not etcd and not consul'" >> "${GITHUB_ENV}"
+            # default: select everything _but_ the KV backend tests
+            echo "PYTEST_ADDOPTS=-k 'not etcd and not consul and not redis'" >> "${GITHUB_ENV}"
           fi
 
       - name: Run tests

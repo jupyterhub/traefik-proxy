@@ -40,6 +40,17 @@
 ```
 
 ```{eval-rst}
+.. currentmodule:: jupyterhub_traefik_proxy.redis
+```
+
+### {class}`TraefikRedisProxy`
+
+```{eval-rst}
+.. autoconfigurable:: TraefikRedisProxy
+    :members:
+```
+
+```{eval-rst}
 .. currentmodule:: jupyterhub_traefik_proxy.etcd
 ```
 

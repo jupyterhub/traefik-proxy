@@ -61,11 +61,16 @@ TKvProxy is an adapter layer, implementing all of the above methods, based on a 
 
 TKvProxy is responsible for translating between key-value-friendly "flat" dictionaries and the 'true' nested dictionary format of the configuration (i.e. the nested dictionary `{"a": {"b": 5}}` will be flattened to `{"a/b": "5"}`).
 
-Finally, we have our specific key-value store implementations: [](TraefikEtcdProxy) and [](TraefikConsulProxy).
+Finally, we have our specific key-value store implementations:
+
+- [](TraefikRedisProxy)
+- [](TraefikEtcdProxy)
+- [](TraefikConsulProxy)
+
 These classes only need to implement:
 
-1. configuration necessary to connect to the key-value provider
-2. `_setup_traefik_static_config` to tell traefik how to talk to the same key-value provider
+1. configuration necessary to connect to the key-value store
+2. `_setup_traefik_static_config` to tell traefik how to talk to the key-value store
 3. the above three `_kv_` methods for reading, writing, and deleting keys
 
 ## Testing jupyterhub-traefik-proxy

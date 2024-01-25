@@ -59,6 +59,9 @@ extensions = [
     'myst_parser',
 ]
 
+myst_enable_extensions = [
+    "colon_fence",
+]
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -209,4 +212,7 @@ epub_exclude_files = ['search.html']
 # -- Options for intersphinx extension ---------------------------------------
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "redis": ("https://redis-py.readthedocs.io/en/stable/", None),
+}

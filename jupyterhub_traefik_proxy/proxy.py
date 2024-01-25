@@ -596,7 +596,9 @@ class TraefikProxy(Proxy):
         if the proxy is to be started by the Hub
         """
         self._stop_traefik()
-        self._cleanup()
+        _cleanup_result = self._cleanup()
+        if _cleanup_result is not None:
+            await _cleanup_result
 
     def _cleanup(self):
         """Cleanup after stop
