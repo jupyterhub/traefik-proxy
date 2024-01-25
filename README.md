@@ -37,14 +37,6 @@ with examples for the three different implementations.
 
 ## Running tests
 
-There are some tests that use _etcdctl_ command line client for etcd. Make sure
-to set environment variable `ETCDCTL_API=3` before running the tests, so that
-the v3 API to be used, e.g.:
-
-```
-$ export ETCDCTL_API=3
-```
-
 You can then run the all the test suite from the _traefik-proxy_ directory with:
 
 ```
@@ -55,4 +47,12 @@ Or you can run a specific test file with:
 
 ```
 $ pytest tests/<test-file-name>
+```
+
+There are some tests that use _etcdctl_ command line client for etcd. Make sure
+to set environment variable `ETCDCTL_API=3` before running the tests if etcd
+version 3.3 or older is used, so that the v3 API to be used, e.g.:
+
+```
+$ export ETCDCTL_API=3
 ```

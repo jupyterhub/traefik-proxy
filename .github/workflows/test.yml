@@ -24,7 +24,6 @@ on:
   workflow_dispatch:
 
 env:
-  ETCDCTL_API: "3"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
