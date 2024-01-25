@@ -21,7 +21,7 @@ class TraefikRedisProxy(TKvProxy):
 
     redis_client_kwargs = Dict(
         config=True,
-        help="Additional keyword arguments to pass through to the `redis.Redis` constructor",
+        help="Additional keyword arguments to pass through to the `redis.asyncio.Redis` constructor",
     )
 
     redis = Any()
@@ -60,7 +60,7 @@ class TraefikRedisProxy(TKvProxy):
         await self.redis.close()
 
     def _setup_traefik_static_config(self):
-        self.log.debug("Setting up the redis provider in the static config")
+        self.log.debug("Setting up the redis provider in the traefik static config")
         url = urlparse(self.redis_url)
         redis_config = {
             "endpoints": [url.netloc],
