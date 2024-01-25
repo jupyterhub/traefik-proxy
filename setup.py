@@ -22,7 +22,7 @@ setup(
         "consul": ["python-consul2"],
         "etcd": ["etcdpy"],
     },
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     author="Project Jupyter Contributors",
     author_email="jupyter@googlegroups.com",
     url="https://jupyterhub-traefik-proxy.readthedocs.io",

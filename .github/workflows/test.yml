@@ -39,7 +39,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - python: "3.7"
           - python: "3.8"
             backend: "etcd"
           - python: "3.9"
