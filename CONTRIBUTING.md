@@ -10,13 +10,9 @@ This package requires Python >= 3.6.
 
 As a Python package, you can set up a development environment by cloning this repo and running:
 
-    python3 -m pip install --editable .
+    python3 -m pip install --editable ".[test]"
 
 from the repo directory.
-
-You can also install the tools we use for testing and development with:
-
-    python3 -m pip install -r dev-requirements.txt
 
 ### Auto-format with pre-commit
 

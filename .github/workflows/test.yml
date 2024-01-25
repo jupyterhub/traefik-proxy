@@ -79,7 +79,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade setuptools pip
-          pip install -r dev-requirements.txt -e .
+          pip install -e ".[test]"
 
       - name: List Python dependencies
         run: |
