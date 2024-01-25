@@ -148,10 +148,7 @@ class TraefikRedisProxy(TKvProxy):
         await asyncio.gather(*futures)
 
     async def _kv_get_tree(self, prefix):
-        """Return all data under prefix as a dict
-
-        Should probably use `unflatten_dict_from_kv`
-        """
+        """Return all data under prefix as a dict"""
         if not prefix.endswith(self.kv_separator):
             prefix = prefix + self.kv_separator
 
