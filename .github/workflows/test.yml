@@ -47,11 +47,24 @@ jobs:
 
           # Test each backend that requires a python client against a modern
           # version of python to ensure clients are compatible.
+          #
+          # - About redis versions:
+          #   redis can be installed from source, as an ubuntu distribution, or
+          #   snap package. To avoid complexity we don't build from source, but we
+          #   test against the ubuntu and snap package, where the ubuntu package
+          #   typically is behind the snap package.
+          #
+          #   redis-test-version is provided as a matrix input only to provide
+          #   visibility via github's web UI.
+          #
           - python: "3.12"
             backend: redis
-            # redis-test-version is tied to ubuntu's package, so we only test
-            # redis 6 currently while redis 7 is out, see
-            # https://packages.ubuntu.com/jammy/redis-server
+            install-via: apt # version 6.0.16 in ubuntu 22.04, https://packages.ubuntu.com/jammy/redis-server
+            redis-test-version: "6.0.16?"
+          - python: "3.12"
+            backend: redis
+            install-via: snap # version 7.2.4 or higher, https://snapcraft.io/redis
+            redis-test-version: ">=7.2.4"
           - python: "3.12"
             backend: etcd
             etcd-test-version: "v3.4.29" # https://github.com/etcd-io/etcd/releases
@@ -73,9 +86,9 @@ jobs:
         run: |
           pip freeze
 
-      - name: Add ./bin to PATH
+      - name: Add bin directories to PATH
         run: |
-          echo "PATH=$PWD/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=$PWD/bin:/snap/redis/current/usr/bin/:$PATH" >> $GITHUB_ENV
 
       - name: Install traefik
         run: |
@@ -104,10 +117,16 @@ jobs:
 
           etcdctl version
 
-      - name: Install redis
+      - name: Install redis via ${{ matrix.install-via }}
         if: matrix.backend == 'redis'
         run: |
-          sudo apt-get -y install redis-server
+          if [[ "${{ matrix.install-via }}" == "apt" ]]; then
+            sudo apt-get -y install redis-server
+          else
+            sudo snap install redis
+          fi
+
+          redis-server --version
 
       - name: Run tests
         run: |

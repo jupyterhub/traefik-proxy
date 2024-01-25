@@ -189,7 +189,11 @@ This is an example setup for using JupyterHub and TraefikRedisProxy managed by a
 2. Start a single-node Redis cluster on the default port on localhost. e.g.:
 
    ```bash
-   $ redis-server
+   redis-server
+
+   # if redis-server isn't found on path, and you installed it with snap, you
+   # probably need to do this:
+   # export PATH="/snap/redis/current/usr/bin/:$PATH"
    ```
 
 3. Create a traefik static configuration file, _traefik.toml_, e.g:.
