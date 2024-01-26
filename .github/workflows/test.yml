@@ -48,17 +48,18 @@ jobs:
           # version of python to ensure clients are compatible.
           #
           # - About redis versions:
-          #   redis can be installed from source, as an ubuntu distribution, or
-          #   snap package. To avoid complexity we don't build from source, but we
-          #   test against the ubuntu and snap package, where the ubuntu package
-          #   typically is behind the snap package.
+          #   redis can be installed from source, as an apt package for an
+          #   ubuntu lts release, or snap package. To avoid complexity we don't
+          #   build from source which would allow us to pick a version to
+          #   install, but we test against the ubuntu and snap package, where
+          #   the ubuntu package typically is behind the snap package.
           #
           #   redis-version is provided as a matrix input only to provide
           #   visibility via github's web UI.
           #
           - python: "3.12"
             backend: redis
-            install-via: apt # version 6.0.16 in ubuntu 22.04, https://packages.ubuntu.com/jammy/redis-server
+            install-via: apt # version 6.0.16 in ubuntu 22.04, https://packages.ubuntu.com/jammy/redis
             redis-version: "6.0.16?"
           - python: "3.12"
             backend: redis
@@ -120,7 +121,7 @@ jobs:
         if: matrix.backend == 'redis'
         run: |
           if [[ "${{ matrix.install-via }}" == "apt" ]]; then
-            sudo apt-get -y install redis-server
+            sudo apt-get -y install redis
           else
             sudo snap install redis
           fi
