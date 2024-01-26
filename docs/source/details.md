@@ -8,7 +8,7 @@ Because of **security** concerns, in traefik-proxy implementation, traefik api e
 
 The port on which traefik-proxy's api will run, as well as the username and password used for authenticating, can be passed to the proxy through `jupyterhub_config.py`, e.g.:
 
-```
+```python
 c.TraefikFileProviderProxy.traefik_api_url = "http://127.0.0.1:8099"
 c.TraefikFileProviderProxy.traefik_api_password = "admin"
 c.TraefikFileProviderProxy.traefik_api_username = "admin"
@@ -77,12 +77,12 @@ These classes only need to implement:
 
 You can then run the all the test suite from the _traefik-proxy_ directory with:
 
-```
-$ pytest -v ./tests
+```shell
+pytest
 ```
 
 Or you can run a specific test with:
 
-```
-$ pytest -v ./tests/<test-file-name>
+```shell
+pytest tests/<test-file-name>
 ```

@@ -50,10 +50,9 @@ profile = "black"
 # ref: https://docs.pytest.org/en/stable/
 #
 [tool.pytest.ini_options]
-addopts = "--verbose --color=yes --durations=10"
+addopts = "--verbose --color=yes --durations=10 --maxfail 3 --slow-last --cov=jupyterhub_traefik_proxy"
 asyncio_mode = "auto"
-# Ignore thousands of tests in dependencies installed in a virtual environment
-norecursedirs = "lib lib64"
+testpaths = ["tests"]
 
 [tool.tbump]
 github_url = "https://github.com/jupyterhub/traefik-proxy"

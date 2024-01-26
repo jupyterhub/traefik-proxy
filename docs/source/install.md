@@ -63,7 +63,7 @@ If you want to use a key-value store to mediate configuration
 (mainly for use in distributed deployments, such as containers),
 you can get the key-value stores via their respective installation pages:
 
-- Install [`redis-server`](https://redis.io/docs/install/install-redis/)
+- Install [`redis`](https://redis.io/docs/install/install-redis/)
 
 - Install [`etcd`](https://github.com/etcd-io/etcd/releases)
 

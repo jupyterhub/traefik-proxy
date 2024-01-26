@@ -24,10 +24,7 @@ on:
   workflow_dispatch:
 
 env:
-  ETCDCTL_API: "3"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
-  ETCD_DOWNLOAD_VERSION: "3.4.24"
-  CONSUL_VERSION: "1.14.4"
 
 jobs:
   # Run "pytest tests" for various Python versions
@@ -39,68 +36,108 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Test against old and new python, and traefik v2 and v3
           - python: "3.8"
-            backend: "etcd"
-          - python: "3.9"
-            backend: "consul"
-          - python: "3.10"
-            backend: "redis"
-          - python: "3.11"
-    steps:
-      # NOTE: In GitHub workflows, environment variables are set by writing
-      #       assignment statements to a file. They will be set in the following
-      #       steps as if would used `export MY_ENV=my-value`.
-      - name: Configure environment variables
-        run: |
-          echo "PATH=$PWD/bin:$PATH" >> $GITHUB_ENV
+            backend: file
+            traefik-version: "v2.10.7"
+          - python: "3.12"
+            backend: file
+            traefik-version: "v3.0.0-beta5"
 
+          # Test each backend that requires a python client against a modern
+          # version of python to ensure clients are compatible.
+          #
+          # - About redis versions:
+          #   redis can be installed from source, as an apt package for an
+          #   ubuntu lts release, or snap package. To avoid complexity we don't
+          #   build from source which would allow us to pick a version to
+          #   install, but we test against the ubuntu and snap package, where
+          #   the ubuntu package typically is behind the snap package.
+          #
+          #   redis-version is provided as a matrix input only to provide
+          #   visibility via github's web UI.
+          #
+          - python: "3.12"
+            backend: redis
+            install-via: apt # version 6.0.16 in ubuntu 22.04, https://packages.ubuntu.com/jammy/redis
+            redis-version: "6.0.16?"
+          - python: "3.12"
+            backend: redis
+            install-via: snap # version 7.2.4 or higher, https://snapcraft.io/redis
+            redis-version: ">=7.2.4"
+          - python: "3.12"
+            backend: etcd
+            etcd-version: "v3.4.29" # https://github.com/etcd-io/etcd/releases
+          - python: "3.12"
+            backend: consul
+            consul-version: "1.17.2" # https://github.com/hashicorp/consul/releases (but omit v prefix)
+    steps:
       - uses: actions/checkout@v4
-      # NOTE: actions/setup-python@v5 make use of a cache within the GitHub base
-      #       environment and setup in a fraction of a second.
-      - name: Install Python ${{ matrix.python }}
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
 
       - name: Install Python dependencies
         run: |
           pip install --upgrade setuptools pip
-          pip install -r dev-requirements.txt -e .
-          python -m jupyterhub_traefik_proxy.install --output=./bin
+          pip install -e ".[test]"
 
+      - name: List Python dependencies
+        run: |
           pip freeze
+
+      - name: Add bin directories to PATH
+        run: |
+          echo "PATH=$PWD/bin:/snap/redis/current/usr/bin/:$PATH" >> $GITHUB_ENV
+
+      - name: Install traefik
+        run: |
+          TRAEFIK_VERSION=
+          if [[ ! -z "${{ matrix.traefik-version }}" ]]; then
+            TRAEFIK_VERSION=--traefik-version=${{ matrix.traefik-version }}
+          fi
+
+          python -m jupyterhub_traefik_proxy.install --output=./bin ${TRAEFIK_VERSION}
+
+          traefik version
+
       - name: Install consul
         if: matrix.backend == 'consul'
         run: |
-          curl -L https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip > consul.zip
+          curl -L https://releases.hashicorp.com/consul/${{ matrix.consul-version }}/consul_${{ matrix.consul-version }}_linux_amd64.zip > consul.zip
           unzip consul.zip -d ./bin consul
+
+          consul version
 
       - name: Install etcd
         if: matrix.backend == 'etcd'
         run: |
-          curl -L https://github.com/etcd-io/etcd/releases/download/v${ETCD_DOWNLOAD_VERSION}/etcd-v${ETCD_DOWNLOAD_VERSION}-linux-amd64.tar.gz   > etcd.tar.gz
+          curl -L https://github.com/etcd-io/etcd/releases/download/${{ matrix.etcd-version }}/etcd-${{ matrix.etcd-version }}-linux-amd64.tar.gz > etcd.tar.gz
           tar -xzf etcd.tar.gz -C ./bin --strip-components=1 --wildcards '*/etcd*'
 
-      - name: Install redis
+          etcdctl version
+
+      - name: Install redis via ${{ matrix.install-via }}
         if: matrix.backend == 'redis'
         run: |
-          sudo apt-get -y install redis-server
-
-      - name: Select tests
-        run: |
-          if [[ ! -z "${{ matrix.backend }}" ]]; then
-            # select backend subset
-            echo "PYTEST_ADDOPTS=-k ${{ matrix.backend }}" >> "${GITHUB_ENV}"
+          if [[ "${{ matrix.install-via }}" == "apt" ]]; then
+            sudo apt-get -y install redis
           else
-            # default: select everything _but_ the KV backend tests
-            echo "PYTEST_ADDOPTS=-k 'not etcd and not consul and not redis'" >> "${GITHUB_ENV}"
+            sudo snap install redis
           fi
+
+          redis-server --version
 
       - name: Run tests
         run: |
-          # Using the "--slow-last" flag, should run the slow tests last
-          pytest -v --durations 10 --maxfail 3 --slow-last --color=yes --cov=jupyterhub_traefik_proxy tests
+          if [[ "${{ matrix.backend }}" == "file" ]]; then
+            # select everything _but_ the KV store backend tests
+            export PYTEST_ADDOPTS="-k 'not etcd and not consul and not redis'"
+          else
+            # select backend subset
+            export PYTEST_ADDOPTS="-k ${{ matrix.backend }}"
+          fi
 
-      - name: Submit codecov report
-        run: |
-          codecov
+          pytest
+
+      - uses: codecov/codecov-action@v3

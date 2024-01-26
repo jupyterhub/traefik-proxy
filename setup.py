@@ -21,6 +21,15 @@ setup(
         # see https://github.com/jupyterhub/traefik-proxy/issues/155 for more
         "consul": ["python-consul2"],
         "etcd": ["etcdpy"],
+        "test": [
+            "jupyterhub-traefik-proxy[redis,etcd,consul]",
+            "certipy",
+            "notebook>=4.0",
+            "pytest",
+            "pytest-asyncio>=0.17,<0.23",  # FIXME: unpin pytest-asyncio
+            "pytest-cov",
+            "websockets",
+        ],
     },
     python_requires=">=3.8",
     author="Project Jupyter Contributors",
