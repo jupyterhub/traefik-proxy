@@ -53,23 +53,23 @@ jobs:
           #   test against the ubuntu and snap package, where the ubuntu package
           #   typically is behind the snap package.
           #
-          #   redis-test-version is provided as a matrix input only to provide
+          #   redis-version is provided as a matrix input only to provide
           #   visibility via github's web UI.
           #
           - python: "3.12"
             backend: redis
             install-via: apt # version 6.0.16 in ubuntu 22.04, https://packages.ubuntu.com/jammy/redis-server
-            redis-test-version: "6.0.16?"
+            redis-version: "6.0.16?"
           - python: "3.12"
             backend: redis
             install-via: snap # version 7.2.4 or higher, https://snapcraft.io/redis
-            redis-test-version: ">=7.2.4"
+            redis-version: ">=7.2.4"
           - python: "3.12"
             backend: etcd
-            etcd-test-version: "v3.4.29" # https://github.com/etcd-io/etcd/releases
+            etcd-version: "v3.4.29" # https://github.com/etcd-io/etcd/releases
           - python: "3.12"
             backend: consul
-            consul-test-version: "1.17.2" # https://github.com/hashicorp/consul/releases (but omit v prefix)
+            consul-version: "1.17.2" # https://github.com/hashicorp/consul/releases (but omit v prefix)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -103,7 +103,7 @@ jobs:
       - name: Install consul
         if: matrix.backend == 'consul'
         run: |
-          curl -L https://releases.hashicorp.com/consul/${{ matrix.consul-test-version }}/consul_${{ matrix.consul-test-version }}_linux_amd64.zip > consul.zip
+          curl -L https://releases.hashicorp.com/consul/${{ matrix.consul-version }}/consul_${{ matrix.consul-version }}_linux_amd64.zip > consul.zip
           unzip consul.zip -d ./bin consul
 
           consul version
@@ -111,7 +111,7 @@ jobs:
       - name: Install etcd
         if: matrix.backend == 'etcd'
         run: |
-          curl -L https://github.com/etcd-io/etcd/releases/download/${{ matrix.etcd-test-version }}/etcd-${{ matrix.etcd-test-version }}-linux-amd64.tar.gz > etcd.tar.gz
+          curl -L https://github.com/etcd-io/etcd/releases/download/${{ matrix.etcd-version }}/etcd-${{ matrix.etcd-version }}-linux-amd64.tar.gz > etcd.tar.gz
           tar -xzf etcd.tar.gz -C ./bin --strip-components=1 --wildcards '*/etcd*'
 
           etcdctl version
