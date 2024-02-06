@@ -5,7 +5,6 @@ Usage:
     pip install [-e] .
 """
 
-
 from setuptools import find_packages, setup
 
 with open("README.md", encoding="utf8") as f:

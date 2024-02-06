@@ -1,4 +1,5 @@
 """Redis backend"""
+
 import asyncio
 from urllib.parse import urlparse
 

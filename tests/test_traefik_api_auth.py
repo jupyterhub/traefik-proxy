@@ -1,4 +1,5 @@
 """Tests for the authentication to the traefik proxy api (dashboard)"""
+
 import pytest
 from jupyterhub.utils import exponential_backoff
 from tornado.httpclient import AsyncHTTPClient
