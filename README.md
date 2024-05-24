@@ -26,6 +26,7 @@ For **distributed** setups:
 
 Other implementations are maintained on a best-effort basis due to a lack of well-maintained
 Python clients:
+
 - TraefikEtcdProxy
 - TraefikConsulProxy
 
