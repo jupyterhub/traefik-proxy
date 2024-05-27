@@ -9,17 +9,23 @@
 
 When JupyterHub starts a server for a user, it will _dynamically configure a
 proxy server_ so that accessing `jupyterhub.example.com/user/<user>` routes to
-the individual Jupyter server. This project contains what JupyterHub need to
-dynamically configure the routes of a [traefik](https://traefik.io) proxy
-server! There are three implementations of the [JupyterHub proxy
+the individual Jupyter server.
+This project enables JupyterHub to dynamically configure the routes of a [traefik](https://traefik.io) proxy server!
+
+There are two main implementations of the [JupyterHub proxy
 API](https://jupyterhub.readthedocs.io/en/stable/reference/proxy.html),
-depending on how traefik store its routing configuration.
+depending on how traefik stores its routing configuration.
 
 For **smaller**, single-node deployments:
 
 - TraefikFileProviderProxy
 
 For **distributed** setups:
+
+- TraefikRedisProxy
+
+Other implementations are maintained on a best-effort basis due to a lack of well-maintained
+Python clients:
 
 - TraefikEtcdProxy
 - TraefikConsulProxy
@@ -29,11 +35,8 @@ For **distributed** setups:
 The [documentation](https://jupyterhub-traefik-proxy.readthedocs.io) contains a
 [complete installation
 guide](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/install.html)
-with examples for the three different implementations.
-
-- [For TraefikFileProviderProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/file.html#example-setup)
-- [For TraefikEtcdProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/etcd.html#example-setup)
-- [For TraefikConsulProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/consul.html#example-setup)
+with examples for all implementations, including the recommended
+[TraefikRedisProxy](https://jupyterhub-traefik-proxy.readthedocs.io/en/latest/redis.html#example-setup).
 
 ## Running tests
 
