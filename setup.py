@@ -20,8 +20,9 @@ setup(
         # see https://github.com/jupyterhub/traefik-proxy/issues/155 for more
         "consul": ["python-consul2"],
         "etcd": ["etcdpy"],
+        "yaml": ["ruamel.yaml"],
         "test": [
-            "jupyterhub-traefik-proxy[redis,etcd,consul]",
+            "jupyterhub-traefik-proxy[redis,etcd,consul,yaml]",
             "certipy",
             "notebook>=4.0",
             "pytest",
