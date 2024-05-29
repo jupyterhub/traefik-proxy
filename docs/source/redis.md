@@ -74,6 +74,23 @@ c.JupyterHub.proxy_class = "traefik_redis"
 
 **TraefikRedisProxy does not manage the Redis cluster** and assumes it is up and running before the proxy itself starts.
 
+In order for traefik to reliably receive notifications of changes from redis, redis must enable [keyspace notifications](https://redis.io/docs/latest/develop/use/keyspace-notifications/),
+e.g. with
+
+```
+--notify-keyspace-events KEA
+```
+
+To avoid losing configuration upon redis restart, the redis server should also enable persistence, e.g. with
+
+```
+--appendonly yes
+```
+
+:::
+
+:::{note}
+
 Based on how Redis is configured and started, TraefikRedisProxy needs to be told about some Redis configuration details, such as:
 
 - Redis **address** where it accepts client requests
