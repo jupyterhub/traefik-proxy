@@ -75,6 +75,15 @@ will be managed by JupyterHub. This allows e.g., the administrator to configure 
 
 ```
 
+````{note}
+yaml support requires the `ruamel.yaml` package, which you can install directly, or with:
+
+```
+pip install jupyterhub-traefik-proxy[yaml]
+```
+
+````
+
 ## Externally managed TraefikFileProviderProxy
 
 When TraefikFileProviderProxy is externally managed, service managers like [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
