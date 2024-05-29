@@ -47,6 +47,17 @@ class TraefikRedisProxy(TKvProxy):
             port=port,
             decode_responses=True,
         )
+        if not any(key.startswith('retry') for key in self.redis_client_kwargs):
+            # default retry configuration, if no retry configuration provided
+
+            from redis.asyncio.retry import Retry
+            from redis.backoff import ExponentialBackoff
+            from redis.exceptions import BusyLoadingError, ConnectionError, TimeoutError
+
+            # works out to ~30 seconds, e.g. handling redis server restart
+            # sum(ExponentialBackoff(cap=5).compute(i) for i in range(15))
+            kwargs["retry"] = Retry(ExponentialBackoff(cap=5), 15)
+            kwargs["retry_on_error"] = [BusyLoadingError, ConnectionError, TimeoutError]
         if self.redis_password:
             kwargs["password"] = self.redis_password
         if self.redis_username:
