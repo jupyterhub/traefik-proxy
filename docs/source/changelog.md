@@ -25,8 +25,8 @@
 
 ### Documentation improvements
 
-- [doc] note keyspace notifications, persistence requirement for redis [#246](https://github.com/jupyterhub/traefik-proxy/pull/246) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
-- express yaml optional dependency [#245](https://github.com/jupyterhub/traefik-proxy/pull/245) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
+- Note keyspace notifications, persistence requirement for redis [#246](https://github.com/jupyterhub/traefik-proxy/pull/246) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
+- Express yaml optional dependency [#245](https://github.com/jupyterhub/traefik-proxy/pull/245) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
 - README: Emphasize Redis over Etcd and Consul [#243](https://github.com/jupyterhub/traefik-proxy/pull/243) ([@manics](https://github.com/manics), [@minrk](https://github.com/minrk))
 
 ### Continuous integration improvements
@@ -37,21 +37,6 @@
 - Bump actions/setup-python from 4 to 5 [#225](https://github.com/jupyterhub/traefik-proxy/pull/225) ([@consideRatio](https://github.com/consideRatio))
 - Bump actions/checkout from 3 to 4 [#221](https://github.com/jupyterhub/traefik-proxy/pull/221) ([@consideRatio](https://github.com/consideRatio))
 - Bump pypa/gh-action-pypi-publish from 1.8.6 to release/v1 (edited) [#214](https://github.com/jupyterhub/traefik-proxy/pull/214) ([@consideRatio](https://github.com/consideRatio))
-
-### Other merged PRs
-
-- [pre-commit.ci] pre-commit autoupdate [#248](https://github.com/jupyterhub/traefik-proxy/pull/248) ([@minrk](https://github.com/minrk))
-- [pre-commit.ci] pre-commit autoupdate [#241](https://github.com/jupyterhub/traefik-proxy/pull/241) ([@consideRatio](https://github.com/consideRatio))
-- [pre-commit.ci] pre-commit autoupdate [#238](https://github.com/jupyterhub/traefik-proxy/pull/238) ([@consideRatio](https://github.com/consideRatio))
-- ci: test with traefik v3.0.0-rc1 [#236](https://github.com/jupyterhub/traefik-proxy/pull/236) ([@consideRatio](https://github.com/consideRatio), [@GeorgianaElena](https://github.com/GeorgianaElena))
-- [pre-commit.ci] pre-commit autoupdate [#235](https://github.com/jupyterhub/traefik-proxy/pull/235) ([@consideRatio](https://github.com/consideRatio))
-- [pre-commit.ci] pre-commit autoupdate [#224](https://github.com/jupyterhub/traefik-proxy/pull/224) ([@consideRatio](https://github.com/consideRatio))
-- [pre-commit.ci] pre-commit autoupdate [#223](https://github.com/jupyterhub/traefik-proxy/pull/223) ([@minrk](https://github.com/minrk))
-- [pre-commit.ci] pre-commit autoupdate [#222](https://github.com/jupyterhub/traefik-proxy/pull/222) ([@consideRatio](https://github.com/consideRatio))
-- Installation documentation fixes [#219](https://github.com/jupyterhub/traefik-proxy/pull/219) ([@cmd-ntrf](https://github.com/cmd-ntrf), [@minrk](https://github.com/minrk))
-- [pre-commit.ci] pre-commit autoupdate [#218](https://github.com/jupyterhub/traefik-proxy/pull/218) ([@consideRatio](https://github.com/consideRatio))
-- [pre-commit.ci] pre-commit autoupdate [#217](https://github.com/jupyterhub/traefik-proxy/pull/217) ([@consideRatio](https://github.com/consideRatio))
-- [pre-commit.ci] pre-commit autoupdate [#215](https://github.com/jupyterhub/traefik-proxy/pull/215) ([@consideRatio](https://github.com/consideRatio))
 
 ### Contributors to this release
 
