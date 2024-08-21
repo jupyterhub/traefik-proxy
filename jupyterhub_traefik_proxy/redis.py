@@ -136,32 +136,6 @@ class TraefikRedisProxy(TKvProxy):
         """
         return self.redis.register_script(_delete_lua)
 
-    @default("_delete_script_2")
-    def _register_delete_script_2(self):
-        """Register LUA script for deleting all keys matching in a prefix
-
-        Doing the scan & delete from Python is _extremely_ slow
-        for some reason
-        """
-        _delete_lua = """
-        local all_keys = {};
-        for pattern in ARGV do
-            local cursor = "0";
-            repeat
-                local result = redis.call("SCAN", cursor, "match", ARGV[1], "count", 100)
-                cursor = result[1];
-                for i, key in ipairs(result[2]) do
-                    table.insert(all_keys, key);
-                end
-            until cursor == "0"
-        end
-        for i, key in ipairs(all_keys) do
-            redis.call("DEL", key);
-        end
-        return #all_keys;
-        """
-        return self.redis.register_script(_delete_lua)
-
     async def _kv_atomic_delete(self, *keys):
         """Delete one or more keys
 
