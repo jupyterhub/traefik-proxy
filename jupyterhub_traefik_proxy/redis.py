@@ -1,6 +1,7 @@
 """Redis backend"""
 
 import asyncio
+from functools import partial
 from urllib.parse import urlparse
 
 from traitlets import Any, Dict, Unicode, default
@@ -115,7 +116,7 @@ class TraefikRedisProxy(TKvProxy):
         """
         _delete_lua = """
         local all_keys = {};
-        local cursor = "";
+        local cursor = "0";
         repeat
             local result = redis.call("SCAN", cursor, "match", ARGV[1], "count", ARGV[2])
             cursor = result[1];
@@ -123,6 +124,32 @@ class TraefikRedisProxy(TKvProxy):
                 table.insert(all_keys, key);
             end
         until cursor == "0"
+        for i, key in ipairs(all_keys) do
+            redis.call("DEL", key);
+        end
+        return #all_keys;
+        """
+        return self.redis.register_script(_delete_lua)
+
+    @default("_delete_script_2")
+    def _register_delete_script_2(self):
+        """Register LUA script for deleting all keys matching in a prefix
+
+        Doing the scan & delete from Python is _extremely_ slow
+        for some reason
+        """
+        _delete_lua = """
+        local all_keys = {};
+        for pattern in ARGV do
+            local cursor = "0";
+            repeat
+                local result = redis.call("SCAN", cursor, "match", ARGV[1], "count", 100)
+                cursor = result[1];
+                for i, key in ipairs(result[2]) do
+                    table.insert(all_keys, key);
+                end
+            until cursor == "0"
+        end
         for i, key in ipairs(all_keys) do
             redis.call("DEL", key);
         end
@@ -144,11 +171,11 @@ class TraefikRedisProxy(TKvProxy):
                 prefix = key + "*"
                 self.log.debug("Deleting redis tree %s", prefix)
                 f = asyncio.ensure_future(self._delete_script(args=[prefix, 100]))
-                f.add_done_callback(
-                    lambda f: self.log.debug(
-                        "Deleted %i keys in %s", f.result(), prefix
-                    )
-                )
+
+                def _log_delete(_prefix, f):
+                    self.log.debug("Deleted %i keys in %s", f.result(), _prefix)
+
+                f.add_done_callback(partial(_log_delete, prefix))
                 futures.append(f)
             else:
                 to_delete.append(key)
