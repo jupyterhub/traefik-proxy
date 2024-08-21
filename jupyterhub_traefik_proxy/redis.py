@@ -70,7 +70,12 @@ class TraefikRedisProxy(TKvProxy):
         f = super()._cleanup()
         if f is not None:
             await f
-        await self.redis.close()
+        if hasattr(self.redis, 'aclose'):
+            aclose = self.redis.aclose
+        else:
+            # redis < 5.0.1
+            aclose = self.redis.close
+        await aclose()
 
     def _setup_traefik_static_config(self):
         self.log.debug("Setting up the redis provider in the traefik static config")

@@ -418,6 +418,7 @@ async def external_redis_proxy(launch_traefik_redis, proxy_args):
     )
     await proxy._start_future
     yield proxy
+    await proxy._cleanup()
 
 
 @pytest.fixture
@@ -801,6 +802,7 @@ async def _wait_for_redis():
     from redis.asyncio import Redis
 
     async def _check_redis():
+        r = None
         try:
             r = Redis(
                 port=Config.redis_port,
@@ -811,6 +813,10 @@ async def _wait_for_redis():
         except redis.exceptions.ConnectionError as e:
             print(e)
             return False
+        finally:
+            if r is not None:
+                await r.aclose()
+
         return True
 
     await exponential_backoff(
