@@ -1,8 +1,55 @@
 # Changelog
 
-For detailed changes from the prior release, click on the version number
-and its link will bring up a GitHub listing of changes. Use `git log` on
-the command line for details.
+## 2.0.0 2024-08-22
+
+([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/1.1.0...2.0.0))
+
+### API and Breaking Changes
+
+- Require python 3.8+ [#232](https://github.com/jupyterhub/traefik-proxy/pull/232) ([@consideRatio](https://github.com/consideRatio), [@minrk](https://github.com/minrk))
+
+### New features added
+
+- add redis implementation [#230](https://github.com/jupyterhub/traefik-proxy/pull/230) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio), [@GeorgianaElena](https://github.com/GeorgianaElena), [@manics](https://github.com/manics))
+- Add arm64 support to install script [#220](https://github.com/jupyterhub/traefik-proxy/pull/220) ([@cmd-ntrf](https://github.com/cmd-ntrf), [@minrk](https://github.com/minrk))
+
+### Enhancements made
+
+- [redis] add default retry config [#244](https://github.com/jupyterhub/traefik-proxy/pull/244) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
+
+## Bugs fixed
+
+- fix initial cursor in delete script [#253](https://github.com/jupyterhub/traefik-proxy/pull/253) ([@minrk](https://github.com/minrk))
+
+### Maintenance and upkeep improvements
+
+- Update default traefik to install to 2.10.7 [#233](https://github.com/jupyterhub/traefik-proxy/pull/233) ([@consideRatio](https://github.com/consideRatio), [@minrk](https://github.com/minrk))
+- Test python 3.12, redis 7, traefik 3 - and misc updates to align with jupyterhub-python-repo-template [#231](https://github.com/jupyterhub/traefik-proxy/pull/231) ([@consideRatio](https://github.com/consideRatio), [@GeorgianaElena](https://github.com/GeorgianaElena), [@minrk](https://github.com/minrk))
+- temporary pin for pytest-asyncio [#227](https://github.com/jupyterhub/traefik-proxy/pull/227) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
+
+### Documentation improvements
+
+- Note keyspace notifications, persistence requirement for redis [#246](https://github.com/jupyterhub/traefik-proxy/pull/246) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
+- Express yaml optional dependency [#245](https://github.com/jupyterhub/traefik-proxy/pull/245) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
+- README: Emphasize Redis over Etcd and Consul [#243](https://github.com/jupyterhub/traefik-proxy/pull/243) ([@manics](https://github.com/manics), [@minrk](https://github.com/minrk))
+
+### Continuous integration improvements
+
+- ci: test with traefik v3.0.0 [#240](https://github.com/jupyterhub/traefik-proxy/pull/240) ([@consideRatio](https://github.com/consideRatio))
+- ci: test with traefik v2.11.2 and v3.0.0-rc5 [#239](https://github.com/jupyterhub/traefik-proxy/pull/239) ([@consideRatio](https://github.com/consideRatio))
+- Bump codecov/codecov-action from 3 to 4 [#234](https://github.com/jupyterhub/traefik-proxy/pull/234) ([@consideRatio](https://github.com/consideRatio))
+- Bump actions/setup-python from 4 to 5 [#225](https://github.com/jupyterhub/traefik-proxy/pull/225) ([@consideRatio](https://github.com/consideRatio))
+- Bump actions/checkout from 3 to 4 [#221](https://github.com/jupyterhub/traefik-proxy/pull/221) ([@consideRatio](https://github.com/consideRatio))
+- Bump pypa/gh-action-pypi-publish from 1.8.6 to release/v1 (edited) [#214](https://github.com/jupyterhub/traefik-proxy/pull/214) ([@consideRatio](https://github.com/consideRatio))
+
+### Contributors to this release
+
+The following people contributed discussions, new ideas, code and documentation contributions, and review.
+See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/#how-does-this-tool-define-contributions-in-the-reports).
+
+([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2023-06-06&to=2024-08-22&type=c))
+
+[@cmd-ntrf](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Acmd-ntrf+updated%3A2023-06-06..2024-08-22&type=Issues) | [@consideRatio](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2023-06-06..2024-08-22&type=Issues) | [@dependabot](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adependabot+updated%3A2023-06-06..2024-08-22&type=Issues) | [@manics](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amanics+updated%3A2023-06-06..2024-08-22&type=Issues) | [@minrk](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2023-06-06..2024-08-22&type=Issues) | [@pre-commit-ci](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Apre-commit-ci+updated%3A2023-06-06..2024-08-22&type=Issues) | [@rcthomas](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Arcthomas+updated%3A2023-06-06..2024-08-22&type=Issues) | [@welcome](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Awelcome+updated%3A2023-06-06..2024-08-22&type=Issues)
 
 ## 1.1.0 - 2023-06-06
 
