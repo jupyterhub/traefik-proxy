@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 2024-MM-DD
+## 2.0.0 2024-08-22
 
 ([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/1.1.0...2.0.0))
 
@@ -16,6 +16,10 @@
 ### Enhancements made
 
 - [redis] add default retry config [#244](https://github.com/jupyterhub/traefik-proxy/pull/244) ([@minrk](https://github.com/minrk), [@consideRatio](https://github.com/consideRatio))
+
+## Bugs fixed
+
+- fix initial cursor in delete script [#253](https://github.com/jupyterhub/traefik-proxy/pull/253) ([@minrk](https://github.com/minrk))
 
 ### Maintenance and upkeep improvements
 
@@ -43,9 +47,9 @@
 The following people contributed discussions, new ideas, code and documentation contributions, and review.
 See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/#how-does-this-tool-define-contributions-in-the-reports).
 
-([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2023-06-06&to=2024-07-12&type=c))
+([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2023-06-06&to=2024-08-22&type=c))
 
-@cmd-ntrf ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Acmd-ntrf+updated%3A2023-06-06..2024-07-12&type=Issues)) | @consideRatio ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2023-06-06..2024-07-12&type=Issues)) | @GeorgianaElena ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AGeorgianaElena+updated%3A2023-06-06..2024-07-12&type=Issues)) | @manics ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amanics+updated%3A2023-06-06..2024-07-12&type=Issues)) | @minrk ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2023-06-06..2024-07-12&type=Issues)) | @rcthomas ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Arcthomas+updated%3A2023-06-06..2024-07-12&type=Issues))
+[@cmd-ntrf](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Acmd-ntrf+updated%3A2023-06-06..2024-08-22&type=Issues) | [@consideRatio](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2023-06-06..2024-08-22&type=Issues) | [@dependabot](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Adependabot+updated%3A2023-06-06..2024-08-22&type=Issues) | [@manics](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amanics+updated%3A2023-06-06..2024-08-22&type=Issues) | [@minrk](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2023-06-06..2024-08-22&type=Issues) | [@pre-commit-ci](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Apre-commit-ci+updated%3A2023-06-06..2024-08-22&type=Issues) | [@rcthomas](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Arcthomas+updated%3A2023-06-06..2024-08-22&type=Issues) | [@welcome](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Awelcome+updated%3A2023-06-06..2024-08-22&type=Issues)
 
 ## 1.1.0 - 2023-06-06
 
