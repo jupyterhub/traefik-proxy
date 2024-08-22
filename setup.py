@@ -12,7 +12,7 @@ with open("README.md", encoding="utf8") as f:
 
 setup(
     name="jupyterhub-traefik-proxy",
-    version="1.1.0",
+    version="2.0.0",
     install_requires=open("requirements.txt").read().splitlines(),
     extras_require={
         "redis": ["redis"],
