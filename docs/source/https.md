@@ -115,6 +115,7 @@ c.TraefikProxy.extra_static_config = {
             "address": ":80"
         },
         "https": {
+            "address": ":443",
             "http": {
                 "tls": {
                     "options": "default"
@@ -127,8 +128,8 @@ c.TraefikProxy.extra_static_config = {
             "acme": {
                 "email": "you@example.com",
                 "storage": "acme.json",
+                "tlsChallenge": {},
             },
-            "tlsChallenge": {},
         },
     },
 }
