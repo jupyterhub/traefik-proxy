@@ -39,10 +39,13 @@ jobs:
           # Test against old and new python, and traefik v2 and v3
           - python: "3.8"
             backend: file
-            traefik-version: "v2.11.2"
+            traefik-version: "v2.11.10"
           - python: "3.12"
             backend: file
-            traefik-version: "v3.0.0"
+            traefik-version: "v3.1.4"
+          - python: "3.x"
+            backend: file
+            traefik-version: "" # default value
 
           # Test each backend that requires a python client against a modern
           # version of python to ensure clients are compatible.

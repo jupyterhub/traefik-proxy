@@ -149,7 +149,7 @@ def main():
         dest="traefik_version",
         # default version to install should be regularly updated, see
         # https://github.com/traefik/traefik/releases
-        default="2.10.7",
+        default="3.1.4",
         help=textwrap.dedent(
             """\
             The version of traefik to download.
