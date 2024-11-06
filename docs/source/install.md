@@ -96,7 +96,7 @@ you can load a specific config file and start JupyterHub using:
 $ jupyterhub -f /path/to/jupyterhub_config.py
 ```
 
-There is an example configuration file [here](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/examples/jupyterhub_config_toml.py) that configures JupyterHub to run with [TraefikRedisProxy](redis) as the proxy and uses dummyauthenticator and simplespawner to enable testing without administrative privileges.
+There is an example configuration file [here](https://github.com/jupyterhub/traefik-proxy/blob/HEAD/examples/jupyterhub_config_redis.py) that configures JupyterHub to run with [TraefikRedisProxy](redis) as the proxy and uses dummyauthenticator and simplespawner to enable testing without administrative privileges.
 
 In _jupyterhub_config.py_:
 
