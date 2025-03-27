@@ -499,6 +499,7 @@ async def test_check_routes(proxy, username):
     assert_equal(before, after)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="websockets require Python 3.9")
 async def test_websockets(proxy, launch_backends):
     routespec = "/user/username/"
     data = {}
