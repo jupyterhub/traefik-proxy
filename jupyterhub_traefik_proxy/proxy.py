@@ -293,18 +293,29 @@ class TraefikProxy(Proxy):
         )
         return ""
 
-    traefik_api_hashed_password = Unicode()
+    traefik_api_hashed_password = Unicode(
+        config=True,
+        help="""
+        Set the hashed password to use for the API
+
+        If unspecified, `traefik_api_password` will be hashed with bcrypt.
+        ref: https://doc.traefik.io/traefik/middlewares/http/basicauth/
+        """,
+    )
+
+    @default("traefik_api_hashed_password")
+    def _generate_htpassword(self):
+        import bcrypt
+
+        return bcrypt.hashpw(
+            self.traefik_api_password.encode("utf8"), bcrypt.gensalt()
+        ).decode("ascii")
 
     check_route_timeout = Integer(
         30,
         config=True,
         help="""Timeout (in seconds) when waiting for traefik to register an updated route.""",
     )
-
-    def _generate_htpassword(self):
-        from passlib.hash import apr_md5_crypt
-
-        self.traefik_api_hashed_password = apr_md5_crypt.hash(self.traefik_api_password)
 
     async def _check_for_traefik_service(self, routespec, kind):
         """Check for an expected router or service in the Traefik API.
@@ -508,7 +519,6 @@ class TraefikProxy(Proxy):
 
     async def _setup_traefik_dynamic_config(self):
         self.log.debug("Setting up traefik's dynamic config...")
-        self._generate_htpassword()
         api_url = urlparse(self.traefik_api_url)
         api_path = api_url.path if api_url.path.strip("/") else '/api'
         api_credentials = (
