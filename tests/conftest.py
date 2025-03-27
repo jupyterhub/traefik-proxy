@@ -149,6 +149,11 @@ def client_ca(certipy):
         # self.internal_ssl_cert,
         # cafile=self.internal_ssl_ca,
     )
+    # FIXME: generate certs with Authority Key defined for strict checking
+    # upstream PR: https://github.com/LLNL/certipy/pull/23/
+    # avoids Missing Authority Key Identifier SSL errors
+    # with new defaults in Python 3.13
+    ssl_context.verify_flags &= ~ssl.VERIFY_X509_STRICT
     AsyncHTTPClient.configure(None, defaults={"ssl_options": ssl_context})
     return record['files']['ca']
 
@@ -311,6 +316,8 @@ def _check_ssl(proxy, client_ca):
     )
     context.check_hostname = True
     context.verify_mode = ssl.VerifyMode.CERT_REQUIRED
+    # required for Python 3.13 until we get a certipy update
+    context.verify_flags &= ~ssl.VERIFY_X509_STRICT
     context.load_cert_chain(proxy.ssl_cert, proxy.ssl_key)
 
     url = urlparse(Config.public_url)
