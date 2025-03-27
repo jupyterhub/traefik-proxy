@@ -26,6 +26,7 @@ from os.path import abspath
 from subprocess import Popen, TimeoutExpired
 from urllib.parse import urlparse, urlunparse
 
+import bcrypt
 from jupyterhub.proxy import Proxy
 from jupyterhub.utils import exponential_backoff, new_token, url_path_join
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
@@ -305,8 +306,6 @@ class TraefikProxy(Proxy):
 
     @default("traefik_api_hashed_password")
     def _generate_htpassword(self):
-        import bcrypt
-
         return bcrypt.hashpw(
             self.traefik_api_password.encode("utf8"), bcrypt.gensalt()
         ).decode("ascii")
