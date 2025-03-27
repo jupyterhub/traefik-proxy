@@ -1,5 +1,43 @@
 # Changelog
 
+## 2.1.0 2025-03
+
+([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/2.0.0...a8f6766126ec45520a90133820b09997932a7147))
+
+### New features added
+
+- allow explicit traefik_api_hashed_password, use bcrypt for hash instead of md5 [#269](https://github.com/jupyterhub/traefik-proxy/pull/269) ([@minrk](https://github.com/minrk), [@manics](https://github.com/manics))
+
+### Maintenance and upkeep improvements
+
+- update tests for websockets 14, python 3.13 ssl [#268](https://github.com/jupyterhub/traefik-proxy/pull/268) ([@minrk](https://github.com/minrk))
+- ignore some more files [#267](https://github.com/jupyterhub/traefik-proxy/pull/267) ([@minrk](https://github.com/minrk))
+- Bump default traefik version to install from 2.10.7 to 3.1.4 [#258](https://github.com/jupyterhub/traefik-proxy/pull/258) ([@consideRatio](https://github.com/consideRatio), [@minrk](https://github.com/minrk))
+
+### Documentation improvements
+
+- add missing example redis config [#261](https://github.com/jupyterhub/traefik-proxy/pull/261) ([@minrk](https://github.com/minrk), [@GeorgianaElena](https://github.com/GeorgianaElena))
+- Fix link to traefik example [#260](https://github.com/jupyterhub/traefik-proxy/pull/260) ([@matuzalemmuller](https://github.com/matuzalemmuller), [@manics](https://github.com/manics), [@minrk](https://github.com/minrk))
+- Update Docs on setting up https [#254](https://github.com/jupyterhub/traefik-proxy/pull/254) ([@buti1021](https://github.com/buti1021), [@minrk](https://github.com/minrk))
+
+### Contributors to this release
+
+The following people contributed discussions, new ideas, code and documentation contributions, and review.
+See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/#how-does-this-tool-define-contributions-in-the-reports).
+
+([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2024-08-22&to=2025-03-27&type=c))
+
+@buti1021 ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Abuti1021+updated%3A2024-08-22..2025-03-27&type=Issues)) | @consideRatio ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2024-08-22..2025-03-27&type=Issues)) | @GeorgianaElena ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AGeorgianaElena+updated%3A2024-08-22..2025-03-27&type=Issues)) | @manics ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amanics+updated%3A2024-08-22..2025-03-27&type=Issues)) | @matuzalemmuller ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amatuzalemmuller+updated%3A2024-08-22..2025-03-27&type=Issues)) | @minrk ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2024-08-22..2025-03-27&type=Issues)) | @rcthomas ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Arcthomas+updated%3A2024-08-22..2025-03-27&type=Issues))
+
+### Contributors to this release
+
+The following people contributed discussions, new ideas, code and documentation contributions, and review.
+See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/#how-does-this-tool-define-contributions-in-the-reports).
+
+([GitHub contributors page for this release](https://github.com/jupyterhub/traefik-proxy/graphs/contributors?from=2024-08-22&to=2025-03-27&type=c))
+
+@buti1021 ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Abuti1021+updated%3A2024-08-22..2025-03-27&type=Issues)) | @consideRatio ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AconsideRatio+updated%3A2024-08-22..2025-03-27&type=Issues)) | @GeorgianaElena ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3AGeorgianaElena+updated%3A2024-08-22..2025-03-27&type=Issues)) | @manics ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amanics+updated%3A2024-08-22..2025-03-27&type=Issues)) | @matuzalemmuller ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Amatuzalemmuller+updated%3A2024-08-22..2025-03-27&type=Issues)) | @minrk ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Aminrk+updated%3A2024-08-22..2025-03-27&type=Issues)) | @rcthomas ([activity](https://github.com/search?q=repo%3Ajupyterhub%2Ftraefik-proxy+involves%3Arcthomas+updated%3A2024-08-22..2025-03-27&type=Issues))
+
 ## 2.0.0 2024-08-22
 
 ([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/1.1.0...2.0.0))
