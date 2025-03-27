@@ -11,17 +11,37 @@ from functools import partial
 from http import HTTPStatus
 
 import websockets
+from packaging.version import parse as V
+
+_old_ws = V(websockets.__version__) < V("14")
 
 
+# websockets 14 changed APIs
+# drop _old_ws logic when we drop Python 3.8
+# _old_ws signature: (path, request_headers, port)
 async def process_request(connection, request, port):
-    if request.path.endswith("/ws"):
+    if _old_ws:
+        path = connection
+        request_headers = request
+    else:
+        path = request.path
+        request_headers = request.headers
+
+    if path.endswith("/ws"):
         return None
+
     headers = {
         "Content-Type": "text/plain",
-        "Host": request.headers.get("Host", "None"),
-        "Origin": request.headers.get("Origin", "None"),
+        "Host": request_headers.get("Host", "None"),
+        "Origin": request_headers.get("Origin", "None"),
     }
-    return connection.respond(HTTPStatus.OK, headers, str(port).encode("utf8"))
+
+    if _old_ws:
+        return (HTTPStatus.OK, headers, str(port).encode())
+    else:
+        response = connection.respond(HTTPStatus.OK, str(port))
+        response.headers.update(headers)
+        return response
 
 
 async def send_port(websocket):
