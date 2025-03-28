@@ -58,7 +58,7 @@ testpaths = ["tests"]
 github_url = "https://github.com/jupyterhub/traefik-proxy"
 
 [tool.tbump.version]
-current = "2.0.0.dev"
+current = "2.1.0"
 
 regex = '''
   (?P<major>\d+)
