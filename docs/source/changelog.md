@@ -2,7 +2,7 @@
 
 ## 2.1.0 2025-03
 
-([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/2.0.0...a8f6766126ec45520a90133820b09997932a7147))
+([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/2.0.0...2.1.0))
 
 ### New features added
 
