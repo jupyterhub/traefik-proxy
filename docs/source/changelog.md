@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.1.0 2025-03
+## 2.1.0 2025-03-28
 
 ([full changelog](https://github.com/jupyterhub/traefik-proxy/compare/2.0.0...2.1.0))
 
