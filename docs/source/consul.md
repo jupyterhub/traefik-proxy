@@ -44,7 +44,6 @@ You can choose to:
 ## Consul configuration
 
 1. Depending on the value of the `should_start` proxy flag, you can choose whether or not TraefikConsulProxy willl be externally managed.
-
    - When **should_start** is set to **True**, TraefikConsulProxy will auto-generate its static configuration
      (using the override values or the defaults) and store it in `traefik.toml` file.
      The traefik process will then be launched using this file.
@@ -116,7 +115,6 @@ If TraefikConsulProxy is used as an externally managed service, then make sure y
 2.  Configure `TraefikConsulProxy` in **jupyterhub_config.py**
 
     JupyterHub configuration file, _jupyterhub_config.py_ must specify at least:
-
     - That the proxy is externally managed
     - The traefik api credentials
     - The consul credentials (if consul acl is enabled)
@@ -144,7 +142,6 @@ If TraefikConsulProxy is used as an externally managed service, then make sure y
     traefik static configuration and pass it to traefik when you launch the process.
     Keep in mind that in order for the routes to be stored in **consul**,
     this _toml_ file **must** specify consul as the provider/
-
     - **Keep in mind that the static configuration must configure at least:**
       - The default entrypoint
       - The api entrypoint

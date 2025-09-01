@@ -100,7 +100,6 @@ If TraefikFileProviderProxy is used as an externally managed service, then make 
 2. Configure `TraefikFileProviderProxy` in **jupyterhub_config.py**
 
    JupyterHub configuration file, _jupyterhub_config.py_ must specify at least:
-
    - That the proxy is externally managed
    - The traefik api credentials
    - The dynamic configuration file, if different from _rules.toml_ or if this
@@ -138,7 +137,6 @@ If TraefikFileProviderProxy is used as an externally managed service, then make 
 3. Ensure **traefik.toml** / **traefik.yaml**
 
    The static configuration file, _traefik.toml_ (or **traefik.yaml**) must configure at least:
-
    - The default entrypoint
    - The api entrypoint (_and authenticate it in a user-managed dynamic configuration file_)
    - The websockets protocol

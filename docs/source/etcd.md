@@ -47,7 +47,6 @@ You can choose to:
 ## Etcd configuration
 
 1. Depending on the value of the `should_start` proxy flag, you can choose whether or not TraefikEtcdProxy willl be externally managed.
-
    - When **should_start** is set to **True**, TraefikEtcdProxy will auto-generate its static configuration
      (using the override values or the defaults) and store it in `traefik.toml` file.
      The traefik process will then be launched using this file.
@@ -125,7 +124,6 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
 2. Configure `TraefikEtcdProxy` in **jupyterhub_config.py**
 
    JupyterHub configuration file, _jupyterhub_config.py_ must specify at least:
-
    - That the proxy is externally managed
    - The traefik api credentials
    - The etcd credentials (if etcd authentication is enabled)
@@ -154,9 +152,7 @@ If TraefikEtcdProxy is used as an externally managed service, then make sure you
    traefik static configuration and pass it to traefik when you launch the process.
    Keep in mind that in order for the routes to be stored in **etcd**,
    this _toml_ file **must** specify etcd as the provider/
-
    - **Keep in mind that the static configuration must configure at least:**
-
      - The default entrypoint
      - The api entrypoint
      - The etcd provider
