@@ -17,7 +17,6 @@
 3. In order to be able to launch JupyterHub with traefik-proxy or run the tests, **traefik**, must first be installed and added to your `PATH`.
 
    There are two ways you can install traefik:
-
    1. Through traefik-proxy's **install utility**.
 
       ```
@@ -35,7 +34,6 @@
       ```
 
       If you want to install other versions of traefik in a directory of your choice, just specify it to the installer through the following arguments:
-
       - `--traefik-version`
       - `--output`
 
