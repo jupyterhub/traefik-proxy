@@ -557,7 +557,7 @@ class TraefikProxy(Proxy):
                     }
                 }
             }
-        if self.app.internal_ssl:
+        if getattr(self.app, "internal_ssl", False):
 
             def _resolve_path(path):
                 if os.path.isabs(path):
@@ -684,7 +684,7 @@ class TraefikProxy(Proxy):
         traefik_config["http"]["services"][service_alias] = {
             "loadBalancer": {"servers": [{"url": target}], "passHostHeader": True}
         }
-        if self.app.internal_ssl:
+        if getattr(self.app, "internal_ssl", False):
             traefik_config["http"]["services"][service_alias]["loadBalancer"][
                 "serversTransport"
             ] = self.traefik_http_servers_transport
