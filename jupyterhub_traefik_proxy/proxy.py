@@ -69,7 +69,7 @@ class TraefikProxy(Proxy):
 
     extra_static_config = Dict(
         config=True,
-        help="""Extra static configuration for treafik.
+        help="""Extra static configuration for traefik.
 
         Merged with the default static config before writing to `.static_config_file`.
 
@@ -79,7 +79,7 @@ class TraefikProxy(Proxy):
 
     extra_dynamic_config = Dict(
         config=True,
-        help="""Extra dynamic configuration for treafik.
+        help="""Extra dynamic configuration for traefik.
 
         Merged with the default dynamic config during startup.
 
@@ -200,6 +200,12 @@ class TraefikProxy(Proxy):
 
         Only has an effect when traefik is a subprocess (should_start=True).
         """,
+    )
+
+    traefik_http_servers_transport = Unicode(
+        "jupyterhub",
+        config=True,
+        help="The name of the servers transport to use for internal SSL",
     )
 
     provider_name = Unicode(
@@ -364,7 +370,7 @@ class TraefikProxy(Proxy):
             scale_factor=1.2,
             timeout=self.check_route_timeout,
         )
-        self.log.debug("Treafik route for %s: registered", routespec)
+        self.log.debug("Traefik route for %s: registered", routespec)
 
     async def _traefik_api_request(self, path):
         """Make an API request to traefik"""
@@ -551,13 +557,39 @@ class TraefikProxy(Proxy):
                     }
                 }
             }
+        if self.app.internal_ssl:
+
+            def _resolve_path(path):
+                if os.path.isabs(path):
+                    return path
+                return url_path_join(os.getcwd(), path)
+
+            client_key = _resolve_path(
+                self.app.internal_proxy_certs["proxy-client"]['keyfile']
+            )
+            client_cert = _resolve_path(
+                self.app.internal_proxy_certs["proxy-client"]['certfile']
+            )
+            client_ca = _resolve_path(
+                self.app.internal_trust_bundles["proxy-client-ca"]
+            )
+            dynamic_config["http"]["serversTransports"] = {
+                self.traefik_http_servers_transport: {
+                    "certificates": [
+                        {
+                            "certfile": client_cert,
+                            "keyfile": client_key,
+                        }
+                    ],
+                    "rootCAs": client_ca,
+                }
+            }
 
         self.dynamic_config = deep_merge(dynamic_config, self.dynamic_config)
         if self.extra_dynamic_config:
             self.dynamic_config = deep_merge(
                 self.dynamic_config, self.extra_dynamic_config
             )
-
         await self._apply_dynamic_config(self.dynamic_config, None)
 
     def validate_routespec(self, routespec):
@@ -652,6 +684,10 @@ class TraefikProxy(Proxy):
         traefik_config["http"]["services"][service_alias] = {
             "loadBalancer": {"servers": [{"url": target}], "passHostHeader": True}
         }
+        if self.app.internal_ssl:
+            traefik_config["http"]["services"][service_alias]["loadBalancer"][
+                "serversTransport"
+            ] = self.traefik_http_servers_transport
 
         # Add the data node to a separate top-level node, so traefik doesn't see it.
         # key needs to be key-value safe (no '/')
