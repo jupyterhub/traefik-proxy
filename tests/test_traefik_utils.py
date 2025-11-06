@@ -79,17 +79,36 @@ def test_atomic_writing_recovery(tmpdir):
 
 
 @pytest.mark.parametrize(
-    "routespec, expected_rule",
+    "routespec, expected_rule, enforced_host_in_rules",
     [
-        ("/", "PathPrefix(`/`)"),
-        ("/path/prefix/", "( PathPrefix(`/path/prefix/`) || Path(`/path/prefix`) )"),
-        ("host/", "Host(`host`) && PathPrefix(`/`)"),
+        ("/", "PathPrefix(`/`)", ""),
+        (
+            "/path/prefix/",
+            "( PathPrefix(`/path/prefix/`) || Path(`/path/prefix`) )",
+            "",
+        ),
+        ("host/", "Host(`host`) && PathPrefix(`/`)", ""),
         (
             "host/path/prefix/",
             "Host(`host`) && ( PathPrefix(`/path/prefix/`) || Path(`/path/prefix`) )",
+            "",
+        ),
+        ("/", "Host(`host`) && PathPrefix(`/`)", "host"),
+        (
+            "/path/prefix/",
+            "Host(`host`) && ( PathPrefix(`/path/prefix/`) || Path(`/path/prefix`) )",
+            "host",
+        ),
+        ("host/", "Host(`host`) && PathPrefix(`/`)", "host"),
+        (
+            "host/path/prefix/",
+            "Host(`host`) && ( PathPrefix(`/path/prefix/`) || Path(`/path/prefix`) )",
+            "host",
         ),
     ],
 )
-def test_generate_rule(routespec, expected_rule):
-    rule = traefik_utils.generate_rule(routespec)
+def test_generate_rule(routespec, expected_rule, enforced_host_in_rules):
+    rule = traefik_utils.generate_rule(
+        routespec, enforce_host_in_rules=enforced_host_in_rules
+    )
     assert rule == expected_rule
