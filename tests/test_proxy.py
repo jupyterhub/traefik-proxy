@@ -513,6 +513,8 @@ async def test_host_origin_headers(
 
     expected_host_header = traefik_host + ":" + str(traefik_port)
     expected_origin_header = proxy.public_url + routespec
+    if traefik_enforce_host_in_rules:
+        expected_host_header = traefik_enforce_host_in_rules
 
     req = HTTPRequest(
         req_url,
