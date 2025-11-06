@@ -181,7 +181,9 @@ class TraefikFileProviderProxy(TraefikProxy):
             None: if there are no routes matching the given routespec
         """
         routespec = self.validate_routespec(routespec)
-        router_alias = traefik_utils.generate_alias(routespec, "router")
+        router_alias = traefik_utils.generate_alias(
+            routespec, "router", self.traefik_alias_prefix
+        )
         async with self.mutex:
             route = self.dynamic_config["jupyterhub"]["routes"].get(router_alias)
             if not route:
