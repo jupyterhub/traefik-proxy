@@ -158,15 +158,6 @@ def test_default_port():
 
 
 @pytest.mark.parametrize(
-    "traefik_enforce_host_in_rules, traefik_alias_prefix",
-    [
-        ("", ""),
-        ("host.localhost", ""),
-        ("", "alias1_"),
-        ("host.localhost", "alias1_"),
-    ],
-)
-@pytest.mark.parametrize(
     "routespec, existing_routes",
     [
         # default route
@@ -222,11 +213,7 @@ async def test_add_get_delete(
     routespec,
     existing_routes,
     event_loop,
-    traefik_enforce_host_in_rules,
-    traefik_alias_prefix,
 ):
-    proxy.traefik_enforce_host_in_rules = traefik_enforce_host_in_rules
-    proxy.traefik_alias_prefix = traefik_alias_prefix
     data = {"test": "test1", "user": "username"}
 
     backends = await launch_backends(1 + len(existing_routes))
@@ -585,20 +572,7 @@ async def test_check_routes(
     assert_equal(before, after)
 
 
-@pytest.mark.parametrize(
-    "traefik_enforce_host_in_rules, traefik_alias_prefix",
-    [
-        ("", ""),
-        ("host.localhost", ""),
-        ("", "alias1_"),
-        ("host.localhost", "alias1_"),
-    ],
-)
-async def test_websockets(
-    proxy, launch_backends, traefik_enforce_host_in_rules, traefik_alias_prefix
-):
-    proxy.traefik_enforce_host_in_rules = traefik_enforce_host_in_rules
-    proxy.traefik_alias_prefix = traefik_alias_prefix
+async def test_websockets(proxy, launch_backends):
     routespec = "/user/username/"
     data = {}
 
