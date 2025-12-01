@@ -75,7 +75,7 @@ jobs:
             backend: consul
             consul-version: "1.17.2" # https://github.com/hashicorp/consul/releases (but omit v prefix)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
