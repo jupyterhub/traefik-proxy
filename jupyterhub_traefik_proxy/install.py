@@ -111,14 +111,12 @@ def main():
         "--output",
         dest="installation_dir",
         default="./dependencies",
-        help=textwrap.dedent(
-            """\
+        help=textwrap.dedent("""\
             The installation directory (absolute or relative path).
             If it doesn't exist, it will be created.
             If no directory is provided, it defaults to:
             --- %(default)s ---
-            """
-        ),
+            """),
     )
 
     machine = platform.machine()
@@ -129,13 +127,11 @@ def main():
         "--platform",
         dest="plat",
         default=default_platform,
-        help=textwrap.dedent(
-            """\
+        help=textwrap.dedent("""\
             The platform to download for.
             If no platform is provided, it defaults to:
             --- %(default)s ---
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
@@ -150,13 +146,11 @@ def main():
         # default version to install should be regularly updated, see
         # https://github.com/traefik/traefik/releases
         default="3.1.4",
-        help=textwrap.dedent(
-            """\
+        help=textwrap.dedent("""\
             The version of traefik to download.
             If no version is provided, it defaults to:
             --- %(default)s ---
-            """
-        ),
+            """),
     )
     if "--etcd" in sys.argv:
         sys.exit(
