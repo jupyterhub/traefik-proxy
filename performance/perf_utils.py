@@ -30,8 +30,7 @@ performance_dir = Path(__file__).parent.resolve()
 def configure_argument_parser():
     parser = argparse.ArgumentParser(
         description="Performance measurement utility",
-        epilog=textwrap.dedent(
-            """\
+        epilog=textwrap.dedent("""\
             Available measurements:
             - Proxy methods:
                 - add_route
@@ -40,8 +39,7 @@ def configure_argument_parser():
             - Request throughput: small requests
             - Request throughput: large requests
             - Websocket throughput
-            """
-        ),
+            """),
         formatter_class=argparse.RawTextHelpFormatter,
     )
 
@@ -56,8 +54,7 @@ def configure_argument_parser():
             "ws_throughput_small",
             "ws_throughput_large",
         ],
-        help=textwrap.dedent(
-            """\
+        help=textwrap.dedent("""\
             What metric to measure. Available metrics:
             - methods
             - http_throughput_small
@@ -65,16 +62,14 @@ def configure_argument_parser():
             - ws_throughput
             If no metric is provided, it defaults to:
             --- %(default)s ---
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
         "--proxy",
         dest="proxy_class",
         default="file",
-        help=textwrap.dedent(
-            """\
+        help=textwrap.dedent("""\
             Proxy class to analyze.
             Available proxies:
             - file
@@ -83,21 +78,18 @@ def configure_argument_parser():
             - chp
             If no proxy is provided, it defaults to:
             --- %(default)s ---
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
         "--routes",
         dest="routes",
         default=10,
-        help=textwrap.dedent(
-            """\
+        help=textwrap.dedent("""\
             Number of routes to be added/deleted/retrieved.
             If no number is provided, it defaults to:
             --- %(default)s ---
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
@@ -105,51 +97,43 @@ def configure_argument_parser():
         "--concurrency",
         dest="concurrency",
         default=10,
-        help=textwrap.dedent(
-            """\
+        help=textwrap.dedent("""\
             Number of concurrent requests when computing the throughput.
             Number of concurrent API calls when computing method performance.
             If no number is provided, it defaults to:
             --- %(default)s ---
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
         "--requests",
         dest="total_requests",
         default=1000,
-        help=textwrap.dedent(
-            """\
+        help=textwrap.dedent("""\
             Total number of requests when computing the throughput.
             If no number is provided, it defaults to:
             --- %(default)s ---
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
         "--iterations",
         dest="test_iterations",
         default=1,
-        help=textwrap.dedent(
-            """
+        help=textwrap.dedent("""
             How many times to run the measurement.
             If no value is provided, it defaults to:
             --- %(default)s ---
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
         "--output",
         dest="csv_filename",
-        help=textwrap.dedent(
-            """
+        help=textwrap.dedent("""
             The csv file name where the results will be stored.
             If no file is provided, the results will only be outputed to stdout.
-            """
-        ),
+            """),
     )
 
     return parser
