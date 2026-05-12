@@ -63,7 +63,9 @@ async def check_host_up_http(url, **req_kwargs):
     return True
 
 
-async def get_responding_backend_port(traefik_url, path, **kwargs):
+async def get_responding_backend_port(
+    traefik_url, path, ensured_host_in_rules="", **kwargs
+):
     """Check if traefik followed the configuration and routed the
     request to the right backend"""
 
@@ -73,6 +75,8 @@ async def get_responding_backend_port(traefik_url, path, **kwargs):
         host, slash, path = path.partition("/")
         path = slash + path
         headers["Host"] = host
+    elif ensured_host_in_rules:
+        headers["Host"] = ensured_host_in_rules
 
     req = HTTPRequest(
         traefik_url + path,

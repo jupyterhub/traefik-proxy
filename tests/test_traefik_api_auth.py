@@ -9,10 +9,28 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.mark.parametrize(
+    "traefik_enforce_host_in_rules, traefik_alias_prefix",
+    [
+        ("", ""),
+        ("host.localhost", ""),
+        ("", "alias1_"),
+        ("host.localhost", "alias1_"),
+    ],
+)
+@pytest.mark.parametrize(
     "username, password, expected_rc",
     [("api_admin", "admin", 200), ("api_admin", "1234", 401), ("", "", 401)],
 )
-async def test_traefik_api_auth(proxy, username, password, expected_rc):
+async def test_traefik_api_auth(
+    proxy,
+    username,
+    password,
+    expected_rc,
+    traefik_enforce_host_in_rules,
+    traefik_alias_prefix,
+):
+    proxy.traefik_enforce_host_in_rules = traefik_enforce_host_in_rules
+    proxy.traefik_alias_prefix = traefik_alias_prefix
     traefik_api_url = proxy.traefik_api_url + "/api/overview"
 
     async def api_login():
