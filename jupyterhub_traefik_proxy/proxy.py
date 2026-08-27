@@ -206,6 +206,26 @@ class TraefikProxy(Proxy):
         help="""The provider name that Traefik expects, e.g. file, consul, etcd"""
     )
 
+    traefik_alias_prefix = Unicode(
+        "",
+        config=True,
+        help="""The alias prefix to use for traefik services.
+
+        This is used to namespace the services created by traefik,
+        to avoid conflicts with other services running in the same
+        environment.
+        """,
+    )
+
+    traefik_enforce_host_in_rules = Unicode(
+        "",
+        config=True,
+        help="""
+        Optional configuration to enforce a specific host in all generated traefik rules.
+        Allows running multiple JupyterHub instances behind the same traefik proxy.
+        """,
+    )
+
     is_https = Bool(
         help="""Whether :attr:`.public_url` specifies an https entrypoint"""
     )
@@ -325,7 +345,9 @@ class TraefikProxy(Proxy):
         # expected e.g. 'service' + '_' + routespec @ file
         routespec = self.validate_routespec(routespec)
         expected = (
-            traefik_utils.generate_alias(routespec, kind) + "@" + self.provider_name
+            traefik_utils.generate_alias(routespec, kind, self.traefik_alias_prefix)
+            + "@"
+            + self.provider_name
         )
         path = f"/api/http/{kind}s/{expected}"
         try:
@@ -557,7 +579,6 @@ class TraefikProxy(Proxy):
             self.dynamic_config = deep_merge(
                 self.dynamic_config, self.extra_dynamic_config
             )
-
         await self._apply_dynamic_config(self.dynamic_config, None)
 
     def validate_routespec(self, routespec):
@@ -631,9 +652,15 @@ class TraefikProxy(Proxy):
             (implementation-specific) and associated with the route
         """
 
-        service_alias = traefik_utils.generate_alias(routespec, "service")
-        router_alias = traefik_utils.generate_alias(routespec, "router")
-        rule = traefik_utils.generate_rule(routespec)
+        service_alias = traefik_utils.generate_alias(
+            routespec, "service", self.traefik_alias_prefix
+        )
+        router_alias = traefik_utils.generate_alias(
+            routespec, "router", self.traefik_alias_prefix
+        )
+        rule = traefik_utils.generate_rule(
+            routespec, self.traefik_enforce_host_in_rules
+        )
         # dynamic config to deep merge
         traefik_config = {
             "http": {
@@ -711,8 +738,12 @@ class TraefikProxy(Proxy):
 
         i.e. ( (["http", "routers", "router_name"], ("routes", "route_name") )
         """
-        service_alias = traefik_utils.generate_alias(routespec, "service")
-        router_alias = traefik_utils.generate_alias(routespec, "router")
+        service_alias = traefik_utils.generate_alias(
+            routespec, "service", self.traefik_alias_prefix
+        )
+        router_alias = traefik_utils.generate_alias(
+            routespec, "router", self.traefik_alias_prefix
+        )
         traefik_keys = (
             ["http", "routers", router_alias],
             ["http", "services", service_alias],
@@ -768,6 +799,12 @@ class TraefikProxy(Proxy):
 
         all_routes = {}
         for _key, route in jupyterhub_config.get("routes", {}).items():
+            if self.traefik_alias_prefix and (
+                not route.get("router", "").startswith(self.traefik_alias_prefix)
+                and not route.get("service", "").startswith(self.traefik_alias_prefix)
+            ):
+                # not our route
+                continue
             all_routes[route["routespec"]] = {
                 "routespec": route["routespec"],
                 "data": route.get("data", {}),

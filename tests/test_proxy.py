@@ -207,7 +207,12 @@ def test_default_port():
     ],
 )
 async def test_add_get_delete(
-    request, proxy, launch_backends, routespec, existing_routes, event_loop
+    request,
+    proxy,
+    launch_backends,
+    routespec,
+    existing_routes,
+    event_loop,
 ):
     data = {"test": "test1", "user": "username"}
 
@@ -262,13 +267,19 @@ async def test_add_get_delete(
 
             # Test the actual routing
             responding_backend1 = await utils.get_responding_backend_port(
-                proxy_url, normalize_spec(spec)
+                proxy_url, normalize_spec(spec), proxy.traefik_enforce_host_in_rules
             )
             responding_backend2 = await utils.get_responding_backend_port(
-                proxy_url, normalize_spec(spec) + "something"
+                proxy_url,
+                normalize_spec(spec) + "something",
+                proxy.traefik_enforce_host_in_rules,
             )
-            assert responding_backend1 == urlparse(backend).port
-            assert responding_backend2 == urlparse(backend).port
+            assert (
+                responding_backend1 == urlparse(backend).port
+            ), f"Route {spec} did not route to expected backend"
+            assert (
+                responding_backend2 == urlparse(backend).port
+            ), f"Route {spec} did not route to expected backend"
 
     # Create existing routes
     futures = []
@@ -321,7 +332,9 @@ async def test_add_get_delete(
                 normalize_spec(routespec) + "something",
             ]:
                 try:
-                    result = await utils.get_responding_backend_port(proxy_url, spec)
+                    result = await utils.get_responding_backend_port(
+                        proxy_url, spec, proxy.traefik_enforce_host_in_rules
+                    )
                     if result != urlparse(default_backend).port:
                         deleted += 1
                 except HTTPClientError:
@@ -338,7 +351,20 @@ async def test_add_get_delete(
         await test_route_exist(spec, extra_backends[i])
 
 
-async def test_trailing_slash(proxy, launch_backends):
+@pytest.mark.parametrize(
+    "traefik_enforce_host_in_rules, traefik_alias_prefix",
+    [
+        ("", ""),
+        ("host.localhost", ""),
+        ("", "alias1_"),
+        ("host.localhost", "alias1_"),
+    ],
+)
+async def test_trailing_slash(
+    proxy, launch_backends, traefik_enforce_host_in_rules, traefik_alias_prefix
+):
+    proxy.traefik_enforce_host_in_rules = traefik_enforce_host_in_rules
+    proxy.traefik_alias_prefix = traefik_alias_prefix
     proxy_url = proxy.public_url.rstrip("/")
     routespec = "/path/prefix/"
     default_backend, target_backend = await launch_backends(2)
@@ -348,18 +374,37 @@ async def test_trailing_slash(proxy, launch_backends):
     await proxy.add_route("/", default_backend, {})
     await proxy.add_route(routespec, target_backend, {})
 
-    port = await utils.get_responding_backend_port(proxy_url, "/path/prefix/")
+    port = await utils.get_responding_backend_port(
+        proxy_url, "/path/prefix/", proxy.traefik_enforce_host_in_rules
+    )
     assert port == target_port
-    port = await utils.get_responding_backend_port(proxy_url, "/path/prefix")
+    port = await utils.get_responding_backend_port(
+        proxy_url, "/path/prefix", proxy.traefik_enforce_host_in_rules
+    )
     assert port == target_port
-    port = await utils.get_responding_backend_port(proxy_url, "/path/prefixnoslash")
+    port = await utils.get_responding_backend_port(
+        proxy_url, "/path/prefixnoslash", proxy.traefik_enforce_host_in_rules
+    )
     assert port == default_port
 
     for route in ["/", routespec]:
         await proxy.delete_route(route)
 
 
-async def test_get_all_routes(proxy, launch_backends):
+@pytest.mark.parametrize(
+    "traefik_enforce_host_in_rules, traefik_alias_prefix",
+    [
+        ("", ""),
+        ("host.localhost", ""),
+        ("", "alias1_"),
+        ("host.localhost", "alias1_"),
+    ],
+)
+async def test_get_all_routes(
+    proxy, launch_backends, traefik_enforce_host_in_rules, traefik_alias_prefix
+):
+    proxy.traefik_enforce_host_in_rules = traefik_enforce_host_in_rules
+    proxy.traefik_alias_prefix = traefik_alias_prefix
     # initial state: no routes
     routes = await proxy.get_all_routes()
     assert routes == {}
@@ -409,7 +454,20 @@ async def test_get_all_routes(proxy, launch_backends):
     assert routes == {}
 
 
-async def test_host_origin_headers(proxy, launch_backends):
+@pytest.mark.parametrize(
+    "traefik_enforce_host_in_rules, traefik_alias_prefix",
+    [
+        ("", ""),
+        ("host.localhost", ""),
+        ("", "alias1_"),
+        ("host.localhost", "alias1_"),
+    ],
+)
+async def test_host_origin_headers(
+    proxy, launch_backends, traefik_enforce_host_in_rules, traefik_alias_prefix
+):
+    proxy.traefik_enforce_host_in_rules = traefik_enforce_host_in_rules
+    proxy.traefik_alias_prefix = traefik_alias_prefix
     routespec = "/user/username/"
     target = "http://127.0.0.1:9000"
     data = {}
@@ -442,6 +500,8 @@ async def test_host_origin_headers(proxy, launch_backends):
 
     expected_host_header = traefik_host + ":" + str(traefik_port)
     expected_origin_header = proxy.public_url + routespec
+    if traefik_enforce_host_in_rules:
+        expected_host_header = traefik_enforce_host_in_rules
 
     req = HTTPRequest(
         req_url,
@@ -455,8 +515,21 @@ async def test_host_origin_headers(proxy, launch_backends):
     assert resp.headers["Origin"] == expected_origin_header
 
 
+@pytest.mark.parametrize(
+    "traefik_enforce_host_in_rules, traefik_alias_prefix",
+    [
+        ("", ""),
+        ("host.localhost", ""),
+        ("", "alias1_"),
+        ("host.localhost", "alias1_"),
+    ],
+)
 @pytest.mark.parametrize("username", ["zoe", "50fia", "秀樹", "~TestJH", "has@"])
-async def test_check_routes(proxy, username):
+async def test_check_routes(
+    proxy, username, traefik_enforce_host_in_rules, traefik_alias_prefix
+):
+    proxy.traefik_enforce_host_in_rules = traefik_enforce_host_in_rules
+    proxy.traefik_alias_prefix = traefik_alias_prefix
     # fill out necessary attributes for check_routes
     proxy.app = MockApp()
     proxy.hub = proxy.app.hub

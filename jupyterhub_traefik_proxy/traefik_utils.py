@@ -21,7 +21,7 @@ class KVStorePrefix(Unicode):
         return u
 
 
-def generate_rule(routespec):
+def generate_rule(routespec, enforce_host_in_rules=""):
     """Generate a traefik routing rule for a jupyterhub routespec
 
 
@@ -60,6 +60,8 @@ def generate_rule(routespec):
 
     if host:
         rule = f"Host(`{host}`) && {path_rule}"
+    elif enforce_host_in_rules:
+        rule = f"Host(`{enforce_host_in_rules}`) && {path_rule}"
     else:
         rule = path_rule
     return rule
@@ -68,7 +70,7 @@ def generate_rule(routespec):
 _safe = set(string.ascii_letters + string.digits + "-")
 
 
-def generate_alias(routespec, kind=""):
+def generate_alias(routespec, kind="", alias_prefix=""):
     """Generate an alias for a routespec
 
     A safe string for use in key-value store keys, etc.
@@ -76,6 +78,8 @@ def generate_alias(routespec, kind=""):
     alias = escapism.escape(routespec, safe=_safe)
     if kind:
         alias = f"{kind}_{alias}"
+    if alias_prefix:
+        alias = f"{alias_prefix}_{alias}"
     return alias
 
 
